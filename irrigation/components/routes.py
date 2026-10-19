@@ -15,6 +15,7 @@ import json
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
+from irrigation.components.valve_generator import generate_valves
 from irrigation.extensions import mongo
 
 components_bp = Blueprint("components", __name__, url_prefix="/components")
@@ -138,6 +139,10 @@ def valves(project_id):
         valve["type_badge"] = badge
 
         properties = valve.get("properties") or {}
+        valve["diameter"] = properties.get("diameter")
+        valve["upstream_diameter"] = properties.get("upstream_diameter")
+        valve["upstream_type"] = properties.get("upstream_type") or properties.get("upstream")
+        valve["coordinates"] = (valve.get("geometry") or {}).get("coordinates")
         if valve.get("type") == "sector_valve":
             sector = sector_names.get(properties.get("sector_id"))
             valve["assignment_en"] = sector["name_en"] if sector else "Sector %s" % properties.get("sector_id", "-")
@@ -167,6 +172,7 @@ def valves(project_id):
         sectors=sectors,
         zones=zones,
         valves=valves,
+        valve_type_labels=VALVE_NAMES,
     )
 
 
@@ -177,6 +183,11 @@ def valve_add(project_id):
     coords = request.form.get("coordinates", "").strip()
     sector_id = request.form.get("sector_id", type=int)
     zone_id = request.form.get("zone_id", type=int)
+    # Only the assignment that belongs to the chosen type is kept.
+    if valve_type != "sector_valve":
+        sector_id = None
+    if valve_type != "zone_valve":
+        zone_id = None
 
     if not coords or not valve_type:
         flash("Valve type and location required / نوع وموقع الصمام مطلوبان", "danger")
@@ -201,11 +212,14 @@ def valve_add(project_id):
         {"project_id": project_id, "type": valve_type}
     )
     name_en, name_ar = VALVE_NAMES[valve_type]
-    properties = {}
+    diameter = request.form.get("diameter", type=int)
+    properties = {"source": "manual"}
     if sector_id:
         properties["sector_id"] = sector_id
     if zone_id:
         properties["zone_id"] = zone_id
+    if diameter:
+        properties["diameter"] = diameter
 
     add_network_element(
         project_id,
@@ -218,6 +232,109 @@ def valve_add(project_id):
     _invalidate_piping_report(project_id)
 
     flash(f"{name_en} added / تمت إضافة {name_ar}", "success")
+    return redirect(url_for("components.valves", project_id=project_id))
+
+
+@components_bp.route("/<int:project_id>/valves/<int:element_id>/edit", methods=["POST"])
+@login_required
+def valve_edit(project_id, element_id):
+    project = get_project_or_redirect(project_id)
+    if not project:
+        return redirect(url_for("project.index"))
+
+    valve = mongo.db.network_elements.find_one(
+        {"project_id": project_id, "id": element_id, "type": {"$in": VALVE_TYPES}}
+    )
+    if not valve:
+        flash("Valve not found / الصمام غير موجود", "danger")
+        return redirect(url_for("components.valves", project_id=project_id))
+
+    valve_type = request.form.get("valve_type", valve.get("type"))
+    if valve_type not in VALVE_NAMES:
+        flash("Invalid valve type / نوع صمام غير صالح", "danger")
+        return redirect(url_for("components.valves", project_id=project_id))
+
+    name_en = request.form.get("name_en", "").strip()
+    name_ar = request.form.get("name_ar", "").strip()
+    if not name_en and not name_ar:
+        name_en, name_ar = valve.get("name_en", ""), valve.get("name_ar", "")
+
+    updates = {
+        "type": valve_type,
+        "name_en": name_en,
+        "name_ar": name_ar,
+    }
+
+    properties = dict(valve.get("properties") or {})
+    # Assignment follows the valve type: sector valves keep a sector, zone valves
+    # keep a zone, the master valve is tied to the water source.
+    properties.pop("sector_id", None)
+    properties.pop("zone_id", None)
+    if valve_type == "sector_valve":
+        sector_id = request.form.get("sector_id", type=int)
+        if sector_id:
+            properties["sector_id"] = sector_id
+    elif valve_type == "zone_valve":
+        zone_id = request.form.get("zone_id", type=int)
+        if zone_id:
+            properties["zone_id"] = zone_id
+
+    diameter = request.form.get("diameter", type=int)
+    if diameter:
+        properties["diameter"] = diameter
+    updates["properties"] = properties
+
+    coords = request.form.get("coordinates", "").strip()
+    if coords:
+        try:
+            coord = json.loads(coords)
+            if isinstance(coord, list) and len(coord) == 2:
+                updates["geometry"] = {"type": "Point", "coordinates": coord}
+            else:
+                flash("Invalid coordinates / إحداثيات غير صالحة", "danger")
+                return redirect(url_for("components.valves", project_id=project_id))
+        except Exception:
+            flash("Invalid coordinates / إحداثيات غير صالحة", "danger")
+            return redirect(url_for("components.valves", project_id=project_id))
+
+    mongo.db.network_elements.update_one(
+        {"project_id": project_id, "id": element_id}, {"$set": updates}
+    )
+    _invalidate_piping_report(project_id)
+    flash("Valve updated / تم تحديث الصمام", "success")
+    return redirect(url_for("components.valves", project_id=project_id))
+
+
+@components_bp.route("/<int:project_id>/valves/generate", methods=["POST"])
+@login_required
+def valves_generate(project_id):
+    """Place master / sector / zone valves from the drawn pipe network."""
+    project = get_project_or_redirect(project_id)
+    if not project:
+        return redirect(url_for("project.index"))
+
+    replace = request.form.get("replace") in ("1", "on", "true")
+    result = generate_valves(project_id, replace=replace)
+    created = result.get("created") or {}
+    total = sum(created.values())
+
+    if total:
+        flash(
+            "Generated %d master, %d sector and %d zone valve(s) from the pipes / "
+            "تم إنشاء %d صمام رئيسي و%d صمام قطاع و%d صمام منطقة"
+            % (created.get("master_valve", 0), created.get("sector_valve", 0),
+               created.get("zone_valve", 0), created.get("master_valve", 0),
+               created.get("sector_valve", 0), created.get("zone_valve", 0)),
+            "success",
+        )
+    else:
+        flash(
+            "No valve generated — every valve this network needs already exists or the pipes "
+            "are missing / لم يتم إنشاء صمامات",
+            "warning",
+        )
+    for warning in (result.get("warnings") or [])[:4]:
+        flash(warning, "warning")
     return redirect(url_for("components.valves", project_id=project_id))
 
 

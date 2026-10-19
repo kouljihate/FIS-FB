@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.83 - 2026-10-19
+
+### Added
+- Generate Valves - places master, sector and zone valves on the pipe junctions using each pipe's diameter (upstream -> valve), with warnings for sectors or zones that have no pipe
+- Edit Valve action and modal (type, assignment, diameter, location, names)
+
+### Changed
+- Valves toolbar order is now Add, Edit, Rename, Delete, Generate, Validate
+- the Add Valve card is replaced by a modal that can pick its point on the map
+- Valves table shows the diameter column (upstream pipe -> valve)
+
 ## 0.3.82 - 2026-10-19
 
 ### Added

@@ -12,13 +12,13 @@
     <span class="badge bg-primary"><i class="bi bi-folder"></i> {{ project.name }}</span>
 </div>
 
-<div class="alert alert-info">
+<div class="alert alert-info py-2">
     <i class="bi bi-info-circle"></i>
-    <strong>Master Valve (MV):</strong> between basin and main pipe.
-    <strong>Sector Valve:</strong> one per sector.
-    <strong>Zone Valve (ZV):</strong> one per zone.
+    <strong>MV</strong> at the basin &rarr; main pipe &middot; <strong>Sector valve</strong> on the main pipe where the sector's second pipe leaves it &middot;
+    <strong>Zone valve</strong> on the feeding pipe where the zone pipe leaves it — diameters always come from those pipes.
     <br>
-    الصمام الرئيسي: بين الحوض والأنبوب الرئيسي. صمام القطاع: لكل قطاع. صمام المنطقة: لكل منطقة.
+    الصمام الرئيسي بين الحوض والأنبوب الرئيسي &middot; صمام القطاع على الأنبوب الرئيسي عند تفرع الأنبوب الثانوي &middot;
+    صمام المنطقة عند تفرع أنبوب المنطقة — والأقطار تؤخذ من الأنابيب نفسها.
 </div>
 
 <!-- Valves Table -->
@@ -28,7 +28,16 @@
             <table class="table table-hover mb-0" id="valvesTable">
                 <thead>
                     <tr class="table-light">
-                        <th colspan="7" class="text-center">
+                        <th colspan="8" class="text-center">
+                            <button class="btn btn-circle btn-success" id="valveAddBtn" type="button"
+                                    data-bs-toggle="modal" data-bs-target="#addValveModal"
+                                    title="Add / إضافة">
+                                <i class="bi bi-plus-circle"></i>
+                            </button>
+                            <button class="btn btn-circle btn-primary" id="valveEditBtn" type="button"
+                                    onclick="valveEditSelected()" title="Edit / تعديل">
+                                <i class="bi bi-pencil"></i>
+                            </button>
                             <button class="btn btn-circle btn-info" id="valveRenameBtn" type="button"
                                     onclick="valveRenameSelected()" title="Rename / إعادة تسمية">
                                 <i class="bi bi-input-cursor-text"></i>
@@ -36,13 +45,13 @@
                             <form method="POST" id="removeValvesForm"
                                   action="{{ url_for('components.valves_remove', project_id=project.id) }}" class="d-inline">
                                 <button class="btn btn-circle btn-outline-danger" id="valveRemoveBtn" type="button"
-                                        onclick="valvesRemoveSelected()" title="Remove / إزالة">
+                                        onclick="valvesRemoveSelected()" title="Delete / حذف">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </form>
-                            <button class="btn btn-circle btn-success" type="button" onclick="focusValveForm()"
-                                    title="Add / إضافة">
-                                <i class="bi bi-plus-circle"></i>
+                            <button class="btn btn-circle btn-warning" type="button" data-bs-toggle="modal"
+                                    data-bs-target="#generateValvesModal" title="Generate / إنشاء">
+                                <i class="bi bi-magic"></i>
                             </button>
                             <form method="POST" action="{{ url_for('components.valves_validate', project_id=project.id) }}" class="d-inline">
                                 <button type="submit" class="btn btn-circle btn-primary" title="Validate / التحقق">
@@ -52,11 +61,11 @@
                         </th>
                     </tr>
                     <tr class="table-light">
-                        <th colspan="7" class="text-center align-middle">
+                        <th colspan="8" class="text-center align-middle">
                             <div class="input-group input-group-sm search-zone">
                                 <div class="search-field">
                                     <input type="text" id="valveSearch" class="form-control search-input"
-                                           placeholder="Filter by name, type or assignment / تصفية حسب الاسم أو النوع أو الارتباط"
+                                           placeholder="Filter by name, type, assignment or diameter / تصفية"
                                            autocomplete="off" aria-label="Filter valves / تصفية الصمامات">
                                     <div class="search-suffix">
                                         <span class="badge rounded-pill text-bg-secondary search-row-count" id="valveRowCount"
@@ -74,6 +83,7 @@
                         <th class="text-center"> اسم الصمام <br> Valve Name</th>
                         <th class="text-center"> النوع <br> Type</th>
                         <th class="text-center"> مرتبط بـ <br> Assigned To</th>
+                        <th class="text-center"> القطر (مم) <br> Diameter (mm)</th>
                         <th class="text-center"> تم التحقق <br> Validated</th>
                         <th class="text-center"> إجراءات <br> Actions</th>
                     </tr>
@@ -90,6 +100,16 @@
                         </td>
                         <td class="text-center">{{ v.assignment_en }} <span class="ar-text">/ {{ v.assignment_ar }}</span></td>
                         <td class="text-center">
+                            {% if v.diameter and v.upstream_diameter and v.upstream_diameter != v.diameter %}
+                            <span class="badge bg-secondary"
+                                  title="Upstream pipe {{ v.upstream_diameter }} mm → valve {{ v.diameter }} mm / الأنبوب المغذي ثم الصمام">{{ v.upstream_diameter }} &rarr; {{ v.diameter }}</span>
+                            {% elif v.diameter %}
+                            <span class="badge bg-light text-dark" title="Valve and pipe diameter / قطر الصمام والأنبوب">{{ v.diameter }}</span>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
                             {% if v.validated %}
                             <span class="badge bg-success"><i class="bi bi-check"></i></span>
                             {% else %}
@@ -97,6 +117,10 @@
                             {% endif %}
                         </td>
                         <td class="text-center">
+                            <button class="btn btn-circle btn-primary" data-bs-toggle="modal"
+                                    data-bs-target="#editValveModal{{ v.id }}" title="Edit / تعديل">
+                                <i class="bi bi-pencil"></i>
+                            </button>
                             <button class="btn btn-circle btn-info" data-bs-toggle="modal"
                                     data-bs-target="#renameValveModal{{ v.id }}" title="Rename / إعادة تسمية">
                                 <i class="bi bi-input-cursor-text"></i>
@@ -105,19 +129,19 @@
                                   class="d-inline"
                                   data-confirm-delete="{{ v.name_en }}" data-confirm-delete-ar="{{ v.name_ar }}">
                                 <input type="hidden" name="element_ids" value="{{ v.id }}">
-                                <button type="submit" class="btn btn-circle btn-outline-danger" title="Remove / إزالة">
+                                <button type="submit" class="btn btn-circle btn-outline-danger" title="Delete / حذف">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </form>
                         </td>
                     </tr>
                     {% else %}
-                    <tr><td colspan="7" class="text-center text-muted py-3">No valves yet / لا توجد صمامات</td></tr>
+                    <tr><td colspan="8" class="text-center text-muted py-3">No valves yet / لا توجد صمامات — استخدم زر الإنشاء</td></tr>
                     {% endfor %}
                 </tbody>
                 <tfoot class="table-light">
                     <tr>
-                        <th colspan="7" class="text-center">Total Valves: {{ valves|length }} / إجمالي الصمامات: {{ valves|length }}</th>
+                        <th colspan="8" class="text-center">Total Valves: {{ valves|length }} / إجمالي الصمامات: {{ valves|length }}</th>
                     </tr>
                 </tfoot>
             </table>
@@ -126,6 +150,78 @@
 </div>
 
 {% for v in valves %}
+<!-- Edit Valve Modal -->
+<div class="modal fade" id="editValveModal{{ v.id }}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('components.valve_edit', project_id=project.id, element_id=v.id) }}">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-pencil"></i> Edit Valve / تعديل الصمام</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Valve Type / نوع الصمام</label>
+                        <select name="valve_type" class="form-select" onchange="toggleModalAssignment(this)">
+                            {% for value, labels in valve_type_labels.items() %}
+                            <option value="{{ value }}"{% if v.type == value %} selected{% endif %}>{{ labels[0] }} / {{ labels[1] }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3 assignment-sector">
+                        <label class="form-label">Sector / القطاع</label>
+                        <select name="sector_id" class="form-select">
+                            {% for s in sectors %}
+                            <option value="{{ s.id }}"{% if v.properties.sector_id == s.id %} selected{% endif %}>{{ s.name_en }} ({{ s.name_ar }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3 assignment-zone">
+                        <label class="form-label">Zone / المنطقة</label>
+                        <select name="zone_id" class="form-select">
+                            {% for z in zones %}
+                            <option value="{{ z.id }}"{% if v.properties.zone_id == z.id %} selected{% endif %}>{{ z.name_en }} ({{ z.name_ar }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Diameter (mm) / القطر</label>
+                            <input type="number" name="diameter" class="form-control" min="16" step="1"
+                                   value="{{ v.diameter or '' }}">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Location (JSON) / الموقع</label>
+                            <input type="text" name="coordinates" class="form-control"
+                                   value="{{ v.coordinates|tojson if v.coordinates else '' }}">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label">Name (EN)</label>
+                            <input type="text" name="name_en" class="form-control" value="{{ v.name_en }}">
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label">Name (AR)</label>
+                            <input type="text" name="name_ar" class="form-control" value="{{ v.name_ar }}">
+                        </div>
+                    </div>
+                    {% if v.upstream_type %}
+                    <p class="text-muted small mb-0">
+                        Fed by {{ v.upstream_type.replace('_', ' ') }}{% if v.upstream_diameter %}
+                        ({{ v.upstream_diameter }} mm){% endif %} / الأنبوب المغذي
+                    </p>
+                    {% endif %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close / إغلاق</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check"></i> Save / حفظ</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- Rename Valve Modal -->
 <div class="modal fade" id="renameValveModal{{ v.id }}" tabindex="-1">
     <div class="modal-dialog">
@@ -158,53 +254,103 @@
 </div>
 {% endfor %}
 
-<!-- Add Valve -->
-<div class="card shadow-sm mt-4" id="addValveCard">
-    <div class="card-header bg-success text-white">
-        <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Add Valve / إضافة صمام</h5>
+<!-- Add Valve Modal -->
+<div class="modal fade" id="addValveModal" tabindex="-1" aria-labelledby="addValveTitle" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('components.valve_add', project_id=project.id) }}">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title" id="addValveTitle"><i class="bi bi-plus-circle"></i> Add Valve / إضافة صمام</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Valve Type / نوع الصمام</label>
+                        <select name="valve_type" class="form-select" id="newValveType" onchange="toggleModalAssignment(this)">
+                            {% for value, labels in valve_type_labels.items() %}
+                            <option value="{{ value }}">{{ labels[0] }} / {{ labels[1] }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3 assignment-sector">
+                        <label class="form-label">Sector / القطاع</label>
+                        <select name="sector_id" class="form-select">
+                            {% for s in sectors %}
+                            <option value="{{ s.id }}">{{ s.name_en }} ({{ s.name_ar }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3 assignment-zone">
+                        <label class="form-label">Zone / المنطقة</label>
+                        <select name="zone_id" class="form-select">
+                            {% for z in zones %}
+                            <option value="{{ z.id }}">{{ z.name_en }} ({{ z.name_ar }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Diameter (mm) / القطر</label>
+                            <input type="number" name="diameter" id="newValveDiameter" class="form-control"
+                                   min="16" step="1" placeholder="90">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Location (JSON) / الموقع</label>
+                            <input type="text" name="coordinates" id="valveCoords" class="form-control"
+                                   placeholder="[lng,lat]" required>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="addValvePlacePoint()">
+                        <i class="bi bi-geo-alt"></i> Pick the point on the map / اختر النقطة على الخريطة
+                    </button>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel / إلغاء</button>
+                    <button type="submit" class="btn btn-success"><i class="bi bi-check"></i> Add Valve / إضافة صمام</button>
+                </div>
+            </form>
+        </div>
     </div>
-    <div class="card-body">
-        <form method="POST" action="{{ url_for('components.valve_add', project_id=project.id) }}">
-            <div class="row align-items-end">
-                <div class="col-md-3">
-                    <label class="form-label">Valve Type / نوع الصمام</label>
-                    <select name="valve_type" class="form-select" id="valveType" required onchange="toggleSectorZone(this)">
-                        <option value="master_valve">Master Valve / الصمام الرئيسي</option>
-                        <option value="sector_valve">Sector Valve / صمام القطاع</option>
-                        <option value="zone_valve">Zone Valve / صمام المنطقة</option>
-                    </select>
+</div>
+
+<!-- Generate Valves Modal -->
+<div class="modal fade" id="generateValvesModal" tabindex="-1" aria-labelledby="generateValvesTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('components.valves_generate', project_id=project.id) }}">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title" id="generateValvesTitle"><i class="bi bi-magic"></i> Generate Valves / إنشاء الصمامات</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="col-md-3" id="sectorSelect" style="display:none;">
-                    <label class="form-label">Sector / القطاع</label>
-                    <select name="sector_id" class="form-select">
-                        {% for s in sectors %}
-                        <option value="{{ s.id }}">{{ s.name_en }} ({{ s.name_ar }})</option>
-                        {% endfor %}
-                    </select>
+                <div class="modal-body">
+                    <ul class="small mb-3">
+                        <li>Master valve on the main pipe (MP) at the water source.</li>
+                        <li>Sector valve where each sector's second pipe (SP) leaves the main pipe.</li>
+                        <li>Zone valve where each zone pipe (ZP) leaves its feeding pipe.</li>
+                        <li>Each valve takes the diameter of the pipe it switches, so a 90 mm main pipe with a 63 mm second pipe gives a 90 → 63 valve at that point.</li>
+                    </ul>
+                    <p class="small text-muted mb-3">
+                        كل صمام يُوضع على الأنبوب الذي يتحكم به ويأخذ قطره من الأنابيب المتصلة: 90 ← 63 عند نقطة التفرع.
+                        القطاعات أو المناطق بدون أنابيب لا تُنشئ صمامات وسيتم تنبيهك.
+                    </p>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" name="replace" id="generateValvesReplace" value="1" checked>
+                        <label class="form-check-label" for="generateValvesReplace">
+                            Replace existing valves / استبدال الصمامات الموجودة
+                        </label>
+                    </div>
+                    <div class="alert alert-info py-2 small mb-0">
+                        Uncheck to only add the valves that are still missing.
+                        <br>
+                        أزل التحديد لإضافة الصمامات الناقصة فقط.
+                    </div>
                 </div>
-                <div class="col-md-3" id="zoneSelect" style="display:none;">
-                    <label class="form-label">Zone / المنطقة</label>
-                    <select name="zone_id" class="form-select">
-                        {% for z in zones %}
-                        <option value="{{ z.id }}">{{ z.name_en }} ({{ z.name_ar }})</option>
-                        {% endfor %}
-                    </select>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel / إلغاء</button>
+                    <button type="submit" class="btn btn-warning"><i class="bi bi-magic"></i> Generate / إنشاء</button>
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label">Location (JSON) / الموقع</label>
-                    <input type="text" name="coordinates" id="valveCoords" class="form-control"
-                           placeholder='[lng,lat]' required>
-                </div>
-            </div>
-            <div class="mt-3 d-flex align-items-center gap-2">
-                <button type="submit" class="btn btn-success">
-                    <i class="bi bi-check"></i> Add Valve / إضافة صمام
-                </button>
-                <button type="button" class="btn btn-outline-primary btn-sm" onclick="startDrawPoint()">
-                    <i class="bi bi-pencil-square"></i> Place Point on map / وضع نقطة على الخريطة
-                </button>
-            </div>
-        </form>
+            </form>
+        </div>
     </div>
 </div>
 
@@ -214,7 +360,7 @@
     {% include "_map_header.html" %}
     <div class="card-body">
         <div class="mb-2">
-            <button class="btn btn-outline-primary btn-sm" onclick="startDrawPoint()">
+            <button class="btn btn-outline-primary btn-sm" onclick="addValvePlacePoint()">
                 <i class="bi bi-pencil-square"></i> Place Point / وضع نقطة
             </button>
             <button class="btn btn-outline-danger btn-sm" onclick="clearDrawn()">
@@ -246,7 +392,24 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     updateValvesToolbar();
     setupValveSearch();
+    document.querySelectorAll('.modal select[name="valve_type"]').forEach(function (select) {
+        toggleModalAssignment(select);
+    });
+
+    // A point picked while the Add form was still closing reopens it here.
+    const addForm = document.getElementById('addValveModal');
+    if (addForm) {
+        addForm.addEventListener('hidden.bs.modal', function () {
+            if (pendingValvePoint !== null) {
+                pendingValvePoint = null;
+                bootstrap.Modal.getOrCreateInstance(addForm).show();
+            }
+        });
+    }
 });
+
+// Coordinates picked on the map while the Add form was closing.
+let pendingValvePoint = null;
 
 function valveRowVisible(checkbox) {
     const tr = checkbox.closest('tr');
@@ -255,8 +418,10 @@ function valveRowVisible(checkbox) {
 
 function updateValvesToolbar() {
     const checked = document.querySelectorAll('.valve-checkbox:checked');
+    const editBtn = document.getElementById('valveEditBtn');
     const renameBtn = document.getElementById('valveRenameBtn');
     const removeBtn = document.getElementById('valveRemoveBtn');
+    if (editBtn) editBtn.disabled = checked.length !== 1;
     if (renameBtn) renameBtn.disabled = checked.length !== 1;
     if (removeBtn) removeBtn.disabled = checked.length === 0;
     updateValveRowCount();
@@ -284,6 +449,13 @@ function toggleAllValves(source) {
         cb.checked = source.checked;
         cb.dispatchEvent(new Event('change', { bubbles: true }));
     });
+}
+
+function valveEditSelected() {
+    const selected = document.querySelectorAll('.valve-checkbox:checked');
+    if (selected.length !== 1) return;
+    const modal = document.getElementById('editValveModal' + selected[0].value);
+    if (modal) bootstrap.Modal.getOrCreateInstance(modal).show();
 }
 
 function valveRenameSelected() {
@@ -322,7 +494,60 @@ function valvesRemoveSelected() {
     }
 }
 
-// Narrow the table to the valves matching the typed text (name, type, assignment, id).
+const VALVE_DEFAULT_DIAMETERS = { master_valve: 90, sector_valve: 63, zone_valve: 32 };
+
+// Show only the sector select for sector valves and the zone select for zone valves.
+function toggleModalAssignment(select) {
+    if (!select) return;
+    const form = select.closest('form');
+    if (!form) return;
+    const type = select.value;
+    const sectorField = form.querySelector('.assignment-sector');
+    const zoneField = form.querySelector('.assignment-zone');
+    if (sectorField) sectorField.style.display = (type === 'sector_valve') ? '' : 'none';
+    if (zoneField) zoneField.style.display = (type === 'zone_valve') ? '' : 'none';
+
+    // Keep a sensible diameter for the chosen type, but never overwrite a size
+    // the user typed themselves.
+    const diameter = form.querySelector('input[name="diameter"]');
+    if (diameter) {
+        const previousDefault = select.dataset.defaultDiameter;
+        const nextDefault = VALVE_DEFAULT_DIAMETERS[type];
+        if (nextDefault && (!diameter.value || diameter.value === previousDefault)) {
+            diameter.value = nextDefault;
+        }
+        select.dataset.defaultDiameter = nextDefault ? String(nextDefault) : '';
+    }
+}
+
+// Pick the valve location on the map: close the modal, arm the point tool,
+// then reopen the form with the coordinates filled in.
+function addValvePlacePoint() {
+    const formEl = document.getElementById('addValveModal');
+    const modal = formEl && window.bootstrap ? bootstrap.Modal.getOrCreateInstance(formEl) : null;
+    if (modal) modal.hide();
+    const mapEl = document.getElementById('map');
+    if (mapEl) mapEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    initDrawTools('point', function (coords, coordsStr) {
+        const field = document.getElementById('valveCoords');
+        if (field) field.value = coordsStr;
+        if (!formEl) return;
+
+        // Reopen the form with the picked point. While the hide transition is
+        // still running Bootstrap ignores show(), so that case is deferred to
+        // the hidden.bs.modal handler registered on page load.
+        pendingValvePoint = coordsStr;
+        const stillClosing = !formEl.classList.contains('show')
+            && getComputedStyle(formEl).display !== 'none';
+        if (!stillClosing) {
+            pendingValvePoint = null;
+            bootstrap.Modal.getOrCreateInstance(formEl).show();
+        }
+    });
+}
+
+// Narrow the table to the valves matching the typed text.
 function setupValveSearch() {
     const input = document.getElementById('valveSearch');
     if (!input) return;
@@ -354,26 +579,6 @@ function setupValveSearch() {
         });
     }
     applyFilter();
-}
-
-function focusValveForm() {
-    const card = document.getElementById('addValveCard');
-    if (!card) return;
-    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    const typeSelect = document.getElementById('valveType');
-    if (typeSelect) typeSelect.focus({ preventScroll: true });
-}
-
-function toggleSectorZone(select) {
-    const type = select.value;
-    document.getElementById('sectorSelect').style.display = (type === 'sector_valve') ? 'block' : 'none';
-    document.getElementById('zoneSelect').style.display = (type === 'zone_valve') ? 'block' : 'none';
-}
-
-function startDrawPoint() {
-    initDrawTools('point', function(coords, coordsStr) {
-        document.getElementById('valveCoords').value = coordsStr;
-    });
 }
 </script>
 {% endblock %}
