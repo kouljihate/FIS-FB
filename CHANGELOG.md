@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.1 - 2026-10-19
+
+### Added
+- compass button in the Sectors Actions column, right after Edit, opening an orientation modal in degrees
+- POST route storing the angle exactly and rounding it to the nearest of the 32 compass points, with a live nearest-point preview in the modal
+
+### Changed
+- Orientation (°) column and the edit modal show the exact stored angle, kept in sync when the compass list is used
+
 ## 0.4.0 - 2026-10-19
 
 ### Added

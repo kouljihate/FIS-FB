@@ -5,10 +5,11 @@ from irrigation.models import get_next_id, serialize_doc, assign_short_names
 from irrigation.engineering.regeneration import regenerate_sectors, regenerate_zones
 from irrigation.engineering.projection import projected_shape, get_project_centroid
 from irrigation.engineering.elevation import (
-    get_or_build_elevation_model, aspect_for_polygon, ORIENTATION_DEGREES,
-    ORIENTATION_OPTIONS, COMPASS_POINTS, ORIENTATION_ALIASES)
+    get_or_build_elevation_model, aspect_for_polygon, compass_from_bearing,
+    ORIENTATION_DEGREES, ORIENTATION_OPTIONS, COMPASS_POINTS, ORIENTATION_ALIASES)
 from shapely.geometry import shape
 import json
+import math
 
 geometry_bp = Blueprint('geometry', __name__)
 
@@ -129,6 +130,7 @@ def sector_add(project_id):
         'name_ar': name_ar or f"القطاع {mongo.db.sectors.count_documents({'project_id': project_id}) + 1}",
         'polygon': polygon_geojson,
         'orientation': orientation,
+        'orientation_deg': ORIENTATION_DEGREES.get(orientation),
         'validated': False
     }
     mongo.db.sectors.insert_one(sector)
@@ -171,15 +173,55 @@ def sector_edit(project_id, sector_id):
             poly = update.get('polygon') or sector.get('polygon')
             if poly:
                 update['orientation'] = auto_polygon_orientation(project_id, project, poly)
+                update['orientation_deg'] = ORIENTATION_DEGREES.get(update['orientation'])
         else:
             normalized = normalize_orientation(value)
             if normalized:
                 update['orientation'] = normalized
+                update['orientation_deg'] = ORIENTATION_DEGREES.get(normalized)
 
     if update:
         mongo.db.sectors.update_one({'id': sector_id, 'project_id': project_id}, {'$set': update})
         flash('Sector updated / تم تحديث القطاع', 'success')
 
+    return redirect(url_for('geometry.sectors_view', project_id=project_id))
+
+
+@geometry_bp.route('/<int:project_id>/sectors/<int:sector_id>/orientation', methods=['POST'])
+@login_required
+def sector_orientation(project_id, sector_id):
+    """Set a sector's orientation from an angle in degrees.
+
+    The angle is stored exactly in ``orientation_deg`` and rounded to the
+    nearest of the 32 compass points in ``orientation``, which is what the
+    layout/regeneration code reads.
+    """
+    project = get_project_or_redirect(project_id)
+    if not project:
+        return redirect(url_for('project.index'))
+
+    sector = mongo.db.sectors.find_one({'id': sector_id, 'project_id': project_id})
+    if not sector:
+        flash('Sector not found / القطاع غير موجود', 'danger')
+        return redirect(url_for('geometry.sectors_view', project_id=project_id))
+
+    raw = request.form.get('orientation_deg', '').strip().rstrip('\u00b0').strip()
+    try:
+        value = float(raw.replace(',', '.'))
+    except ValueError:
+        flash('Orientation must be a number of degrees / يجب أن يكون الاتجاه رقماً بالدرجات', 'danger')
+        return redirect(url_for('geometry.sectors_view', project_id=project_id))
+
+    if not math.isfinite(value):
+        flash('Orientation must be a number of degrees / يجب أن يكون الاتجاه رقماً بالدرجات', 'danger')
+        return redirect(url_for('geometry.sectors_view', project_id=project_id))
+
+    degrees = round(value % 360.0, 1)
+    point = compass_from_bearing(degrees)
+    mongo.db.sectors.update_one(
+        {'id': sector_id, 'project_id': project_id},
+        {'$set': {'orientation': point, 'orientation_deg': degrees}})
+    flash('Sector orientation set to %g\u00b0 (%s) / تم ضبط اتجاه القطاع' % (degrees, point), 'success')
     return redirect(url_for('geometry.sectors_view', project_id=project_id))
 
 
