@@ -4,7 +4,7 @@
 Irrigation Planning System - A Flask-based web application for irrigation planning and management.
 
 ## Current Version
-- **Version**: 0.3.80
+- **Version**: 0.3.81
 - **Last Updated**: 2026-10-19
 
 ## Architecture Overview
@@ -162,7 +162,7 @@ Key API endpoints for rebuild:
 
 ### Version Control
 - Git branches: `project-settings-v1`
-- Version: 0.3.80
+- Version: 0.3.81
 - Changelog: CHANGELOG.md
 - **ALWAYS bump the version on every change (never forget).** Increment `__version__` in
   `irrigation/__init__.py` (patch `+1`, e.g. `0.3.44` -> `0.3.45`), add a dated `## <version> - YYYY-MM-DD`
@@ -174,6 +174,8 @@ Key API endpoints for rebuild:
   it bumps the version, writes the dated `CHANGELOG.md` entry, syncs the version in this file and
   `README.md`, commits as `vX.Y.Z: <summary>`, and pushes the branch to the `fb` remote
   (`git@github.com:kouljihate/FIS-FB.git`), branch `main`.
+- `python release.py --push-only` retries just the push (after fixing credentials); the script falls
+  back to HTTPS when the SSH key is denied.
 - `python release.py --list` prints every recorded version and the pending changes without touching
   anything; `--dry-run` prints the plan only; `--no-push` commits locally without pushing.
 - Note format: `--note "Added|Changed|Fixed: text"`; notes without a section land under `Changed`.

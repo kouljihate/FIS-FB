@@ -31,6 +31,7 @@ import datetime
 import re
 import subprocess
 import sys
+from os import environ
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -66,10 +67,11 @@ class Failure(Exception):
 # --------------------------------------------------------------------------- #
 # shell helpers
 # --------------------------------------------------------------------------- #
-def run(args: list[str], check: bool = True) -> subprocess.CompletedProcess:
+def run(args: list[str], check: bool = True,
+        env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
     proc = subprocess.run(
         args, cwd=str(ROOT), capture_output=True, text=True, encoding="utf-8",
-        errors="replace",
+        errors="replace", env=env,
     )
     if check and proc.returncode != 0:
         detail = (proc.stderr or proc.stdout or "").strip()
@@ -77,8 +79,9 @@ def run(args: list[str], check: bool = True) -> subprocess.CompletedProcess:
     return proc
 
 
-def git(*args: str, check: bool = True) -> subprocess.CompletedProcess:
-    return run(["git", *args], check=check)
+def git(*args: str, check: bool = True,
+        env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
+    return run(["git", *args], check=check, env=env)
 
 
 # --------------------------------------------------------------------------- #
@@ -199,6 +202,8 @@ def prepend_changelog(new_version: str, today: str, notes: dict[str, list[str]])
         lines.append("### %s" % section)
         lines.extend("- %s" % item for item in notes[section])
         lines.append("")
+    while lines and not lines[-1]:  # one blank line between entries, no more
+        lines.pop()
     block = newline.join(lines) + newline + newline
 
     anchor = "# Changelog" + newline
@@ -207,7 +212,9 @@ def prepend_changelog(new_version: str, today: str, notes: dict[str, list[str]])
     if "## %s - " % new_version in text:
         raise Failure("CHANGELOG.md already has an entry for %s" % new_version)
 
-    write_text(CHANGELOG_FILE, text.replace(anchor, anchor + newline + block, 1))
+    title, separator, rest = text.partition(anchor)
+    rest = rest.lstrip("\r\n")  # the blank line(s) under the title are rebuilt below
+    write_text(CHANGELOG_FILE, title + separator + newline + block + rest)
     return CHANGELOG_FILE
 
 
@@ -272,6 +279,22 @@ def remote_tip(name: str, branch: str) -> str | None:
     return rev.stdout.strip()
 
 
+def ssh_to_https(url: str) -> str | None:
+    """git@github.com:owner/repo.git -> https://github.com/owner/repo.git"""
+    match = re.fullmatch(r"git@([^:]+):(.+?)(?:\.git)?", url.strip())
+    if not match:
+        return None
+    return "https://%s/%s" % (match.group(1), match.group(2))
+
+
+PUSH_HINT = (
+    "the SSH key in use has no write access to that repository. Fix it with either:\n"
+    "  - use the account/key that owns the repo (ssh -T git@github.com shows which account you are), or\n"
+    "  - push over HTTPS with a token: python release.py --push-only --remote-url https://github.com/OWNER/REPO.git\n"
+    "  - or grant the current account access to the repository on GitHub."
+)
+
+
 def push(name: str, branch: str, previous_tip: str | None) -> None:
     args = ["push", name, "HEAD:%s" % branch]
     if previous_tip:
@@ -280,10 +303,24 @@ def push(name: str, branch: str, previous_tip: str | None) -> None:
         args.append("--force")
 
     proc = git(*args, check=False)
-    if proc.returncode != 0:
-        raise Failure("push failed:\n%s\n(stderr)\n%s"
-                      % (proc.stdout.strip(), proc.stderr.strip()))
-    print(proc.stderr.strip() or proc.stdout.strip())
+    if proc.returncode == 0:
+        print(proc.stderr.strip() or proc.stdout.strip())
+        return
+
+    first_error = (proc.stderr or proc.stdout).strip()
+    remote_url = git("remote", "get-url", name, check=False).stdout.strip()
+    https_url = ssh_to_https(remote_url)
+    if https_url:
+        print("SSH push denied, retrying over %s (no interactive prompt)" % https_url)
+        env = dict(environ, GIT_TERMINAL_PROMPT="0")
+        retry = git("-c", "credential.interactive=false", "push", https_url,
+                   "HEAD:%s" % branch, "--force", check=False, env=env)
+        if retry.returncode == 0:
+            print(retry.stderr.strip() or retry.stdout.strip())
+            return
+        print("HTTPS push also failed: %s" % (retry.stderr or retry.stdout).strip())
+
+    raise Failure("push failed:\n%s\n\n%s" % (first_error, PUSH_HINT))
 
 
 # --------------------------------------------------------------------------- #
@@ -309,6 +346,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--dry-run", action="store_true", help="show the plan, write nothing")
     parser.add_argument("--yes", "-y", action="store_true", help="skip the confirmation prompt")
     parser.add_argument("--no-push", action="store_true", help="commit locally, do not push")
+    parser.add_argument("--push-only", action="store_true",
+                        help="push the current HEAD without bumping or committing again")
     parser.add_argument("--remote", default=DEFAULT_REMOTE, help="remote name (default: %(default)s)")
     parser.add_argument("--remote-url", default=DEFAULT_REMOTE_URL, help="remote URL to add")
     parser.add_argument("--branch", default=DEFAULT_BRANCH, help="branch on the remote (default: %(default)s)")
@@ -340,6 +379,19 @@ def main(argv: list[str]) -> int:
         print("  %-3s %s" % (status.strip(), path))
 
     if args.list:
+        return 0
+
+    if args.push_only:
+        if changed:
+            print("\n! %d uncommitted change(s) are NOT part of this push" % len(changed))
+        branch = git("rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
+        ensure_remote(args.remote, args.remote_url)
+        previous_tip = remote_tip(args.remote, args.branch)
+        print("\npushing %s -> %s:%s%s" % (branch, args.remote, args.branch,
+                                            "  (previous tip %s)" % previous_tip[:12]
+                                            if previous_tip else ""))
+        push(args.remote, args.branch, previous_tip)
+        print("\npushed %s" % git("rev-parse", "--short", "HEAD").stdout.strip())
         return 0
 
     if not changed:

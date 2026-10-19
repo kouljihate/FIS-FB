@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.81 - 2026-10-19
+
+### Added
+- release.py --push-only to retry a failed push, with an automatic HTTPS fallback when the SSH key is denied
+
+### Changed
+- OPENCODE.md documents the release workflow that must follow every change prompt
+
+### Fixed
+- double blank line between CHANGELOG entries
+
 ## 0.3.80 - 2026-10-19
 
 ### Added
@@ -9,8 +20,6 @@
 
 ### Changed
 - Valves page rebuilt as a Rows-style table with filter, rename and per-row actions
-
-
 
 ## 0.3.78 - 2026-10-18
 
