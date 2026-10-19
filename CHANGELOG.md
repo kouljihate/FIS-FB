@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.5 - 2026-10-19
+
+### Changed
+- `app.py` (M)
+- `release.py` (M)
+- `irrigation/templates/components/air_removal.html` (??)
+- `irrigation/templates/components/connectors.html` (??)
+- `irrigation/templates/components/reduce_pressure.html` (??)
+- `irrigation/templates/components/reductors.html` (??)
+- `irrigation/templates/components/terminators.html` (??)
+- `irrigation/templates/hydrology2/placeholder.html` (??)
+- `irrigation/templates/hydrology2/valves.html` (??)
+
 ## 0.4.4 - 2026-10-19
 
 ### Added

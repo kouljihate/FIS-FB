@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+{% block title %}Valves / الصمامات{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="bi bi-valve"></i> Valves / الصمامات</h2>
+    <a href="{{ url_for('project.detail', project_id=project.id) }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back / رجوع
+    </a>
+</div>
+
+<div class="mb-3">
+    <span class="badge bg-primary"><i class="bi bi-folder"></i> {{ project.name }}</span>
+</div>
+
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i>
+    <strong>Master Valve (MV):</strong> Between basin and main pipe.
+    <strong>Main Valve:</strong> For each sector.
+    <strong>Zone Valve (ZV):</strong> For each zone.
+    <br>
+    الصمام الرئيسي: بين الحوض والأنبوب الرئيسي. صمام رئيسي: لكل قطاع. صمام المنطقة: لكل منطقة.
+</div>
+
+<!-- Add Valve -->
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-success text-white">
+        <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Add Valve / إضافة صمام</h5>
+    </div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('hydrology.valve_add', project_id=project.id) }}">
+            <div class="row align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">Valve Type / نوع الصمام</label>
+                    <select name="valve_type" class="form-select" id="valveType" required onchange="toggleSectorZone(this)">
+                        <option value="master_valve">Master Valve / الصمام الرئيسي</option>
+                        <option value="sector_valve">Sector Valve / صمام القطاع</option>
+                        <option value="zone_valve">Zone Valve / صمام المنطقة</option>
+                    </select>
+                </div>
+                <div class="col-md-3" id="sectorSelect" style="display:none;">
+                    <label class="form-label">Sector / القطاع</label>
+                    <select name="sector_id" class="form-select">
+                        {% for s in sectors %}
+                        <option value="{{ s.id }}">{{ s.name_en }} ({{ s.name_ar }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3" id="zoneSelect" style="display:none;">
+                    <label class="form-label">Zone / المنطقة</label>
+                    <select name="zone_id" class="form-select">
+                        {% for z in zones %}
+                        <option value="{{ z.id }}">{{ z.name_en }} ({{ z.name_ar }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Location (JSON) / الموقع</label>
+                    <input type="text" name="coordinates" id="valveCoords" class="form-control"
+                           placeholder='[lng,lat]' required>
+                </div>
+            </div>
+            <div class="mt-3">
+                <button type="submit" class="btn btn-success">
+                    <i class="bi bi-check"></i> Add Valve / إضافة صمام
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Valves Tables -->
+<div class="mb-3">
+    <button class="btn btn-circle btn-outline-danger" id="valveRemoveBtn" type="button"
+            onclick="valvesRemoveSelected()" title="Remove / إزالة">
+        <i class="bi bi-trash"></i>
+    </button>
+    <form method="POST" id="removeValvesForm"
+          action="{{ url_for('hydrology.valves_remove', project_id=project.id) }}" class="d-none"></form>
+</div>
+<div class="row">
+    <!-- Master Valves -->
+    <div class="col-md-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-danger text-white">
+                <h6 class="mb-0"><i class="bi bi-valve"></i> Master Valves ({{ master_valves|length }})</h6>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th width="30"><input type="checkbox" onclick="toggleAllValves(this)"></th><th>ID</th><th>Name</th><th>Validated</th></tr></thead>
+                    <tbody>
+                        {% for v in master_valves %}
+                        <tr>
+                            <td><input type="checkbox" class="valve-checkbox" value="{{ v.id }}" data-name-en="{{ v.name_en }}" data-name-ar="{{ v.name_ar }}"></td>
+                            <td>{{ v.id }}</td>
+                            <td>{{ v.name_en }}</td>
+                            <td>
+                                {% if v.validated %}<span class="badge bg-success"><i class="bi bi-check"></i></span>
+                                {% else %}<span class="badge bg-warning"><i class="bi bi-clock"></i></span>{% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" class="text-center text-muted">None / لا يوجد</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sector Valves -->
+    <div class="col-md-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-warning text-dark">
+                <h6 class="mb-0"><i class="bi bi-valve"></i> Sector Valves ({{ sector_valves|length }})</h6>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th width="30"><input type="checkbox" onclick="toggleAllValves(this)"></th><th>ID</th><th>Name</th><th>Sector</th><th>Validated</th></tr></thead>
+                    <tbody>
+                        {% for v in sector_valves %}
+                        <tr>
+                            <td><input type="checkbox" class="valve-checkbox" value="{{ v.id }}" data-name-en="{{ v.name_en }}" data-name-ar="{{ v.name_ar }}"></td>
+                            <td>{{ v.id }}</td>
+                            <td>{{ v.name_en }}</td>
+                            <td>{{ v.properties.sector_id or '-' }}</td>
+                            <td>
+                                {% if v.validated %}<span class="badge bg-success"><i class="bi bi-check"></i></span>
+                                {% else %}<span class="badge bg-warning"><i class="bi bi-clock"></i></span>{% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="5" class="text-center text-muted">None / لا يوجد</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Zone Valves -->
+    <div class="col-md-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-info text-white">
+                <h6 class="mb-0"><i class="bi bi-valve"></i> Zone Valves ({{ zone_valves|length }})</h6>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th width="30"><input type="checkbox" onclick="toggleAllValves(this)"></th><th>ID</th><th>Name</th><th>Zone</th><th>Validated</th></tr></thead>
+                    <tbody>
+                        {% for v in zone_valves %}
+                        <tr>
+                            <td><input type="checkbox" class="valve-checkbox" value="{{ v.id }}" data-name-en="{{ v.name_en }}" data-name-ar="{{ v.name_ar }}"></td>
+                            <td>{{ v.id }}</td>
+                            <td>{{ v.name_en }}</td>
+                            <td>{{ v.properties.zone_id or '-' }}</td>
+                            <td>
+                                {% if v.validated %}<span class="badge bg-success"><i class="bi bi-check"></i></span>
+                                {% else %}<span class="badge bg-warning"><i class="bi bi-clock"></i></span>{% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="5" class="text-center text-muted">None / لا يوجد</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Validate -->
+<div class="mt-3">
+    <form method="POST" action="{{ url_for('hydrology.valves_validate', project_id=project.id) }}">
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-circle"></i> Validate & Continue / التحقق والمتابعة
+        </button>
+    </form>
+</div>
+
+<!-- Map -->
+<div class="card shadow-sm mt-4">
+    {% set map_title_en = "Map - Add Valves" %}{% set map_title_ar = "الخريطة - إضافة الصمامات" %}
+    {% include "_map_header.html" %}
+    <div class="card-body">
+        <div class="mb-2">
+            <button class="btn btn-outline-primary btn-sm" onclick="startDrawPoint()">
+                <i class="bi bi-pencil-square"></i> Place Point / وضع نقطة
+            </button>
+            <button class="btn btn-outline-danger btn-sm" onclick="clearDrawn()">
+                <i class="bi bi-eraser"></i> Clear / مسح
+            </button>
+        </div>
+        <div id="map"></div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const geojsonUrl = '{{ url_for("api.get_geometry", project_id=project.id) }}';
+    initMap('map', geojsonUrl, {
+        center: [34.0, -6.0], zoom: 14,
+        selectable: { type: ['master_valve', 'sector_valve', 'zone_valve'], checkboxSelector: '.valve-checkbox', toggleOnClick: true },
+        mapDelete: { onClick: valvesRemoveSelected }
+    });
+
+    document.addEventListener('change', function(event) {
+        if (event.target && event.target.matches && event.target.matches('.valve-checkbox')) {
+            updateValvesToolbar();
+        }
+    });
+    updateValvesToolbar();
+});
+
+function updateValvesToolbar() {
+    const count = document.querySelectorAll('.valve-checkbox:checked').length;
+    const removeBtn = document.getElementById('valveRemoveBtn');
+    if (removeBtn) removeBtn.disabled = count === 0;
+}
+
+function toggleAllValves(source) {
+    document.querySelectorAll('.valve-checkbox').forEach(cb => {
+        cb.checked = source.checked;
+        cb.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+}
+
+function valvesRemoveSelected() {
+    const selected = document.querySelectorAll('.valve-checkbox:checked');
+    if (!selected.length) {
+        alert('Select at least one valve first / اختر صماماً واحداً على الأقل أولا');
+        return;
+    }
+    const namesEn = Array.from(selected).map(cb => cb.dataset.nameEn).filter(Boolean);
+    const namesAr = Array.from(selected).map(cb => cb.dataset.nameAr).filter(Boolean);
+    const nameEn = namesEn.join(', ') || 'valve(s)';
+    const nameAr = namesAr.join('، ') || 'صمام';
+    const doSubmit = function () {
+        const form = document.getElementById('removeValvesForm');
+        form.querySelectorAll('input[name="element_ids"]').forEach(el => el.remove());
+        selected.forEach(cb => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'element_ids';
+            input.value = cb.value;
+            form.appendChild(input);
+        });
+        form.requestSubmit();
+    };
+    if (window.confirmDelete) {
+        window.confirmDelete(nameEn, nameAr, doSubmit);
+    } else if (window.confirm('Delete ' + nameEn + ' ?')) {
+        doSubmit();
+    }
+}
+
+function toggleSectorZone(select) {
+    const type = select.value;
+    document.getElementById('sectorSelect').style.display = (type === 'sector_valve') ? 'block' : 'none';
+    document.getElementById('zoneSelect').style.display = (type === 'zone_valve') ? 'block' : 'none';
+}
+
+function startDrawPoint() {
+    initDrawTools('point', function(coords, coordsStr) {
+        document.getElementById('valveCoords').value = coordsStr;
+    });
+}
+</script>
+{% endblock %}

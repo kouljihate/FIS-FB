@@ -49,7 +49,7 @@ OPENCODE_VC_VERSION_RE = re.compile(r"(- Version:\s*)(\d+\.\d+\.\d+)")
 OPENCODE_DATE_RE = re.compile(r"(- \*\*Last Updated\*\*:\s*)(\d{4}-\d{2}-\d{2})")
 
 DEFAULT_REMOTE = "fb"
-DEFAULT_REMOTE_URL = "git@github.com:kouljihate/FIS-FB.git"
+DEFAULT_REMOTE_URL = "git@github.com:kouljihate/FIS-OC.git"
 DEFAULT_BRANCH = "main"
 
 ATTRIBUTION = (
