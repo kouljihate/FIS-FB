@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.82 - 2026-10-19
+
+### Added
+- release.py --transport auto|ssh|https; the successful transport is remembered so later releases skip denied credentials
+
 ## 0.3.81 - 2026-10-19
 
 ### Added

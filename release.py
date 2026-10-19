@@ -295,32 +295,56 @@ PUSH_HINT = (
 )
 
 
-def push(name: str, branch: str, previous_tip: str | None) -> None:
-    args = ["push", name, "HEAD:%s" % branch]
-    if previous_tip:
-        args.append("--force-with-lease=%s:%s" % (branch, previous_tip))
-    else:
-        args.append("--force")
+#: Remembers which transport actually worked, so later runs skip the denied one.
+TRANSPORT_FILE = ROOT / ".git" / "fis-fb-transport"
 
-    proc = git(*args, check=False)
-    if proc.returncode == 0:
-        print(proc.stderr.strip() or proc.stdout.strip())
-        return
 
-    first_error = (proc.stderr or proc.stdout).strip()
+def preferred_transport(explicit: str) -> str:
+    if explicit in ("ssh", "https"):
+        return explicit
+    if TRANSPORT_FILE.exists():
+        remembered = TRANSPORT_FILE.read_text(encoding="utf-8").strip()
+        if remembered in ("ssh", "https"):
+            return remembered
+    return "ssh"
+
+
+def remember_transport(transport: str) -> None:
+    if not TRANSPORT_FILE.exists() or TRANSPORT_FILE.read_text(encoding="utf-8").strip() != transport:
+        TRANSPORT_FILE.write_text(transport + "\n", encoding="utf-8")
+
+
+def push(name: str, branch: str, previous_tip: str | None, transport: str = "ssh") -> str:
+    """Push HEAD to <name>:<branch>; returns the transport that succeeded."""
     remote_url = git("remote", "get-url", name, check=False).stdout.strip()
     https_url = ssh_to_https(remote_url)
-    if https_url:
-        print("SSH push denied, retrying over %s (no interactive prompt)" % https_url)
-        env = dict(environ, GIT_TERMINAL_PROMPT="0")
-        retry = git("-c", "credential.interactive=false", "push", https_url,
-                   "HEAD:%s" % branch, "--force", check=False, env=env)
-        if retry.returncode == 0:
-            print(retry.stderr.strip() or retry.stdout.strip())
-            return
-        print("HTTPS push also failed: %s" % (retry.stderr or retry.stdout).strip())
+    order = [transport] + [item for item in ("https", "ssh") if item != transport]
+    errors: list[str] = []
 
-    raise Failure("push failed:\n%s\n\n%s" % (first_error, PUSH_HINT))
+    for attempt in order:
+        if attempt == "https":
+            if not https_url:
+                continue
+            env = dict(environ, GIT_TERMINAL_PROMPT="0")
+            proc = git("-c", "credential.interactive=false", "push", https_url,
+                       "HEAD:%s" % branch, "--force", check=False, env=env)
+        else:
+            args = ["push", name, "HEAD:%s" % branch]
+            if previous_tip:
+                args.append("--force-with-lease=%s:%s" % (branch, previous_tip))
+            else:
+                args.append("--force")
+            proc = git(*args, check=False)
+
+        if proc.returncode == 0:
+            print("push ok over %s" % attempt)
+            print(proc.stderr.strip() or proc.stdout.strip())
+            remember_transport(attempt)
+            return attempt
+        errors.append("%s: %s" % (attempt, (proc.stderr or proc.stdout).strip().splitlines()[0]
+                                   if (proc.stderr or proc.stdout).strip() else "failed"))
+
+    raise Failure("push failed:\n%s\n\n%s" % ("\n".join(errors), PUSH_HINT))
 
 
 # --------------------------------------------------------------------------- #
@@ -351,6 +375,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--remote", default=DEFAULT_REMOTE, help="remote name (default: %(default)s)")
     parser.add_argument("--remote-url", default=DEFAULT_REMOTE_URL, help="remote URL to add")
     parser.add_argument("--branch", default=DEFAULT_BRANCH, help="branch on the remote (default: %(default)s)")
+    parser.add_argument("--transport", choices=("auto", "ssh", "https"), default="auto",
+                        help="how to reach the remote; auto reuses whichever worked last")
     parser.add_argument("--no-attribution", action="store_true",
                         help="omit the Codebuff footer from the commit message")
     return parser.parse_args(argv)
@@ -387,10 +413,11 @@ def main(argv: list[str]) -> int:
         branch = git("rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
         ensure_remote(args.remote, args.remote_url)
         previous_tip = remote_tip(args.remote, args.branch)
-        print("\npushing %s -> %s:%s%s" % (branch, args.remote, args.branch,
-                                            "  (previous tip %s)" % previous_tip[:12]
-                                            if previous_tip else ""))
-        push(args.remote, args.branch, previous_tip)
+        transport = preferred_transport(args.transport)
+        print("\npushing %s -> %s:%s over %s%s" % (branch, args.remote, args.branch, transport,
+                                                   "  (previous tip %s)" % previous_tip[:12]
+                                                   if previous_tip else ""))
+        push(args.remote, args.branch, previous_tip, transport)
         print("\npushed %s" % git("rev-parse", "--short", "HEAD").stdout.strip())
         return 0
 
@@ -462,7 +489,7 @@ def main(argv: list[str]) -> int:
                                               previous_tip, args.remote, args.branch))
         print("previous %s/%s was %s (saved in %s)"
               % (args.remote, args.branch, previous_tip[:12], backup.name))
-    push(args.remote, args.branch, previous_tip)
+    push(args.remote, args.branch, previous_tip, preferred_transport(args.transport))
     print("\nreleased v%s" % version)
     return 0
 
