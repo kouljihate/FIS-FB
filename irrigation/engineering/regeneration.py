@@ -26,7 +26,7 @@ from irrigation.engineering.projection import (
 from irrigation.engineering.elevation import (
     get_or_build_elevation_model, elevation_metrics_for_polygon,
     get_elevation_at_point, aspect_for_polygon,
-    COMPASS_POINTS, ORIENTATION_ALIASES
+    COMPASS_POINTS, ORIENTATION_ALIASES, ORIENTATION_DEGREES
 )
 
 
@@ -799,10 +799,13 @@ def regenerate_zones(project_id, sector_id=None, zones_per_sector=None, use_elev
             # the terrain aspect (downhill direction) of the zone polygon.
             if target_orientation:
                 zone_orientation = target_orientation
+                zone_orientation_deg = ORIENTATION_DEGREES.get(target_orientation)
             elif aspect:
                 zone_orientation = aspect['compass']
+                zone_orientation_deg = round(aspect['bearing_deg'], 1)
             else:
                 zone_orientation = None
+                zone_orientation_deg = None
 
             zone = {
                 'id': get_next_id('zones'),
@@ -816,7 +819,7 @@ def regenerate_zones(project_id, sector_id=None, zones_per_sector=None, use_elev
                 'ai_score': round(best_result['score'], 4),
                 'area_m2': round(part.area, 2),
                 'orientation': zone_orientation,
-                'orientation_deg': round(aspect['bearing_deg'], 1) if aspect else None,
+                'orientation_deg': zone_orientation_deg,
                 'slope_percent': round(aspect['slope_percent'], 2) if aspect else None,
                 'elevation_aware': elevation_model is not None,
                 'elevation_metrics': elev_metrics

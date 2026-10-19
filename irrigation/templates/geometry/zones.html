@@ -233,7 +233,39 @@
                         </td>
                     </tr>
 
-                    <!-- Edit Zone Modal -->
+                    {% else %}
+                    <tr class="table-secondary">
+                        <td></td>
+                        <td>-</td>
+                        <td></td>
+                        <td>{{ item.sector.name_en }} ({{ item.sector.name_ar
+                            }})</td>
+                        <td colspan="6" class="text-muted text-center">No zones
+                            / لا توجد مناطق</td>
+                    </tr>
+                    {% endif %}
+                    {% else %}
+                    <tr>
+                        <td colspan="10" class="text-center py-4">
+                            <span
+                                class="zone-empty-banner d-inline-flex align-items-center gap-2">
+                                <i class="bi bi-grid"></i> No Zone Yet / لا توجد
+                                مناطق بعد
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Per-row modals: kept outside <tbody> so the browser does not
+     foster-parent them away from their <form> elements. -->
+{% for item in table_data %}
+{% if item.zone %}
+<!-- Edit Zone Modal -->
                     <div class="modal fade" id="editZoneModal{{ item.zone.id }}"
                         tabindex="-1">
                         <div class="modal-dialog">
@@ -448,33 +480,8 @@
                             </div>
                         </div>
                     </div>
-                    {% else %}
-                    <tr class="table-secondary">
-                        <td></td>
-                        <td>-</td>
-                        <td></td>
-                        <td>{{ item.sector.name_en }} ({{ item.sector.name_ar
-                            }})</td>
-                        <td colspan="6" class="text-muted text-center">No zones
-                            / لا توجد مناطق</td>
-                    </tr>
-                    {% endif %}
-                    {% else %}
-                    <tr>
-                        <td colspan="10" class="text-center py-4">
-                            <span
-                                class="zone-empty-banner d-inline-flex align-items-center gap-2">
-                                <i class="bi bi-grid"></i> No Zone Yet / لا توجد
-                                مناطق بعد
-                            </span>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
+{% endif %}
+{% endfor %}
 
 <!-- Map -->
 <div class="card shadow-sm mt-4 geometry-map-card">

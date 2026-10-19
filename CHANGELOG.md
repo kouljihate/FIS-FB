@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.3 - 2026-10-19
+
+### Fixed
+- Zones/Sectors row modals were nested inside <tbody>, so the browser foster-parented them and their forms were emptied - Edit, Orientation, Rename and Split did nothing. Modals now render outside the table.
+- Auto Generate Zones now stores orientation_deg matching a forced compass orientation instead of the terrain slope angle.
+
 ## 0.4.2 - 2026-10-19
 
 ### Added

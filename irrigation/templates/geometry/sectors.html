@@ -127,7 +127,17 @@
                         </td>
                     </tr>
 
-                    <!-- Edit Modal -->
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Per-row modals: kept outside <tbody> so the browser does not
+     foster-parent them away from their <form> elements. -->
+{% for s in sectors %}
+<!-- Edit Modal -->
                     <div class="modal fade" id="editModal{{ s.id }}" tabindex="-1">
                         <div class="modal-dialog">
                             <div class="modal-content">
@@ -226,11 +236,6 @@
                         </div>
                     </div>
                     {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
 
 <!-- Map -->
 <div class="card shadow-sm mt-4 geometry-map-card">
