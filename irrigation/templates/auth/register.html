@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% from "shared/_macros.html" import bilingual_heading, bilingual_label, bilingual_stack, bi_button, bi_label with context %}
+{% block title %}{{ t('register') }} · {{ t('app_name') }}{% endblock %}
+{% block navbar %}{% include "auth/_header.html" %}{% endblock %}
+{% block main_class %}auth-main-content container-xxl py-4{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-7 col-lg-6 col-xl-5">
+    <div class="card">
+      <div class="card-body p-4">
+        <h1 class="h5 mb-3">{{ bilingual_heading('Create account', 'إنشاء حساب') }}</h1>
+
+        {% if first_account %}
+          <div class="alert alert-success py-2 small mb-3" role="alert">
+            <i class="bi bi-shield-check me-1"></i>
+            {{ bilingual_stack('First account → created as Full Admin',
+                               'أول حساب ← يُنشأ كمدير كامل') }}
+          </div>
+        {% else %}
+          <div class="alert alert-info py-2 small mb-3" role="alert">
+            <i class="bi bi-info-circle me-1"></i>
+            {{ bilingual_stack('New accounts are created with the Customer profile; a Full Admin can promote you.',
+                               'تُنشأ الحسابات الجديدة بصلاحية عميل؛ ويمكن للمدير الكامل ترقيتك.') }}
+          </div>
+        {% endif %}
+
+        <form method="post" action="{{ url_for('auth.register') }}">
+          <div class="mb-3">
+            <label class="form-label" for="register-username">
+              {{ bi_label('username') }}
+              <span class="text-secondary small">
+                {{ bilingual_label('(3+ characters)', '(٣ أحرف أو أكثر)') }}
+              </span>
+            </label>
+            <input class="form-control" id="register-username" type="text" name="username"
+                   autocomplete="username" minlength="3" required autofocus>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="register-full-name">{{ bi_label('full_name') }}</label>
+            <input class="form-control" id="register-full-name" type="text" name="full_name"
+                   autocomplete="name">
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="register-email">{{ bi_label('email') }}</label>
+            <input class="form-control" id="register-email" type="email" name="email"
+                   autocomplete="email">
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="register-password">{{ bi_label('password') }}</label>
+            <input class="form-control" id="register-password" type="password" name="password"
+                   autocomplete="new-password" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="register-confirm">{{ bi_label('confirm_password') }}</label>
+            <input class="form-control" id="register-confirm" type="password" name="confirm_password"
+                   autocomplete="new-password" required>
+          </div>
+          <button class="btn btn-primary w-100" type="submit">
+            {{ bi_button('register', 'bi-person-plus') }}
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

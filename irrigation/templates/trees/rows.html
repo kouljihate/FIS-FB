@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+{% from "shared/_macros.html" import bilingual_heading, bilingual_label, bilingual_stack, bilingual_button, bi_button, bi_label, bi_th, th with context %}
+{% block title %}{{ t('rows') }} · {{ t('app_name') }}{% endblock %}
+{% block content %}
+
+<div class="wf-page-header mb-2">
+  <h1 class="wf-title-en h4 mb-0">{{ t_en('rows') }}</h1>
+  <span class="wf-icon"><i class="bi bi-list-ul"></i></span>
+  <h2 class="wf-title-ar ar-text h4 mb-0" lang="ar" dir="rtl">{{ t_ar('rows') }}</h2>
+</div>
+
+<p class="text-secondary small d-flex justify-content-between flex-wrap gap-2">
+  <span>
+    {{ project.name }} &middot;
+    <span class="latin-number">{{ rows|length }}</span> row{{ '' if rows|length == 1 else 's' }}
+  </span>
+  <span class="ar-text" lang="ar" dir="rtl">
+    {{ project.name }} &middot;
+    <span class="latin-number">{{ rows|length }}</span> صف
+  </span>
+</p>
+
+<div class="page-toolbar justify-content-end mb-3">
+  <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#modal-add">
+    {{ bi_button('add', 'bi-plus-lg') }}
+  </button>
+  <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#modal-generate">
+    {{ bilingual_button('Generate rows', 'توليد الصفوف', 'bi-magic') }}
+  </button>
+  <a class="btn btn-outline-secondary" href="{{ url_for('trees.trees', project_id=project['_id']) }}">
+    {{ bilingual_button(t_en('trees'), t_ar('trees'), 'bi-arrow-right') }}
+  </a>
+</div>
+
+<div class="card">
+  {% if not rows %}
+    <div class="card-body">
+      <p class="empty">
+        {{ bilingual_label('No rows yet. Generate carves the sector boundary into parallel row strips at the given spacing.',
+                           'لا توجد صفوف بعد. يقوم «توليد» بتقسيم حدود القطاع إلى شرائح صفوف متوازية بالتباعد المحدد.') }}
+      </p>
+    </div>
+  {% else %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            {{ bi_th('name') }}
+            {{ bi_th('sector') }}
+            {% for label, key in columns %}{{ th(label, tar(label), 'text-end') }}{% endfor %}
+            {{ bi_th('actions', 'text-end') }}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+            <tr>
+              <td>{{ row.name }}</td>
+              <td>{{ row.sector_name or '—' }}</td>
+              {% for label, key in columns %}
+                <td class="num latin-number">{{ row.get(key) if row.get(key) is not none else '—' }}</td>
+              {% endfor %}
+              <td>
+                <div class="actions-row justify-content-end">
+                  <button class="btn btn-outline-primary btn-circle-sm" type="button"
+                          title="{{ t('rename') }}"
+                          data-bs-toggle="modal" data-bs-target="#modal-rename"
+                          data-action="{{ url_for('trees.rename_row', project_id=project['_id'], item_id=row['_id']) }}"
+                          data-name="{{ row.name }}">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button class="btn btn-outline-secondary btn-circle-sm" type="button"
+                          title="{{ t('edit') }}"
+                          data-bs-toggle="modal" data-bs-target="#modal-edit"
+                          data-action="{{ url_for('trees.update_row', project_id=project['_id'], item_id=row['_id']) }}"
+                          data-name="{{ row.name }}"
+                          data-spacing_m="{{ row.spacing_m or '' }}"
+                          data-length_m="{{ row.length_m or '' }}">
+                    <i class="bi bi-sliders"></i>
+                  </button>
+                  <form class="inline" method="post"
+                        action="{{ url_for('trees.remove_row', project_id=project['_id'], item_id=row['_id']) }}"
+                        data-confirm="Remove {{ row.name }} and its trees? — حذف {{ row.name }} وأشجاره؟">
+                    <button class="btn btn-outline-danger btn-circle-sm" type="submit"
+                            title="{{ t('remove') }}">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</div>
+
+{# -------------------------------- add -------------------------------- #}
+<div class="modal fade" id="modal-add" tabindex="-1" aria-labelledby="modal-add-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="{{ url_for('trees.add_row', project_id=project['_id']) }}">
+        <div class="modal-header">
+          <h3 class="modal-title h5" id="modal-add-title">
+            {{ bilingual_heading('Add row', 'إضافة صف') }}
+          </h3>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ t('close') }}"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label" for="add-name">{{ bi_label('name') }}</label>
+            <input class="form-control" id="add-name" type="text" name="name" required autofocus>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="add-sector">{{ bi_label('sector') }}</label>
+            <select class="form-select" id="add-sector" name="sector_id">
+              <option value="">—</option>
+              {% for sector in sectors %}
+                <option value="{{ sector['_id'] }}">{{ sector.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="row g-3">
+            <div class="col-sm-4">
+              <label class="form-label" for="add-spacing">
+                {{ bilingual_label('Spacing (m)', 'التباعد (م)') }}
+              </label>
+              <input class="form-control" id="add-spacing" type="text" name="spacing_m" inputmode="decimal">
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label" for="add-length">
+                {{ bilingual_label('Length (m)', 'الطول (م)') }}
+              </label>
+              <input class="form-control" id="add-length" type="text" name="length_m" inputmode="decimal">
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label" for="add-azimuth">{{ bi_label('azimuth') }}</label>
+              <input class="form-control" id="add-azimuth" type="text" name="azimuth_deg" inputmode="decimal">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">
+            {{ bi_button('cancel') }}
+          </button>
+          <button class="btn btn-primary" type="submit">{{ bi_button('save') }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{# ------------------------------ generate ------------------------------ #}
+<div class="modal fade" id="modal-generate" tabindex="-1" aria-labelledby="modal-generate-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" data-loading
+            action="{{ url_for('trees.generate_rows', project_id=project['_id']) }}">
+        <div class="modal-header">
+          <h3 class="modal-title h5" id="modal-generate-title">
+            {{ bilingual_heading('Generate rows', 'توليد الصفوف') }}
+          </h3>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ t('close') }}"></button>
+        </div>
+        <div class="modal-body">
+          <p class="small text-secondary">
+            {{ bilingual_label('Row count follows the sector span divided by the spacing, so a 30 m span at 1.5 m gives 20 rows.',
+                               'يُحسب عدد الصفوف بقسمة امتداد القطاع على التباعد، فامتداد 30 م بتباعد 1.5 م يعطي 20 صفاً.') }}
+          </p>
+          <div class="mb-3">
+            <label class="form-label" for="generate-sector">{{ bi_label('sector') }}</label>
+            <select class="form-select" id="generate-sector" name="sector_id">
+              <option value="">All sectors · كل القطاعات</option>
+              {% for sector in sectors %}
+                <option value="{{ sector['_id'] }}">{{ sector.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="generate-spacing">{{ bi_label('row_spacing_m') }}</label>
+            <input class="form-control" id="generate-spacing" type="text" name="spacing_m"
+                   inputmode="decimal" value="{{ default_spacing }}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="generate-azimuth">
+              {{ bi_label('azimuth') }} <span class="text-secondary small">{{ bilingual_label('optional, recorded for reference', 'اختياري، يُسجّل للرجوع إليه') }}</span>
+            </label>
+            <input class="form-control" id="generate-azimuth" type="text" name="azimuth_deg" inputmode="decimal">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">
+            {{ bi_button('cancel') }}
+          </button>
+          <button class="btn btn-primary" type="submit">{{ bi_button('generate') }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{# ---------------------------- rename / edit ---------------------------- #}
+<div class="modal fade" id="modal-rename" tabindex="-1" aria-labelledby="modal-rename-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="">
+        <div class="modal-header">
+          <h3 class="modal-title h5" id="modal-rename-title">
+            {{ bilingual_heading('Rename', 'إعادة تسمية') }}
+          </h3>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ t('close') }}"></button>
+        </div>
+        <div class="modal-body">
+          <label class="form-label" for="rename-name">{{ bi_label('name') }}</label>
+          <input class="form-control" id="rename-name" type="text" name="name" required>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">
+            {{ bi_button('cancel') }}
+          </button>
+          <button class="btn btn-primary" type="submit">{{ bi_button('save') }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modal-edit" tabindex="-1" aria-labelledby="modal-edit-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <form method="post" action="">
+        <div class="modal-header">
+          <h3 class="modal-title h5" id="modal-edit-title">
+            {{ bilingual_heading('Edit row', 'تعديل الصف') }}
+          </h3>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ t('close') }}"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label" for="edit-name">{{ bi_label('name') }}</label>
+            <input class="form-control" id="edit-name" type="text" name="name" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="edit-sector">{{ bi_label('sector') }}</label>
+            <select class="form-select" id="edit-sector" name="sector_id">
+              <option value="">—</option>
+              {% for sector in sectors %}
+                <option value="{{ sector['_id'] }}">{{ sector.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="row g-3">
+            <div class="col-sm-4">
+              <label class="form-label" for="edit-spacing">
+                {{ bilingual_label('Spacing (m)', 'التباعد (م)') }}
+              </label>
+              <input class="form-control" id="edit-spacing" type="text" name="spacing_m"
+                     inputmode="decimal" data-fill="spacing_m">
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label" for="edit-length">
+                {{ bilingual_label('Length (m)', 'الطول (م)') }}
+              </label>
+              <input class="form-control" id="edit-length" type="text" name="length_m"
+                     inputmode="decimal" data-fill="length_m">
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label" for="edit-azimuth">{{ bi_label('azimuth') }}</label>
+              <input class="form-control" id="edit-azimuth" type="text" name="azimuth_deg" inputmode="decimal">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">
+            {{ bi_button('cancel') }}
+          </button>
+          <button class="btn btn-primary" type="submit">{{ bi_button('save') }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

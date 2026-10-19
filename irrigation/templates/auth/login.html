@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% from "shared/_macros.html" import bilingual_heading, bi_button, bi_label with context %}
+{% block title %}{{ t('sign_in') }} · {{ t('app_name') }}{% endblock %}
+{% block navbar %}{% include "auth/_header.html" %}{% endblock %}
+{% block main_class %}auth-main-content container-xxl py-4{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6 col-lg-5 col-xl-4">
+    <div class="card">
+      <div class="card-body p-4">
+        <h1 class="h5 mb-4">{{ bilingual_heading('Sign in', 'تسجيل الدخول') }}</h1>
+
+        <form method="post" action="{{ url_for('auth.login', next=request.args.get('next')) }}">
+          <div class="mb-3">
+            <label class="form-label" for="login-username">{{ bi_label('username') }}</label>
+            <input class="form-control" id="login-username" type="text" name="username"
+                   autocomplete="username" required autofocus>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="login-password">{{ bi_label('password') }}</label>
+            <input class="form-control" id="login-password" type="password" name="password"
+                   autocomplete="current-password" required>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" id="login-remember" type="checkbox" name="remember">
+            <label class="form-check-label small" for="login-remember">
+              {{ bi_label('remember_browser') }}
+            </label>
+          </div>
+          <button class="btn btn-primary w-100" type="submit">
+            {{ bi_button('sign_in', 'bi-box-arrow-in-right') }}
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

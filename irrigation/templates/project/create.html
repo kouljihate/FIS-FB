@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% from "shared/_macros.html" import bilingual_heading, bilingual_label, bilingual_stack, bilingual_button, bi_button, bi_label, bi_stack with context %}
+{% block title %}{{ t('new_project') }} · {{ t('app_name') }}{% endblock %}
+{% block content %}
+
+<div class="wf-page-header mb-3">
+  <h1 class="wf-title-en h4 mb-0">{{ t_en('new_project') }}</h1>
+  <span class="wf-icon"><i class="bi bi-folder-plus"></i></span>
+  <h2 class="wf-title-ar ar-text h4 mb-0" lang="ar" dir="rtl">{{ t_ar('new_project') }}</h2>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="row g-4">
+      <div class="col-lg-6">
+        <h2 class="h6">{{ bilingual_heading('Instructions', 'التعليمات') }}</h2>
+        <ol class="small text-secondary mb-0">
+          <li>Upload the land map (<strong>KML, KMZ or DXF</strong>) &mdash; it is required, and
+            the land boundary is read from it to link the project to its land.</li>
+          <li>Open <strong>Geometry</strong> and generate or draw the sectors, then the zones.</li>
+          <li>Record the water sources under <strong>Water Resource</strong>.</li>
+          <li>Size the network in <strong>Hydrology1</strong> (MP, SP, ZP).</li>
+          <li>Lay out <strong>Trees</strong> rows, then generate trees along them.</li>
+          <li>Add the downstream components in <strong>Hydrology2</strong>.</li>
+          <li>Price the work in <strong>Estimation</strong>, then print the <strong>Report</strong>.</li>
+        </ol>
+      </div>
+      <div class="col-lg-6">
+        <h2 class="h6 ar-text" lang="ar" dir="rtl">{{ t_ar('app_short') }} &mdash; التعليمات</h2>
+        <ol class="small text-secondary mb-0 ar-section" lang="ar" dir="rtl">
+          <li>ارفع خريطة الأرض (<strong>KML أو KMZ أو DXF</strong>) &mdash; وهي إلزامية، وتُقرأ منها
+            حدود الأرض لربط المشروع بأرضه.</li>
+          <li>افتح <strong>الهندسة</strong> وولّد أو ارسم القطاعات ثم المناطق.</li>
+          <li>سجّل مصادر المياه في <strong>مصدر المياه</strong>.</li>
+          <li>صمّم الشبكة في <strong>الهيدرولوجيا 1</strong> (الأنابيب الرئيسية والثانوية وقطاع المناطق).</li>
+          <li>وزّع صفوف <strong>الأشجار</strong> ثم ولّد الأشجار على طولها.</li>
+          <li>أضف المكوّنات السفلية في <strong>الهيدرولوجيا 2</strong>.</li>
+          <li>قدّر التكلفة في <strong>التقدير</strong> ثم اطبع <strong>التقرير</strong>.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <h2 class="h6 mb-3">{{ bilingual_heading('Project details', 'بيانات المشروع') }}</h2>
+
+    <form method="post" action="{{ url_for('project.create_project') }}"
+          enctype="multipart/form-data">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label" for="project-name">{{ bi_label('name') }}</label>
+          <input class="form-control" id="project-name" type="text" name="name" required
+                 value="{{ form.name if form is defined and form else '' }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="project-description">{{ bi_label('description') }}</label>
+          <input class="form-control" id="project-description" type="text" name="description"
+                 value="{{ form.description if form is defined and form else '' }}">
+        </div>
+      </div>
+
+      <div class="mt-3">
+        <label class="form-label" for="project-map">
+          {{ bi_label('map_file') }}
+          <span class="text-danger">*</span>
+        </label>
+        <input class="form-control" id="project-map" type="file" name="map_file"
+               accept="{{ map_accept }}" required>
+        <div class="form-text">
+          {{ bilingual_label('Required. The land boundary is read from the largest closed outline in the file; KML and KMZ are treated as lon/lat, a DXF drawing as metres.',
+                             'إلزامي. تُقرأ حدود الأرض من أكبر شكل مغلق في الملف؛ ويُعامَل KML و KMZ كإحداثيات خط طول/عرض، وملف DXF بالمتر.') }}
+        </div>
+      </div>
+
+      <div class="page-toolbar mt-3">
+        <button class="btn btn-primary" type="submit">
+          {{ bi_button('save', 'bi-check-lg') }}
+        </button>
+        <a class="btn btn-outline-secondary" href="{{ url_for('project.list_projects') }}">
+          {{ bi_button('cancel') }}
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

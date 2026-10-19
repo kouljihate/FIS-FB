@@ -1,0 +1,35 @@
+{# Header shared by the signed-out screens (login / register).
+
+   Three columns, the way the rest of the application chrome is built:
+   the English name on the left, the short name (FIS) centred in the middle and
+   the Arabic name on the right.  Underneath sits a two-tab strip - Login and
+   Register - which is the only navigation a signed-out visitor needs. #}
+{% from "shared/_macros.html" import bilingual_button with context %}
+<header class="auth-header">
+  <div class="container-fluid auth-header-grid">
+    <div class="auth-header-col auth-header-en">{{ t_en('app_name') }}</div>
+    <div class="auth-header-col auth-header-brand">{{ t_en('app_short') }}</div>
+    <div class="auth-header-col auth-header-ar ar-text" lang="ar" dir="rtl">{{ t_ar('app_name') }}</div>
+  </div>
+</header>
+
+<nav class="auth-tabs-nav" aria-label="account">
+  <div class="container-fluid">
+    <ul class="nav nav-tabs auth-tabs">
+      <li class="nav-item">
+        <a class="nav-link {{ 'active' if request.endpoint == 'auth.login' }}"
+           href="{{ url_for('auth.login') }}"
+           {% if request.endpoint == 'auth.login' %}aria-current="page"{% endif %}>
+          {{ bilingual_button(t_en('sign_in'), t_ar('sign_in'), 'bi-box-arrow-in-right') }}
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {{ 'active' if request.endpoint == 'auth.register' }}"
+           href="{{ url_for('auth.register') }}"
+           {% if request.endpoint == 'auth.register' %}aria-current="page"{% endif %}>
+          {{ bilingual_button(t_en('register'), t_ar('register'), 'bi-person-plus') }}
+        </a>
+      </li>
+    </ul>
+  </div>
+</nav>

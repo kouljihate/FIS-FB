@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% from "shared/_macros.html" import bilingual_heading, bilingual_label, bilingual_stack, bilingual_button, bi_button, bi_label, bi_stack with context %}
+{% block title %}{{ code }} · {{ t('app_name') }}{% endblock %}
+{% block main_class %}auth-main-content container-xxl py-4{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-8 col-lg-6">
+    <div class="card text-center">
+      <div class="card-body py-5">
+        <div class="display-3 fw-bold text-primary latin-number">{{ code }}</div>
+        <p class="text-secondary">{{ message }}</p>
+        <h2 class="h6 mb-3">{{ bilingual_heading('Something went wrong', 'حدث خطأ ما') }}</h2>
+        <a class="btn btn-primary" href="{{ url_for('project.list_projects') }}">
+          {{ bilingual_button(t_en('projects'), t_ar('projects'), 'bi-house') }}
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

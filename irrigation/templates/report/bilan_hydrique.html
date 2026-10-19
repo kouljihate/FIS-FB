@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+{% from "shared/_macros.html" import bilingual_heading, bilingual_label, bilingual_stack, bilingual_button, bi_button, bi_label, bi_stack, bi_th, th with context %}
+{% block title %}{{ t('bilan_hydrique') }} · {{ t('app_name') }}{% endblock %}
+{% block content %}
+
+<div class="wf-page-header mb-2">
+  <h1 class="wf-title-en h4 mb-0">{{ t_en('bilan_hydrique') }}</h1>
+  <span class="wf-icon"><i class="bi bi-water"></i></span>
+  <h2 class="wf-title-ar ar-text h4 mb-0" lang="ar" dir="rtl">{{ t_ar('bilan_hydrique') }}</h2>
+</div>
+
+<p class="text-secondary small">
+  {{ project.name }} &middot;
+  {{ bilingual_label('irrigated area ' ~ area_ha ~ ' ha (from the drawn sectors)',
+                     'المساحة المروية ' ~ area_ha ~ ' هكتار (من القطاعات المرسومة)') }}
+</p>
+
+<div class="page-toolbar justify-content-end mb-3">
+  <a class="btn btn-outline-secondary" href="{{ url_for('report.charts', project_id=project['_id']) }}">
+    {{ bilingual_button(t_en('charts'), t_ar('charts'), 'bi-arrow-left') }}
+  </a>
+  <a class="btn btn-outline-primary" href="{{ url_for('report.technical', project_id=project['_id']) }}">
+    {{ bilingual_button(t_en('technical_report'), t_ar('technical_report'), 'bi-arrow-right') }}
+  </a>
+  <button class="btn btn-outline-primary" type="button" onclick="window.print()">
+    {{ bi_button('print_pdf', 'bi-printer') }}
+  </button>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <h2 class="h6 mb-0">{{ bilingual_heading('Results', 'النتائج') }}</h2>
+      </div>
+      <div class="card-body">
+        <table class="table table-sm mb-0">
+          <tbody>
+            {% for label_en, label_ar, value in [
+              ('ETc (crop water use)', 'الاحتياج المرجعي للمحصول', balance.etc_mm_per_day ~ ' mm/day'),
+              ('Effective rainfall', 'الأمطار الفعّالة', balance.effective_rain_mm_per_day ~ ' mm/day'),
+              ('Net irrigation requirement', 'صافي الاحتياج للري', balance.net_requirement_mm_per_day ~ ' mm/day'),
+              ('Gross requirement', 'الاحتياج الإجمالي', balance.gross_requirement_mm_per_day ~ ' mm/day'),
+              ('Irrigation interval', 'الفترة بين الريات', balance.interval_days ~ ' day(s)'),
+              ('Depth per event', 'عمق الرية', balance.depth_per_event_mm ~ ' mm'),
+              ('Peak design flow', 'تدفق التصميم الأقصى', peak_flow_m3h ~ ' m³/h'),
+              ('Application rate', 'معدل الإضافة', balance.application_rate_mm_per_h ~ ' mm/h'),
+              ('Seasonal volume', 'الحجم الموسمي', balance.seasonal_volume_m3 ~ ' m³'),
+              ('Leaching requirement', 'احتياج الغسيل', leach_mm ~ ' mm (LF ' ~ leach_fraction ~ ')')] %}
+              <tr>
+                <th scope="row">{{ bilingual_stack(label_en, label_ar) }}</th>
+                <td class="num latin-number">{{ value }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% if balance.notes %}
+          <ul class="small text-secondary mt-3 mb-0">
+            {% for note in balance.notes %}<li>{{ note }}</li>{% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <h2 class="h6 mb-0">{{ bilingual_heading('Pump duty', 'تشغيل المضخة') }}</h2>
+      </div>
+      <div class="card-body">
+        <table class="table table-sm mb-0">
+          <tbody>
+            <tr>
+              <th scope="row">{{ bilingual_stack('Pipe friction head', 'فقد الاحتكاك في الأنابيب') }}</th>
+              <td class="num latin-number">{{ friction_m }} m</td>
+            </tr>
+            <tr>
+              <th scope="row">{{ bilingual_stack('Total dynamic head', 'إجمالي الضغط الديناميكي') }}</th>
+              <td class="num latin-number">{{ total_head_m }} m</td>
+            </tr>
+            <tr>
+              <th scope="row">{{ bilingual_stack('Equivalent', 'ما يعادلها') }}</th>
+              <td class="num latin-number">{{ total_head_psi }} psi / {{ total_head_bar }} bar</td>
+            </tr>
+            <tr>
+              <th scope="row">{{ bilingual_stack('Hydraulic power', 'القدرة الهيدروليكية') }}</th>
+              <td class="num latin-number">{{ pump.power_kw }} kW ({{ pump.power_hp }} hp)</td>
+            </tr>
+            <tr>
+              <th scope="row">{{ bilingual_stack('Pump efficiency assumed', 'كفاءة المضخة المفترضة') }}</th>
+              <td class="num latin-number">{{ pump.efficiency }}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3 class="h6 mt-4 mb-1">{{ bilingual_heading('Critical path', 'المسار الحرج') }}</h3>
+        <p class="small text-secondary">
+          {{ bilingual_label('Worst branch at each level. A main carries the whole block, each secondary serves one sector and each zone pipe serves one zone, so the flow is divided accordingly.',
+                             'أسوأ فرع في كل مستوى. الأنبوب الرئيسي يحمل الكتلة كاملة، وكل أنبوب ثانوي يخدم قطاعاً واحداً، وكل أنبوب منطقة يخدم منطقة واحدة، لذا يُقسَّم التدفق وفقاً لذلك.') }}
+        </p>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead>
+              <tr>
+                {{ bi_th('level') }}
+                {{ bi_th('block_flow_shared', 'text-end') }}
+                {{ th('Flow (m³/h)', 'التدفق (م³/س)', 'text-end') }}
+                {{ th('Ø (mm)', 'القطر (مم)', 'text-end') }}
+                {{ th('Velocity (m/s)', 'السرعة (م/ث)', 'text-end') }}
+                {{ th('Loss (m)', 'الفقد (م)', 'text-end') }}
+              </tr>
+            </thead>
+            <tbody>
+              {% for level, row in path.levels.items() %}
+              <tr>
+                <td>{{ level }}</td>
+                <td class="num latin-number" title="divided by {{ row.divisor }} {{ row.divisor_basis }} · مقسوم على {{ row.divisor }} {{ row.divisor_basis }}">{{ row.divisor }}</td>
+                <td class="num latin-number">{{ (row.flow_m3s * 3600)|round(2) }}</td>
+                <td class="num latin-number">{{ (row.diameter_m * 1000)|round(1) }}</td>
+                <td class="num latin-number">
+                  {{ row.velocity_m_s }}
+                  {% if row.velocity_m_s > 2.0 %}<span class="badge text-bg-warning">{{ bilingual_stack('over 2 m/s', 'أكثر من 2 م/ث') }}</span>
+                  {% elif row.velocity_m_s < 0.5 %}<span class="badge text-bg-secondary">{{ bilingual_stack('under 0.5 m/s', 'أقل من 0.5 م/ث') }}</span>{% endif %}
+                </td>
+                <td class="num latin-number">{{ row.headloss_m|round(2) }}</td>
+              </tr>
+              {% else %}
+                <tr><td colspan="6" class="empty">{{ bilingual_label('No pipes recorded yet.', 'لا توجد أنابيب مسجّلة بعد.') }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="h6 mt-4 mb-1">{{ bilingual_heading('Pipe length recorded', 'أطوال الأنابيب المسجلة') }}</h3>
+        <table class="table table-sm mb-0">
+          <thead>
+            <tr>
+              {{ bi_th('level') }}
+              {{ bi_th('length', 'text-end') }}
+            </tr>
+          </thead>
+          <tbody>
+            {% for level, length in pipe_totals.items() %}
+              <tr><td>{{ level }}</td><td class="num latin-number">{{ length }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% set taw = soil.total_available_water_mm|round(2) %}
+        {% set raw = soil.readily_available_water_mm|round(2) %}
+        <p class="small text-secondary mt-3 mb-0">
+          {{ bilingual_label('Soil reserve: TAW ' ~ taw ~ ' mm, RAW ' ~ raw ~ ' mm.',
+                             'مخزون التربة: TAW ' ~ taw ~ ' مم، RAW ' ~ raw ~ ' مم.') }}
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mt-3">
+  <div class="card-header">
+    <h2 class="h6 mb-0">{{ bilingual_heading('Assumptions', 'الفرضيات') }}</h2>
+  </div>
+  <div class="card-body">
+    <form id="assumptions-save" method="post"
+          action="{{ url_for('report.bilan_hydrique', project_id=project['_id']) }}">
+      <input type="hidden" name="action" value="save">
+      <div class="row g-3">
+        {% for name, label_en, label_ar, mode in [
+            ('et0_mm_per_day', 'ET0 (mm/day)', 'التبخر-النتح المرجعي (مم/يوم)', 'decimal'),
+            ('kc', 'Crop coefficient Kc', 'معامل المحصول Kc', 'decimal'),
+            ('rainfall_mm_per_day', 'Rainfall (mm/day)', 'الأمطار (مم/يوم)', 'decimal'),
+            ('hours_per_day', 'Hours per day', 'ساعات التشغيل يومياً', 'decimal'),
+            ('season_days', 'Season days', 'أيام الموسم', 'numeric'),
+            ('field_capacity', 'Field capacity (m³/m³)', 'السعة الحقلية (م³/م³)', 'decimal'),
+            ('wilting_point', 'Wilting point (m³/m³)', 'نقطة الذبول (م³/م³)', 'decimal'),
+            ('root_depth_m', 'Root depth (m)', 'عمق الجذور (م)', 'decimal'),
+            ('depletion_fraction', 'Depletion fraction p', 'جزء الاستنفاد p', 'decimal'),
+            ('static_lift_m', 'Static lift (m)', 'الرفع الساكن (م)', 'decimal'),
+            ('outlet_pressure_m', 'Outlet pressure (m)', 'ضغط المخرج (م)', 'decimal'),
+            ('pump_efficiency', 'Pump efficiency', 'كفاءة المضخة', 'decimal'),
+            ('ec_water_ds_m', 'Water EC (dS/m)', 'ملوحة المياه (دس/م)', 'decimal')] %}
+          <div class="col-sm-6 col-lg-4 col-xl-3">
+            <label class="form-label" for="assumption-{{ name }}">
+              {{ bilingual_label(label_en, label_ar) }}
+            </label>
+            <input class="form-control text-end latin-number" id="assumption-{{ name }}" type="text"
+                   name="{{ name }}" inputmode="{{ mode }}" value="{{ values[name] }}">
+          </div>
+        {% endfor %}
+        <div class="col-sm-6 col-lg-4 col-xl-3">
+          <label class="form-label" for="assumption-system">
+            {{ bilingual_label('System', 'نظام الري') }}
+          </label>
+          <select class="form-select" id="assumption-system" name="irrigation_system">
+            {% for key, label_en, label_ar in [
+                ('drip', 'Drip (90%)', 'بالتنقيط (90%)'),
+                ('micro_sprinkler', 'Micro-sprinkler (85%)', 'رشّ دقيق (85%)'),
+                ('sprinkler', 'Sprinkler (75%)', 'رشّاشات (75%)'),
+                ('furrow', 'Furrow (65%)', 'أثلام (65%)'),
+                ('surface', 'Surface (60%)', 'سطحية (60%)')] %}
+              <option value="{{ key }}" {{ 'selected' if values.irrigation_system == key }}>
+                {{ label_en }} · {{ label_ar }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </form>
+
+    {# The two buttons belong to two different posts, so they live outside the
+       forms and name their target with the ``form`` attribute. #}
+    <div class="page-toolbar mt-3">
+      <button class="btn btn-primary" type="submit" form="assumptions-save">
+        {{ bi_button('save', 'bi-check-lg') }}
+      </button>
+      <button class="btn btn-outline-danger" type="submit" form="assumptions-reset">
+        {{ bi_button('reset', 'bi-arrow-counterclockwise') }}
+      </button>
+    </div>
+
+    <form id="assumptions-reset" method="post"
+          action="{{ url_for('report.bilan_hydrique', project_id=project['_id']) }}"
+          data-confirm="Reset the assumptions to their defaults? · إعادة الفرضيات إلى قيمها الافتراضية؟">
+      <input type="hidden" name="action" value="reset">
+    </form>
+  </div>
+</div>
+{% endblock %}

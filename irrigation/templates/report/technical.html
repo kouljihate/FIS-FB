@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+{% from "shared/_macros.html" import bilingual_heading, bilingual_label, bilingual_stack, bilingual_button, bi_button, bi_label, bi_stack, bi_th, th with context %}
+{% block title %}{{ t('technical_report') }} · {{ t('app_name') }}{% endblock %}
+{% block content %}
+
+<div class="wf-page-header mb-2">
+  <h1 class="wf-title-en h4 mb-0">{{ t_en('technical_report') }}</h1>
+  <span class="wf-icon"><i class="bi bi-file-earmark-text"></i></span>
+  <h2 class="wf-title-ar ar-text h4 mb-0" lang="ar" dir="rtl">{{ t_ar('technical_report') }}</h2>
+</div>
+
+<p class="text-secondary small">
+  {{ project.name }} &middot;
+  {{ bilingual_label('technical report model for DPA', 'نموذج التقرير الفني للمديرية') }}
+</p>
+
+<div class="page-toolbar justify-content-end mb-3">
+  <a class="btn btn-outline-secondary" href="{{ url_for('report.bilan_hydrique', project_id=project['_id']) }}">
+    {{ bilingual_button(t_en('bilan_hydrique'), t_ar('bilan_hydrique'), 'bi-arrow-left') }}
+  </a>
+  <button class="btn btn-outline-primary" type="button" onclick="window.print()">
+    {{ bi_button('print_pdf', 'bi-printer') }}
+  </button>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header">
+    <h2 class="h6 mb-0">
+      {{ bilingual_heading('1. Project identification', '١. تعريف المشروع') }}
+    </h2>
+  </div>
+  <div class="card-body">
+    <table class="table table-sm mb-0">
+      <tbody>
+        {% for label_en, label_ar, value in [
+            ('Project', 'المشروع', project.name),
+            ('Description', 'الوصف', project.description or '—'),
+            ('Irrigated area', 'المساحة المروية', area_ha ~ ' ha'),
+            ('Water sources', 'مصادر المياه', sources|length),
+            ('Sectors / zones', 'القطاعات / المناطق', sectors|length ~ ' / ' ~ zones|length),
+            ('Rows / trees', 'الصفوف / الأشجار', rows|length ~ ' / ' ~ trees|length)] %}
+          <tr>
+            <th scope="row">{{ bilingual_stack(label_en, label_ar) }}</th>
+            <td class="latin-number">{{ value }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header">
+    <h2 class="h6 mb-0">
+      {{ bilingual_heading('2. Validation findings', '٢. نتائج التحقق') }}
+    </h2>
+  </div>
+  <div class="card-body">
+    {% if validation %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              {{ th('Finding', 'الملاحظة') }}
+              {{ th('Severity', 'الخطورة') }}
+              {{ th('Recommendation', 'التوصية') }}
+            </tr>
+          </thead>
+          <tbody>
+            {% for title, severity, advice in validation %}
+              <tr>
+                <td>{{ title }}</td>
+                <td>
+                  <span class="badge {{ 'text-bg-warning' if severity == 'warning' else 'text-bg-info' }}">
+                    {{ severity }}
+                  </span>
+                </td>
+                <td class="small">{{ advice }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="small mb-0">
+        <span class="badge text-bg-success">{{ bilingual_stack('No blocking findings', 'لا توجد ملاحظات مانعة') }}</span>
+        {{ bilingual_label('The design has the areas, sources and pipes needed for a report.',
+                           'يحتوي التصميم على المساحات والمصادر والأنابيب اللازمة لإعداد تقرير.') }}
+      </p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header">
+    <h2 class="h6 mb-0">{{ bilingual_heading('3. Sectors', '٣. القطاعات') }}</h2>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          {{ bi_th('name') }}
+          {{ th('Area (ha)', 'المساحة (هكتار)', 'text-end') }}
+          {{ th('Perimeter (m)', 'المحيط (م)', 'text-end') }}
+          {{ th('Vertices', 'الرؤوس', 'text-end') }}
+        </tr>
+      </thead>
+      <tbody>
+        {% for sector in sectors %}
+          {% set m = sector.metrics or {} %}
+          <tr>
+            <td>{{ sector.name }}</td>
+            <td class="num latin-number">{{ m.get('area_ha', '—') }}</td>
+            <td class="num latin-number">{{ m.get('perimeter_m', '—') }}</td>
+            <td class="num latin-number">{{ m.get('vertices', '—') }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="4" class="empty">{{ bilingual_label('No sectors.', 'لا توجد قطاعات.') }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header">
+    <h2 class="h6 mb-0">{{ bilingual_heading('4. Hydraulic network', '٤. الشبكة الهيدروليكية') }}</h2>
+  </div>
+  <div class="card-body">
+    <table class="table table-sm mb-0">
+      <thead>
+        <tr>
+          {{ bi_th('level') }}
+          {{ th('Length (m)', 'الطول (م)', 'text-end') }}
+        </tr>
+      </thead>
+      <tbody>
+        {% for level, length in pipe_totals.items() %}
+          <tr><td>{{ level }}</td><td class="num latin-number">{{ length|round(2) }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if pipes %}
+      <div class="table-responsive mt-3">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              {{ bi_th('name') }}
+              {{ bi_th('level') }}
+              {{ th('Diameter (mm)', 'القطر (مم)', 'text-end') }}
+              {{ th('Length (m)', 'الطول (م)', 'text-end') }}
+              {{ bi_th('material') }}
+            </tr>
+          </thead>
+          <tbody>
+            {% for pipe in pipes %}
+              <tr>
+                <td>{{ pipe.name }}</td>
+                <td><span class="badge text-bg-secondary">{{ pipe.get('level') or pipe.get('kind') or '—' }}</span></td>
+                <td class="num latin-number">{{ pipe.diameter_mm or '—' }}</td>
+                <td class="num latin-number">{{ pipe.length_m or '—' }}</td>
+                <td>{{ pipe.material or '—' }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header">
+    <h2 class="h6 mb-0">{{ bilingual_heading('5. Water sources', '٥. مصادر المياه') }}</h2>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          {{ bi_th('name') }}
+          {{ bi_th('kind') }}
+          {{ th('Flow (m³/h)', 'التدفق (م³/س)', 'text-end') }}
+          {{ th('Static level (m)', 'المستوى الساكن (م)', 'text-end') }}
+          {{ th('Depth (m)', 'العمق (م)', 'text-end') }}
+        </tr>
+      </thead>
+      <tbody>
+        {% for source in sources %}
+          <tr>
+            <td>{{ source.name }}</td>
+            <td><span class="badge text-bg-info">{{ source.kind }}</span></td>
+            <td class="num latin-number">{{ source.flow_m3h or '—' }}</td>
+            <td class="num latin-number">{{ source.static_level_m or '—' }}</td>
+            <td class="num latin-number">{{ source.depth_m or '—' }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="5" class="empty">{{ bilingual_label('No water sources recorded.', 'لا توجد مصادر مياه مسجّلة.') }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h2 class="h6 mb-0">{{ bilingual_heading('6. Design assumptions', '٦. فرضيات التصميم') }}</h2>
+  </div>
+  <div class="card-body">
+    <table class="table table-sm mb-0">
+      <tbody>
+        <tr>
+          <th scope="row">{{ bilingual_stack('ET0', 'التبخر-النتح المرجعي') }}</th>
+          <td class="latin-number">{{ assumptions.et0_mm_per_day }} mm/day</td>
+        </tr>
+        <tr>
+          <th scope="row">{{ bilingual_stack('Kc', 'معامل المحصول') }}</th>
+          <td class="latin-number">{{ assumptions.kc }}</td>
+        </tr>
+        <tr>
+          <th scope="row">{{ bilingual_stack('System', 'نظام الري') }}</th>
+          <td class="latin-number">{{ assumptions.irrigation_system }}</td>
+        </tr>
+        <tr>
+          <th scope="row">{{ bilingual_stack('Hours per day', 'ساعات التشغيل يومياً') }}</th>
+          <td class="latin-number">{{ assumptions.hours_per_day }}</td>
+        </tr>
+        <tr>
+          <th scope="row">{{ bilingual_stack('Season', 'الموسم') }}</th>
+          <td class="latin-number">{{ assumptions.season_days }} days</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="small text-secondary mt-3 mb-0">
+      {{ bilingual_label('Figures marked as approximations come from the assumptions page; run the Bilan Hydrique to review them against the drawn area.',
+                         'الأرقام المعلّمة كتقديرية مصدرها صفحة الفرضيات؛ شغّل الموازنة المائية لمراجعتها مقابل المساحة المرسومة.') }}
+    </p>
+  </div>
+</div>
+{% endblock %}

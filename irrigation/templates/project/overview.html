@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% from "shared/_macros.html" import bilingual_heading, bilingual_label, bilingual_stack, bilingual_button, bi_button, bi_label, bi_stack, bi_th, th with context %}
+{% block title %}{{ project.name }} · {{ t('app_name') }}{% endblock %}
+{% block content %}
+
+<div class="wf-page-header mb-3">
+  <h1 class="wf-title-en h4 mb-0">{{ project.name }}</h1>
+  <span class="wf-icon"><i class="bi bi-diagram-3"></i></span>
+  <h2 class="wf-title-ar ar-text h4 mb-0" lang="ar" dir="rtl">{{ project.name }}</h2>
+</div>
+<p class="text-secondary small">
+  {% if project.description %}{{ project.description }}{% else %}{{ bilingual_label('No description', 'لا يوجد وصف') }}{% endif %}
+</p>
+
+<div class="page-toolbar justify-content-end mb-3">
+  <a class="btn btn-outline-secondary" href="{{ url_for('geometry.sectors', project_id=project['_id']) }}">
+    {{ bilingual_button(t_en('geometry'), t_ar('geometry'), 'bi-bounding-box-circles') }}
+  </a>
+  <a class="btn btn-outline-primary" href="{{ url_for('project.edit_project', project_id=project['_id']) }}">
+    {{ bi_button('edit_project', 'bi-pencil-square') }}
+  </a>
+  <button class="btn btn-outline-danger" type="button"
+          data-bs-toggle="modal" data-bs-target="#modal-delete-project">
+    {{ bi_button('remove', 'bi-trash') }}
+  </button>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header">
+    <h2 class="h6 mb-0">{{ bilingual_heading('Land', 'الأرض') }}</h2>
+  </div>
+  <div class="card-body">
+    {% if land_metrics.get('area_ha') %}
+      <div class="row row-cols-2 row-cols-md-4 g-3 text-center">
+        {% for label_en, label_ar, value in [
+            ('Area (ha)', 'المساحة (هكتار)', land_metrics.area_ha),
+            ('Area (m²)', 'المساحة (م²)', land_metrics.area_m2),
+            ('Perimeter (m)', 'المحيط (م)', land_metrics.perimeter_m),
+            ('Vertices', 'الرؤوس', land_metrics.vertices)] %}
+          <div class="col">
+            <div class="text-uppercase text-secondary small">
+              {{ bilingual_stack(label_en, label_ar) }}
+            </div>
+            <div class="fs-5 fw-bold latin-number">{{ value }}</div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="empty">
+        {{ bilingual_label('No land boundary recorded. Open the project edit page to upload its map.',
+                           'لا توجد حدود أرض مسجّلة. افتح صفحة تعديل المشروع لرفع خريطته.') }}
+      </p>
+    {% endif %}
+
+    <p class="small mb-0 mt-3">
+      {{ bilingual_label('Linked map:', 'الخريطة المرتبطة:') }}
+      {% if project.get('map') %}
+        <span class="badge text-bg-secondary text-uppercase">{{ project['map'].get('kind') }}</span>
+        <span class="font-monospace">{{ project['map'].get('original_name') }}</span>
+        <a class="ms-2" href="{{ url_for('project.download_map', project_id=project['_id']) }}">
+          {{ bi_button('download', 'bi-download') }}
+        </a>
+      {% else %}
+        <span class="badge text-bg-warning">
+          {{ bilingual_stack('No map linked', 'لا توجد خريطة مرتبطة') }}
+        </span>
+      {% endif %}
+    </p>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header">
+    <h2 class="h6 mb-0">{{ bilingual_heading('Record counts', 'عدد السجلات') }}</h2>
+  </div>
+  <div class="card-body">
+    <div class="row row-cols-2 row-cols-md-4 g-3 text-center">
+      {% for key, label_en, label_ar in [
+          ('sectors', 'Sectors', 'القطاعات'), ('zones', 'Zones', 'المناطق'),
+          ('rows', 'Rows', 'الصفوف'), ('trees', 'Trees', 'الأشجار'),
+          ('pipes', 'Pipes', 'الأنابيب'), ('fittings', 'Components', 'المكوّنات'),
+          ('water_resources', 'Water sources', 'مصادر المياه')] %}
+        <div class="col">
+          <div class="text-uppercase text-secondary small">
+            {{ bilingual_stack(label_en, label_ar) }}
+          </div>
+          <div class="fs-5 fw-bold latin-number">{{ stats.get(key, 0) }}</div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header">
+    <h2 class="h6 mb-0">{{ bilingual_heading('Design settings', 'إعدادات التصميم') }}</h2>
+  </div>
+  <div class="card-body">
+    {% set settings = project.settings or {} %}
+    <form method="post" action="{{ url_for('project.update_settings', project_id=project['_id']) }}">
+      <div class="row g-3">
+        {# One label key per setting: the i18n table holds both languages. #}
+        {% for name in ['sector_target_ha', 'zones_per_sector', 'pipe_diameters_mm',
+                        'dripper_flow_lph', 'dripper_spacing_m', 'lateral_spacing_m'] %}
+          <div class="col-md-4">
+            <label class="form-label" for="setting-{{ name }}">{{ bi_label(name) }}</label>
+            <input class="form-control" id="setting-{{ name }}" type="text" name="{{ name }}"
+                   value="{{ settings.get(name) or '' }}">
+          </div>
+        {% endfor %}
+      </div>
+      <button class="btn btn-primary mt-3" type="submit">
+        {{ bi_button('save', 'bi-check-lg') }}
+      </button>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h2 class="h6 mb-0">{{ bilingual_heading('Team', 'الفريق') }}</h2>
+  </div>
+  <div class="card-body">
+    <form class="row g-2 align-items-end" method="post"
+          action="{{ url_for('project.add_member', project_id=project['_id']) }}">
+      <div class="col-md-5">
+        <label class="form-label" for="member-username">{{ bi_label('grant_access') }}</label>
+        <input class="form-control" id="member-username" type="text" name="username"
+               placeholder="username · اسم المستخدم">
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-outline-primary" type="submit">{{ bi_button('add') }}</button>
+      </div>
+    </form>
+    {% set member_count = project.members|length if project.members else 0 %}
+    <p class="small text-secondary mt-3 mb-0">
+      {{ bilingual_label(member_count ~ ' member(s) besides the owner.',
+                         member_count ~ ' عضو/أعضاء بالإضافة إلى المالك.') }}
+    </p>
+  </div>
+</div>
+
+{# ---------------------------- rename modal ---------------------------- #}
+<div class="modal fade" id="modal-rename-project" tabindex="-1"
+     aria-labelledby="modal-rename-project-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="{{ url_for('project.rename_project', project_id=project['_id']) }}">
+        <div class="modal-header">
+          <h3 class="modal-title h5" id="modal-rename-project-title">
+            {{ bilingual_heading('Rename project', 'إعادة تسمية المشروع') }}
+          </h3>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"
+                  aria-label="{{ t('close') }}"></button>
+        </div>
+        <div class="modal-body">
+          <label class="form-label" for="rename-name">{{ bi_label('name') }}</label>
+          <input class="form-control" id="rename-name" type="text" name="name"
+                 value="{{ project.name }}" required>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">
+            {{ bi_button('cancel') }}
+          </button>
+          <button class="btn btn-primary" type="submit">{{ bi_button('save') }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{# ---------------------------- delete modal ---------------------------- #}
+<div class="modal fade" id="modal-delete-project" tabindex="-1"
+     aria-labelledby="modal-delete-project-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="{{ url_for('project.delete_project', project_id=project['_id']) }}">
+        <div class="modal-header confirm-delete-header">
+          <h3 class="modal-title h5" id="modal-delete-project-title">
+            <i class="bi bi-exclamation-triangle confirm-delete-icon-col me-2"></i>
+            Delete project / <span class="confirm-delete-title-ar ar-text" lang="ar" dir="rtl">حذف المشروع</span>
+          </h3>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                  aria-label="{{ t('close') }}"></button>
+        </div>
+        <div class="modal-body confirm-delete-body">
+          <p class="confirm-delete-en">
+            This removes <strong>{{ project.name }}</strong> together with its sectors, zones, rows,
+            trees, pipes, components, water sources and estimation.
+          </p>
+          <p class="confirm-delete-ar ar-text" lang="ar" dir="rtl">
+            يحذف هذا المشروع مع قطاعاته ومناطقه وصفوفه وأشجاره وأنابيبه ومكوّناته ومصادر مياهه وتقديره.
+          </p>
+          <p class="small mb-0">{{ bilingual_label('This cannot be undone.', 'لا يمكن التراجع عن هذا.') }}</p>
+        </div>
+        <div class="modal-footer confirm-delete-footer">
+          <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">
+            {{ bi_button('cancel') }}
+          </button>
+          <button class="btn confirm-delete-btn" type="submit">
+            {{ bi_button('delete_permanently') }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

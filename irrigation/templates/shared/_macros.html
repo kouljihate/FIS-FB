@@ -1,0 +1,82 @@
+{# Reusable bilingual building blocks shared by every screen.
+
+   The application chrome is bilingual everywhere: English and Arabic are always
+   printed together and neither is ever hidden.
+
+   Two arrangements are used:
+
+   * ``bilingual_stack`` - Arabic on top, English below.  This is the rule for
+     tabs, buttons and table headers.
+   * ``bilingual_heading`` / ``bilingual_label`` - English on the left, Arabic on
+     the right.  This is the rule for titles, section headings and form labels.
+#}
+
+{# Arabic on top, English below - tabs, buttons and table headers. #}
+{% macro bilingual_stack(en, ar, extra_class='') -%}
+  <span class="bilingual-stack {{ extra_class }}">
+    <span class="bilingual-stack-ar ar-text" lang="ar" dir="rtl">{{ ar }}</span>
+    <span class="bilingual-stack-en latin-number">{{ en }}</span>
+  </span>
+{%- endmacro %}
+
+{# Table header cell carrying both languages, Arabic first. #}
+{% macro th(en, ar, extra_class='') -%}
+  <th class="{{ extra_class }}">{{ bilingual_stack(en, ar) }}</th>
+{%- endmacro %}
+
+{# Shorthand: the text comes from the i18n table. #}
+{% macro bi_stack(key) -%}
+  {{ bilingual_stack(t_en(key), t_ar(key)) }}
+{%- endmacro %}
+
+{% macro bi_label(key) -%}
+  {{ bilingual_label(t_en(key), t_ar(key)) }}
+{%- endmacro %}
+
+{% macro bi_th(key, extra_class='') -%}
+  <th class="{{ extra_class }}">{{ bilingual_stack(t_en(key), t_ar(key)) }}</th>
+{%- endmacro %}
+
+{# English on the left, Arabic on the right - titles and headings. #}
+{% macro bilingual_heading(en, ar) -%}
+  <span class="bilingual-heading">
+    <span class="bilingual-heading-en">{{ en }}</span>
+    <span class="bilingual-heading-ar ar-text" lang="ar" dir="rtl">{{ ar }}</span>
+  </span>
+{%- endmacro %}
+
+{# English on the left, Arabic on the right - form labels. #}
+{% macro bilingual_label(en, ar) -%}
+  <span class="bilingual-label">
+    <span class="bilingual-label-en">{{ en }}</span>
+    <span class="bilingual-label-ar ar-text" lang="ar" dir="rtl">{{ ar }}</span>
+  </span>
+{%- endmacro %}
+
+{# A bilingual button: Arabic above English, with an optional icon to the side. #}
+{% macro bilingual_button(en, ar, icon=None) -%}
+  <span class="bilingual-button">
+    <span class="bilingual-button-text">
+      <span class="bilingual-button-ar ar-text" lang="ar" dir="rtl">{{ ar }}</span>
+      <span class="bilingual-button-en latin-number">{{ en }}</span>
+    </span>
+    {% if icon %}<span class="bilingual-button-icon"><i class="bi {{ icon }}"></i></span>{% endif %}
+  </span>
+{%- endmacro %}
+
+{# Button text straight from the i18n table, both languages. #}
+{% macro bi_button(key, icon=None) -%}
+  {{ bilingual_button(t_en(key), t_ar(key), icon) }}
+{%- endmacro %}
+
+{# Statistic tile. #}
+{% macro stat_tile(key_en, key_ar, value) -%}
+  <div class="col">
+    <div class="card h-100 text-center">
+      <div class="card-body py-2">
+        <div class="text-uppercase text-secondary small">{{ bilingual_stack(key_en, key_ar) }}</div>
+        <div class="fs-5 fw-bold latin-number">{{ value }}</div>
+      </div>
+    </div>
+  </div>
+{%- endmacro %}

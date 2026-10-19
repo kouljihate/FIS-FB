@@ -1,0 +1,1558 @@
+@font-face {
+    font-family: 'VIP-Rawy';
+    src: url('../fonts/VIP-Rawy-Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'VIP-Rawy';
+    src: url('../fonts/VIP-Rawy-Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Comfortaa';
+    src: url('../fonts/Comfortaa-Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Comfortaa';
+    src: url('../fonts/Comfortaa-Light.ttf') format('truetype');
+    font-weight: 300;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Comfortaa';
+    src: url('../fonts/Comfortaa-Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+:root {
+    /* English default: Comfortaa. Arabic glyphs fall back to VIP-Rawy. */
+    --font-en: 'Comfortaa', 'VIP-Rawy', sans-serif;
+    /* Arabic default: VIP-Rawy. */
+    --font-ar: 'VIP-Rawy', 'Comfortaa', sans-serif;
+    /* Make Bootstrap/Bootswatch use the same defaults. */
+    --bs-body-font-family: var(--font-en);
+    --bs-font-sans-serif: var(--font-en);
+
+    /* ── Pastel palette ────────────────────────────────────────────────────
+       The whole interface is built from soft tints of six hues, the way a
+       Nicepage pastel template is: blush, peach, butter, mint, sky, lavender.
+       The plain values are the accents (fills, active tabs), the "-tint"
+       values are the light surfaces. */
+    --pastel-rose: #ffb3ba;
+    --pastel-peach: #ffdfba;
+    --pastel-butter: #fff3bd;
+    --pastel-mint: #baffc9;
+    --pastel-sky: #bae1ff;
+    --pastel-lavender: #cfc4f2;
+
+    --pastel-rose-tint: #ffe8ea;
+    --pastel-peach-tint: #fff2e2;
+    --pastel-butter-tint: #fffbdd;
+    --pastel-mint-tint: #e6fbea;
+    --pastel-sky-tint: #e6f3ff;
+    --pastel-lavender-tint: #f0edfc;
+    --pastel-page: #faf8ff;
+
+    /* Readable ink for pastel surfaces; the tints are too light for white. */
+    --pastel-ink: #4a4a63;
+    --pastel-ink-soft: #7b7b95;
+    --pastel-accent-text: #4f6ea6;
+    --pastel-border: #e4dff5;
+
+    /* Card bands, drawn from the palette above. */
+    --card-header-pastel: var(--pastel-lavender-tint);
+    --card-body-pastel: var(--pastel-mint-tint);
+    --card-footer-pastel: var(--pastel-butter-tint);
+    --card-band-border: rgba(74, 74, 99, 0.12);
+}
+
+/* The two default fonts everywhere — no other fonts. */
+html, body, h1, h2, h3, h4, h5, h6, p, a, li, dl, dt, dd, td, th, label,
+small, strong, b, em, ul, ol, button, input, select, textarea,
+.en-text, .navbar, .nav-link, .btn, .card, .table, .form-control, .form-select,
+.form-label, .form-check-label, .badge, .modal, .dropdown-menu, .list-group-item,
+.card-header, .navbar-brand, .breadcrumb, .alert, .nav-item, .form-text {
+    font-family: var(--font-en) !important;
+}
+
+/* Arabic text uses VIP-Rawy */
+.ar-text,
+[lang="ar"],
+.lang-ar,
+.bilingual .ar {
+    font-family: var(--font-ar) !important;
+    direction: rtl;
+}
+
+/* RTL support for Arabic sections */
+.ar-section {
+    direction: rtl;
+    text-align: right;
+}
+
+/* Bilingual label: English + Arabic side by side */
+.bilingual {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.4em;
+}
+
+.bilingual .ar {
+    font-family: var(--font-ar);
+    direction: rtl;
+}
+
+.bilingual-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    width: 100%;
+}
+
+.bilingual-heading-en {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    min-width: 0;
+}
+
+.bilingual-heading-ar {
+    direction: rtl;
+    text-align: right;
+    margin-left: auto;
+}
+
+.bilingual-label {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.75rem;
+    width: 100%;
+}
+
+.bilingual-label-en {
+    display: inline-flex;
+    align-items: baseline;
+    min-width: 0;
+}
+
+.bilingual-label-ar {
+    direction: rtl;
+    text-align: right;
+    margin-left: auto;
+}
+
+.bilingual-button {
+    display: inline-grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 0.5rem;
+    direction: ltr;
+}
+
+.bilingual-button-text {
+    grid-column: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    min-width: 0;
+}
+
+.bilingual-button-en {
+    display: block;
+    order: 2;
+    text-align: center;
+}
+
+.bilingual-button-ar {
+    direction: rtl;
+    text-align: center;
+    order: 1;
+    white-space: nowrap;
+}
+
+.bilingual-button-icon {
+    grid-column: 2;
+    display: grid;
+    place-items: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    font-size: 1.5rem;
+    line-height: 1;
+}
+
+/* Fixed header and footer */
+body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    margin: 0;
+}
+
+.main-content {
+    flex: 1;
+    padding-bottom: 60px;
+}
+
+.auth-main-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.auth-main-content > .row {
+    width: 100%;
+}
+
+footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1030;
+    background-color: var(--bs-dark, #343a40);
+    color: rgba(255, 255, 255, 0.7);
+    padding: 0.5rem 1rem;
+    text-align: center;
+    font-size: 0.8rem;
+}
+
+.version-badge {
+    background-color: rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.85);
+    font-weight: 500;
+    font-size: 0.72rem;
+    padding: 0.35em 0.65em;
+}
+
+.flash-toast-container {
+    position: fixed;
+    top: 70%;
+    right: 1rem;                 /* distance from right edge */
+    transform: translateY(-70%); /* move up by 50% of its own height */
+    z-index: 1090;
+}
+
+.flash-toast {
+    width: min(30rem, calc(200vw - 2rem));
+}
+
+.projects-page {
+    font-family: var(--font-en);
+}
+
+.projects-page-header {
+    display: grid;
+    grid-template-columns: 15% 70% 15%;
+    align-items: center;
+}
+
+.projects-page-title-en {
+    grid-column: 1;
+    justify-self: start;
+    margin: 0;
+}
+
+.projects-page-create {
+    grid-column: 2;
+    justify-self: center;
+}
+
+.projects-page-title-ar {
+    grid-column: 3;
+    justify-self: end;
+    margin: 0;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.projects-page :is(h1, h2, h3, h4, h5, h6) {
+    font-family: var(--font-en) !important;
+}
+
+.projects-page .ar-text,
+.projects-page .bilingual-heading-ar,
+.projects-page .bilingual-label-ar,
+.projects-page .bilingual-button-ar {
+    font-family: var(--font-ar) !important;
+}
+
+.geometry-sectors-header {
+    display: grid;
+    grid-template-columns: 15% 70% 15%;
+    align-items: center;
+}
+
+.geometry-sectors-title-en,
+.geometry-sectors-title-ar {
+    margin: 0;
+    white-space: nowrap;
+}
+
+.geometry-sectors-title-en {
+    grid-column: 1;
+    justify-self: start;
+    font-family: var(--font-en) !important;
+}
+
+.geometry-sectors-icon {
+    grid-column: 2;
+    justify-self: center;
+    color: var(--bs-primary);
+    font-size: 1.5rem;
+}
+
+.geometry-sectors-title-ar {
+    grid-column: 3;
+    justify-self: end;
+    text-align: right;
+    font-family: var(--font-ar) !important;
+}
+
+.geometry-zones-header {
+    display: grid;
+    grid-template-columns: 15% 70% 15%;
+    align-items: center;
+}
+
+.geometry-zones-title-en,
+.geometry-zones-title-ar {
+    margin: 0;
+    white-space: nowrap;
+}
+
+.geometry-zones-title-en {
+    grid-column: 1;
+    justify-self: start;
+    font-family: var(--font-en) !important;
+}
+
+.geometry-zones-icon {
+    grid-column: 2;
+    justify-self: center;
+    color: var(--bs-primary);
+    font-size: 1.5rem;
+}
+
+.geometry-zones-title-ar {
+    grid-column: 3;
+    justify-self: end;
+    text-align: right;
+    font-family: var(--font-ar) !important;
+}
+
+/* Generic workflow page header (Hydrology 1: Main Pipe / Zone Pipe) */
+.wf-page-header {
+    display: grid;
+    grid-template-columns: 15% 70% 15%;
+    align-items: center;
+}
+
+.wf-title-en,
+.wf-title-ar {
+    margin: 0;
+    white-space: nowrap;
+}
+
+.wf-title-en {
+    grid-column: 1;
+    justify-self: start;
+    font-family: var(--font-en) !important;
+}
+
+.wf-icon {
+    grid-column: 2;
+    justify-self: center;
+    color: var(--bs-primary);
+    font-size: 1.5rem;
+}
+
+.wf-title-ar {
+    grid-column: 3;
+    justify-self: end;
+    text-align: right;
+    font-family: var(--font-ar) !important;
+}
+
+.latin-number,
+.projects-page .latin-number {
+    font-family: var(--font-en) !important;
+    direction: ltr;
+    unicode-bidi: isolate;
+}
+
+.form-control,
+.form-select,
+textarea {
+    font-family: var(--font-en) !important;
+}
+
+@media (max-width: 767.98px) {
+    .geometry-sectors-header {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0.35rem;
+    }
+
+    .geometry-sectors-title-en,
+    .geometry-sectors-icon,
+    .geometry-sectors-title-ar {
+        grid-column: 1;
+    }
+
+    .geometry-sectors-title-en {
+        grid-row: 1;
+    }
+
+    .geometry-sectors-icon {
+        grid-row: 2;
+    }
+
+    .geometry-sectors-title-ar {
+        grid-row: 3;
+    }
+
+    .geometry-zones-header {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0.35rem;
+    }
+
+    .geometry-zones-title-en,
+    .geometry-zones-icon,
+    .geometry-zones-title-ar {
+        grid-column: 1;
+    }
+
+    .geometry-zones-title-en {
+        grid-row: 1;
+    }
+
+    .geometry-zones-icon {
+        grid-row: 2;
+    }
+
+    .geometry-zones-title-ar {
+        grid-row: 3;
+    }
+
+    .wf-page-header {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0.35rem;
+    }
+
+    .wf-title-en,
+    .wf-icon,
+    .wf-title-ar {
+        grid-column: 1;
+    }
+
+    .wf-title-en {
+        grid-row: 1;
+    }
+
+    .wf-icon {
+        grid-row: 2;
+    }
+
+    .wf-title-ar {
+        grid-row: 3;
+    }
+
+    .projects-page-header {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0.75rem;
+    }
+
+    .projects-page-title-en,
+    .projects-page-create,
+    .projects-page-title-ar {
+        grid-column: 1;
+    }
+
+    .projects-page-title-en {
+        grid-row: 1;
+    }
+
+    .projects-page-create {
+        grid-row: 2;
+        justify-self: center;
+    }
+
+    .projects-page-title-ar {
+        grid-row: 3;
+        justify-self: end;
+    }
+}
+
+/* Rounded buttons */
+.btn {
+    border-radius: 1.5rem !important;
+    padding: 0.375rem 1.25rem;
+}
+
+/* Circle buttons inside tables */
+.btn-circle {
+    width: 38px;
+    height: 38px;
+    border-radius: 50% !important;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 2px;
+}
+
+.btn-circle-sm {
+    width: 32px;
+    height: 32px;
+    border-radius: 50% !important;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 1px;
+    font-size: 0.85rem;
+}
+
+/* Navbar styling */
+.navbar {
+    position: sticky;
+    top: 0;
+    z-index: 1031;
+}
+
+.navbar > .planner-navbar {
+    display: grid;
+    grid-template-columns: 20% 60% 20%;
+    align-items: center;
+}
+
+.planner-navbar-en {
+    grid-column: 1;
+    margin-right: 0;
+    white-space: nowrap;
+}
+
+.planner-navbar-center {
+    grid-column: 2;
+    display: flex;
+    justify-content: center;
+    min-width: 0;
+}
+
+.planner-navbar-center .navbar-collapse {
+    flex-grow: 0;
+    flex-basis: auto;
+    gap: 0.75rem;
+}
+
+.planner-navbar-actions {
+    justify-content: center;
+}
+
+.planner-navbar-ar {
+    grid-column: 3;
+    justify-self: end;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.project-workflow-nav {
+    background-color: #fff;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.project-workflow-nav .nav-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    gap: 0.35rem;
+    border-bottom: 0;
+}
+
+.project-workflow-nav .nav-item {
+    flex: 1 0 8rem;
+}
+
+.project-workflow-nav .nav-link {
+    display: grid;
+    width: 100%;
+    justify-content: center;
+    align-content: center;
+    min-height: 3.75rem;
+    height: 100%;
+    color: #343a40;
+    background-color: #e9ecef;
+    border: 1px solid #adb5bd;
+    border-bottom: 3px solid #adb5bd;
+    border-radius: 0.375rem 0.375rem 0 0;
+    font-weight: 600;
+}
+
+.project-workflow-nav .nav-link.active {
+    color: #fff;
+    background-color: var(--bs-primary, #0d6efd);
+    border-color: var(--bs-primary, #0d6efd);
+    font-weight: 700;
+}
+
+.project-workflow-nav .nav-link.disabled {
+    color: #495057;
+    background-color: #f1f3f5;
+    border-color: #ced4da;
+    opacity: 1;
+    cursor: not-allowed;
+}
+
+.project-workflow-subnav {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.project-workflow-subnav .nav {
+    flex-wrap: nowrap;
+    gap: 0.25rem;
+    overflow-x: auto;
+    padding: 0.25rem 0;
+}
+
+.project-workflow-subnav-centered .nav {
+    justify-content: center;
+}
+
+.project-workflow-subnav .nav-link {
+    display: inline-grid;
+    width: auto;
+    justify-content: center;
+    white-space: nowrap;
+}
+
+@media (max-width: 991.98px) {
+    .navbar > .planner-navbar {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 0.25rem;
+    }
+
+    .planner-navbar-en {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .planner-navbar-ar {
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    .planner-navbar-center {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .planner-navbar-center .navbar-toggler {
+        align-self: center;
+    }
+
+    .planner-navbar-center .navbar-collapse {
+        width: 100%;
+        flex-basis: 100%;
+    }
+
+    .planner-navbar-center .navbar-collapse.show {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .planner-navbar-actions {
+        align-items: center;
+    }
+}
+
+/* Map container */
+.geometry-map-card .card-header h5,
+.geometry-map-card .leaflet-container,
+.geometry-map-card .leaflet-control,
+.geometry-map-card .leaflet-popup-content,
+.geometry-map-card .map-legend {
+    font-family: var(--font-en) !important;
+}
+
+.geometry-map-card .ar-text {
+    font-family: var(--font-ar) !important;
+}
+
+/* Shared map card header: EN title (20%) | fullscreen button | AR title (20%) */
+.map-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.map-card-header .map-header-en {
+    flex: 0 0 20%;
+    max-width: 20%;
+    text-align: left;
+    overflow: hidden;
+}
+
+.map-card-header .map-header-ar {
+    flex: 0 0 20%;
+    max-width: 20%;
+    text-align: right;
+    direction: rtl;
+    overflow: hidden;
+}
+
+.map-card-header .map-header-actions {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.map-header-title {
+    font-weight: 700;
+    font-size: 1.05rem;
+    line-height: 1.2;
+}
+
+.map-fullscreen-btn {
+    color: var(--bs-primary, #0d6efd);
+    border-color: currentColor;
+    background: transparent;
+}
+
+.map-fullscreen-btn:hover,
+.map-fullscreen-btn:focus {
+    background-color: var(--bs-primary, #0d6efd);
+    color: #fff;
+}
+
+.map-fullscreen-btn.active {
+    background-color: var(--bs-primary, #0d6efd);
+    color: #fff;
+}
+
+/* Fullscreen map mode: the map container fills the viewport */
+.map-fullscreen-active {
+    position: fixed !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: none !important;
+    max-height: none !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    z-index: 1500 !important;
+    background: #fff;
+}
+
+body.map-fullscreen-lock {
+    overflow: hidden;
+}
+
+.geometry-map-select-button {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    background: #fff;
+    color: #343a40;
+}
+
+.geometry-map-split-panel {
+    width: 170px;
+    padding: 0.5rem;
+    background: #fff;
+    border-radius: 4px;
+    box-shadow: 0 1px 5px rgba(0, 0, 0, 0.4);
+}
+
+.geometry-map-split-panel[hidden] {
+    display: none;
+}
+
+.leaflet-draw-toolbar a.geometry-ruler-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-image: none;
+    background-color: #fff;
+    color: #343a40;
+    font-size: 16px;
+    text-decoration: none;
+}
+
+.leaflet-draw-toolbar a.geometry-ruler-button:hover {
+    background-color: #f4f4f4;
+}
+
+.leaflet-draw-toolbar a.geometry-ruler-button.active {
+    background-color: var(--bs-primary);
+    color: #fff;
+}
+
+.geometry-map-ruler-mode,
+.geometry-map-ruler-mode .leaflet-interactive {
+    cursor: crosshair;
+}
+
+.geometry-ruler-tooltip {
+    padding: 2px 6px;
+    border: 1px solid #c92a2a;
+    color: #c92a2a;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.geometry-ruler-tooltip.total {
+    background: #c92a2a;
+    color: #fff;
+}
+
+.geometry-ruler-tooltip.live {
+    opacity: 0.85;
+}
+
+.geometry-map-actions {
+    margin-top: 6px;
+}
+
+.geometry-map-action-button + .geometry-map-action-button {
+    border-top: 1px solid #ccc;
+}
+
+.geometry-map-select-button.active {
+    background: var(--bs-primary);
+    color: #fff;
+}
+
+.geometry-map-select-button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.geometry-map-select-mode .leaflet-interactive {
+    cursor: pointer;
+}
+
+#map {
+    width: 100%;
+    height: 500px;
+    border-radius: 0.5rem;
+    border: 1px solid #dee2e6;
+}
+
+#map-small {
+    width: 100%;
+    height: 350px;
+    border-radius: 0.5rem;
+    border: 1px solid #dee2e6;
+}
+
+/* Tab navigation */
+.nav-tabs .nav-link {
+    border-radius: 1rem 1rem 0 0;
+}
+
+/* Card styling */
+.card {
+    border-radius: 0.75rem;
+    margin-bottom: 1rem;
+    /* The body tint lives on the card itself so cards whose content is a bare
+       .table-responsive (no .card-body) are tinted as well. */
+    background-color: var(--card-body-pastel);
+}
+
+/* Three pastel bands per card: header, body, footer. */
+.card-header {
+    border-radius: 0.75rem 0.75rem 0 0 !important;
+    background-color: var(--card-header-pastel);
+    border-bottom: 1px solid var(--card-band-border);
+}
+
+.card-body {
+    background-color: var(--card-body-pastel);
+}
+
+.card-footer {
+    border-top: 1px solid var(--card-band-border);
+    border-radius: 0 0 0.75rem 0.75rem !important;
+    background-color: var(--card-footer-pastel);
+}
+
+/* Tables keep their own white background in the theme; inside a card that would
+   hide the body tint behind every row, so let the card's band show through.
+   Stripes and hover still work - they paint their own background. */
+.card .table {
+    --bs-table-bg: transparent;
+}
+
+/* Form controls */
+.form-control, .form-select {
+    border-radius: 0.5rem;
+}
+
+/* Table styling */
+.table th {
+    background-color: #f8f9fa;
+}
+
+/* Badge styling */
+.badge {
+    border-radius: 0.5rem;
+}
+
+/* Modal styling */
+.modal-content {
+    border-radius: 0.75rem;
+}
+
+.modal-header {
+    border-radius: 0.75rem 0.75rem 0 0;
+}
+
+/* ── Delete confirmation modal ──────────────────────────────────────────── */
+.confirm-delete-header {
+    background-color: #dc3545;
+    color: #fff;
+}
+
+.confirm-delete-header .modal-title {
+    color: #fff;
+    font-weight: 700;
+    margin-bottom: 0;
+}
+
+.confirm-delete-icon-col {
+    color: #fff;
+    font-size: 1.35rem;
+}
+
+.confirm-delete-title-ar {
+    direction: rtl;
+    text-align: right;
+}
+
+.confirm-delete-body {
+    background-color: #DD99BB;
+    color: #000;
+}
+
+.confirm-delete-body .confirm-delete-en {
+    font-weight: 600;
+}
+
+.confirm-delete-body .confirm-delete-ar {
+    direction: rtl;
+    text-align: right;
+}
+
+.confirm-delete-body strong {
+    font-weight: 800;
+}
+
+.confirm-delete-footer {
+    border-top: 0;
+}
+
+.confirm-delete-btn {
+    background-color: #dc3545;
+    border-color: #dc3545;
+    color: #fff;
+    border-radius: 50px;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+}
+
+.confirm-delete-btn:hover,
+.confirm-delete-btn:focus,
+.confirm-delete-btn:active {
+    background-color: #bb2d3b;
+    border-color: #b02a37;
+    color: #fff;
+}
+
+/* ── Edit-project modal: scrollable body, always-visible footer ───────────────
+   Bootstrap's modal-dialog-scrollable relies on height:calc(100% - margin*2)
+   which breaks when body is a flex container (100% is unresolvable).
+   Instead we target this modal explicitly:
+     • max-height caps the dialog at viewport minus navbar + footer clearance
+     • modal-content is a flex column → header/footer stick, body scrolls
+     • margin-bottom keeps the dialog above the 44px fixed footer
+   ──────────────────────────────────────────────────────────────────────────── */
+#editSpecModal .modal-dialog {
+    max-height: calc(100dvh - 120px); /* navbar≈60px + footer≈44px + 16px air */
+    margin-top: 16px;
+    margin-bottom: 60px; /* clears fixed footer */
+}
+
+#editSpecModal .modal-content {
+    max-height: calc(100dvh - 120px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#editSpecModal .modal-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+#editSpecModal .modal-footer {
+    flex-shrink: 0; /* never compress — always fully visible */
+}
+
+/* Bilingual toggle for the whole page */
+.page-rtl {
+    direction: rtl;
+}
+
+/* Map legend */
+.map-legend {
+    background: white;
+    padding: 10px 15px;
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+    font-size: 0.85rem;
+}
+
+.map-legend h6 {
+    margin-bottom: 5px;
+    font-size: 0.9rem;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-bottom: 3px;
+}
+
+.legend-color {
+    width: 18px;
+    height: 18px;
+    border-radius: 3px;
+    display: inline-block;
+}
+.ai-generate-sector-zones {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.global-loading-overlay {
+  position: fixed;
+  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(2px);
+  z-index: 2000;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease-in-out, visibility 0.15s ease-in-out;
+  pointer-events: none;
+}
+
+.global-loading-overlay.is-visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: all;
+}
+
+.global-loading-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 32px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 12px 40px rgba(13, 110, 253, 0.18);
+}
+
+.global-loading-gif {
+  width: 96px;
+  height: 96px;
+  display: block;
+}
+
+.global-loading-text {
+  font-family: var(--font-en);
+  font-size: 0.85rem;
+  color: var(--pastel-accent-text);
+  letter-spacing: 0.02em;
+}
+
+/* ── Pastel theme ─────────────────────────────────────────────────────────────
+   A Nicepage pastel template paints every surface with a soft tint rather than
+   leaving white cards on a white page.  This block does the same: page and
+   navbar, the workflow tabs, footer, tables, forms, buttons, badges and
+   dialogs all come from the palette declared in :root.  Bootstrap's own tokens
+   are re-pointed first so anything this block does not name (focus rings,
+   links, validation) follows the palette too. */
+
+:root {
+    --bs-body-bg: var(--pastel-page);
+    --bs-body-color: var(--pastel-ink);
+    --bs-secondary-color: var(--pastel-ink-soft);
+    --bs-border-color: var(--pastel-border);
+    --bs-emphasis-color: #3b3b52;
+    --bs-primary: var(--pastel-sky);
+    --bs-primary-rgb: 186, 225, 255;
+    --bs-primary-bg-subtle: var(--pastel-sky-tint);
+    --bs-primary-border-subtle: var(--pastel-sky);
+    /* Keep --bs-secondary-* a readable grey: .text-secondary (used all over
+       the screens) colours itself from these, and a pastel value there would
+       be unreadable on the pastel surfaces.  The pastel lavender chip is
+       applied to .text-bg-secondary explicitly below. */
+    --bs-secondary: var(--pastel-ink-soft);
+    --bs-secondary-rgb: 123, 123, 149;
+    --bs-link-color-rgb: 111, 143, 199;
+    --bs-link-hover-color-rgb: 79, 110, 166;
+    --bs-card-border-color: var(--pastel-border);
+    --bs-card-cap-bg: var(--card-header-pastel);
+}
+
+body {
+    background-color: var(--bs-body-bg);
+    color: var(--bs-body-color);
+}
+
+/* The dark bar becomes a soft sky-to-blush surface with dark ink. */
+.pastel-navbar {
+    background: linear-gradient(90deg,
+        var(--pastel-sky-tint),
+        var(--pastel-lavender-tint) 55%,
+        var(--pastel-rose-tint));
+    color: var(--pastel-ink);
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.pastel-navbar .navbar-brand,
+.pastel-navbar .navbar-toggler {
+    color: var(--pastel-ink);
+}
+
+.pastel-navbar .navbar-toggler {
+    border-color: rgba(74, 74, 99, 0.3);
+}
+
+.pastel-navbar .btn-outline-secondary {
+    --bs-btn-color: var(--pastel-ink);
+    --bs-btn-border-color: rgba(74, 74, 99, 0.35);
+    --bs-btn-hover-bg: var(--pastel-sky);
+    --bs-btn-hover-border-color: transparent;
+    --bs-btn-hover-color: var(--pastel-ink);
+    --bs-btn-active-bg: var(--pastel-lavender);
+    --bs-btn-active-border-color: transparent;
+    --bs-btn-active-color: var(--pastel-ink);
+}
+
+/* ── Signed-out header (login / register) ────────────────────────────────
+   Three columns - EN name | FIS | AR name - with the account tabs beneath.
+   auth/_header.html renders it; the signed-in navbar is untouched. */
+.auth-header {
+    position: sticky;
+    top: 0;
+    z-index: 1031;
+    background: linear-gradient(90deg,
+        var(--pastel-sky-tint),
+        var(--pastel-lavender-tint) 55%,
+        var(--pastel-rose-tint));
+    color: var(--pastel-ink);
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.auth-header-grid {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 0.75rem;
+    padding-top: 0.7rem;
+    padding-bottom: 0.7rem;
+}
+
+.auth-header-col {
+    min-width: 0;
+}
+
+/* justify-self start/end follow the writing direction, the way the screens'
+   own header grids do, so the two names hug the outer edges in both layouts. */
+.auth-header-en {
+    justify-self: start;
+    font-weight: 600;
+}
+
+.auth-header-ar {
+    justify-self: end;
+    text-align: right;
+    font-weight: 600;
+}
+
+/* The short name sits dead centre, as a white chip on the gradient. */
+.auth-header-brand {
+    padding: 0.15rem 1rem;
+    border: 1px solid var(--pastel-border);
+    border-radius: 999px;
+    background-color: #fff;
+    color: var(--pastel-accent-text);
+    font-weight: 700;
+    letter-spacing: 0.1em;
+}
+
+/* Login / Register tabs: the workflow-tab look, two tabs only. */
+.auth-tabs-nav {
+    background-color: var(--pastel-sky-tint);
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.auth-tabs {
+    justify-content: center;
+    align-items: stretch;
+    flex-wrap: nowrap;
+    gap: 0.35rem;
+    border-bottom: 0;
+}
+
+.auth-tabs .nav-item {
+    display: flex;
+    min-width: 13rem;
+}
+
+.auth-tabs .nav-link {
+    display: grid;
+    width: 100%;
+    height: 100%;
+    min-height: 3rem;
+    justify-content: center;
+    align-content: center;
+    color: var(--pastel-ink);
+    background-color: #fff;
+    border: 1px solid var(--bs-border-color);
+    border-bottom: 3px solid var(--pastel-sky);
+    border-radius: 0.5rem 0.5rem 0 0;
+    font-weight: 600;
+}
+
+.auth-tabs .nav-link.active {
+    color: var(--pastel-ink);
+    background-color: var(--pastel-lavender);
+    border-color: var(--pastel-lavender);
+    border-bottom-color: var(--pastel-lavender);
+}
+
+/* Bootstrap's own .nav-tabs .nav-link:hover is more specific than the
+   two-class rules above, so the hover states are spelled out here. */
+.auth-tabs .nav-link:hover,
+.auth-tabs .nav-link:focus {
+    color: var(--pastel-ink);
+    background-color: var(--pastel-sky-tint);
+    border-color: var(--bs-border-color);
+    border-bottom-color: var(--pastel-sky);
+}
+
+.auth-tabs .nav-link.active:hover,
+.auth-tabs .nav-link.active:focus {
+    background-color: var(--pastel-lavender);
+    border-color: var(--pastel-lavender);
+}
+
+@media (max-width: 575.98px) {
+    .auth-header-grid {
+        gap: 0.4rem;
+        font-size: 0.85rem;
+    }
+
+    .auth-tabs .nav-item {
+        min-width: 0;
+        flex: 1 1 0;
+    }
+}
+
+footer {
+    background-color: var(--pastel-lavender-tint);
+    color: var(--pastel-ink-soft);
+    border-top: 1px solid var(--bs-border-color);
+}
+
+footer a {
+    color: var(--pastel-ink) !important;
+}
+
+.version-badge {
+    background-color: var(--pastel-lavender);
+    color: var(--pastel-ink);
+}
+
+/* Workflow tabs: sky strip, white tabs, active tab in lavender with dark ink. */
+.project-workflow-nav {
+    background-color: var(--pastel-sky-tint);
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.project-workflow-nav .nav-link {
+    color: var(--pastel-ink);
+    background-color: #fff;
+    border: 1px solid var(--bs-border-color);
+    border-bottom: 3px solid var(--pastel-sky);
+}
+
+.project-workflow-nav .nav-link.active {
+    color: var(--pastel-ink);
+    background-color: var(--pastel-lavender);
+    border-color: var(--pastel-lavender);
+    border-bottom-color: var(--pastel-lavender);
+}
+
+.project-workflow-nav .nav-link.disabled {
+    color: var(--pastel-ink-soft);
+    background-color: #fff;
+    border-color: var(--bs-border-color);
+}
+
+.project-workflow-subnav {
+    background-color: var(--pastel-peach-tint);
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.project-workflow-subnav .nav-link {
+    color: var(--pastel-ink);
+}
+
+.project-workflow-subnav .nav-link.active {
+    color: var(--pastel-ink);
+    background-color: var(--pastel-peach);
+    border-color: var(--pastel-peach);
+}
+
+/* Table heads take the lavender tint; the body already shows the card band. */
+.table th {
+    background-color: var(--pastel-lavender-tint);
+}
+
+/* Buttons: soft fills with dark ink - never white text on a pale colour. */
+.btn-primary {
+    --bs-btn-bg: var(--pastel-sky);
+    --bs-btn-border-color: var(--pastel-sky);
+    --bs-btn-color: var(--pastel-ink);
+    --bs-btn-hover-bg: #a5d6fb;
+    --bs-btn-hover-border-color: #a5d6fb;
+    --bs-btn-hover-color: var(--pastel-ink);
+    --bs-btn-active-bg: #8fcbfa;
+    --bs-btn-active-border-color: #8fcbfa;
+    --bs-btn-active-color: var(--pastel-ink);
+    --bs-btn-disabled-bg: var(--pastel-sky);
+    --bs-btn-disabled-border-color: var(--pastel-sky);
+    --bs-btn-disabled-color: var(--pastel-ink-soft);
+}
+
+.btn-outline-primary {
+    --bs-btn-color: var(--pastel-accent-text);
+    --bs-btn-border-color: var(--pastel-sky);
+    --bs-btn-hover-bg: var(--pastel-sky);
+    --bs-btn-hover-border-color: var(--pastel-sky);
+    --bs-btn-hover-color: var(--pastel-ink);
+    --bs-btn-active-bg: #a5d6fb;
+    --bs-btn-active-border-color: #a5d6fb;
+    --bs-btn-active-color: var(--pastel-ink);
+}
+
+.btn-outline-secondary {
+    --bs-btn-color: var(--pastel-ink);
+    --bs-btn-border-color: var(--pastel-lavender);
+    --bs-btn-hover-bg: var(--pastel-lavender);
+    --bs-btn-hover-border-color: var(--pastel-lavender);
+    --bs-btn-hover-color: var(--pastel-ink);
+    --bs-btn-active-bg: var(--pastel-lavender);
+    --bs-btn-active-border-color: var(--pastel-lavender);
+    --bs-btn-active-color: var(--pastel-ink);
+}
+
+.btn-outline-danger {
+    --bs-btn-color: #b4525e;
+    --bs-btn-border-color: var(--pastel-rose);
+    --bs-btn-hover-bg: var(--pastel-rose);
+    --bs-btn-hover-border-color: var(--pastel-rose);
+    --bs-btn-hover-color: #7d2c37;
+    --bs-btn-active-bg: var(--pastel-rose);
+    --bs-btn-active-border-color: var(--pastel-rose);
+    --bs-btn-active-color: #7d2c37;
+}
+
+.btn-outline-warning {
+    --bs-btn-color: #8a7420;
+    --bs-btn-border-color: var(--pastel-butter);
+    --bs-btn-hover-bg: var(--pastel-butter);
+    --bs-btn-hover-border-color: var(--pastel-butter);
+    --bs-btn-hover-color: #6b5a12;
+    --bs-btn-active-bg: var(--pastel-butter);
+    --bs-btn-active-border-color: var(--pastel-butter);
+    --bs-btn-active-color: #6b5a12;
+}
+
+/* Every badge tone becomes a pastel chip with readable ink. */
+.text-bg-primary {
+    background-color: var(--pastel-sky) !important;
+    color: var(--pastel-ink) !important;
+}
+
+.text-bg-secondary {
+    background-color: var(--pastel-lavender) !important;
+    color: var(--pastel-ink) !important;
+}
+
+.text-bg-success {
+    background-color: var(--pastel-mint) !important;
+    color: #2f6b41 !important;
+}
+
+.text-bg-warning {
+    background-color: var(--pastel-butter) !important;
+    color: #7a6612 !important;
+}
+
+.text-bg-info {
+    background-color: var(--pastel-sky) !important;
+    color: #2f5e86 !important;
+}
+
+.text-bg-danger {
+    background-color: var(--pastel-rose) !important;
+    color: #7d2c37 !important;
+}
+
+.text-bg-light {
+    background-color: var(--pastel-lavender-tint) !important;
+    color: var(--pastel-ink) !important;
+}
+
+/* Text utilities that used the old saturated primary. */
+.text-primary {
+    color: var(--pastel-accent-text) !important;
+}
+
+.geometry-sectors-icon,
+.geometry-zones-icon,
+.wf-icon,
+.map-fullscreen-btn {
+    color: var(--pastel-accent-text);
+}
+
+/* Forms: white fields on the pastel surfaces, pastel focus ring. */
+.form-control,
+.form-select {
+    background-color: #fff;
+    border-color: var(--bs-border-color);
+    color: var(--pastel-ink);
+}
+
+.form-control:focus,
+.form-select:focus {
+    background-color: #fff;
+    border-color: var(--pastel-sky);
+    box-shadow: 0 0 0 0.2rem rgba(186, 225, 255, 0.55);
+}
+
+.form-check-input:checked {
+    background-color: var(--pastel-sky);
+    border-color: var(--pastel-sky);
+}
+
+/* Dialogs: lavender head, white body, peach foot. */
+.modal-content {
+    background-color: #fff;
+    border: 1px solid var(--bs-border-color);
+}
+
+.modal-header {
+    background-color: var(--pastel-lavender-tint);
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.modal-footer {
+    background-color: var(--pastel-peach-tint);
+    border-top: 1px solid var(--bs-border-color);
+    border-radius: 0 0 0.75rem 0.75rem;
+}
+
+.confirm-delete-header {
+    background-color: var(--pastel-rose);
+    color: #7d2c37;
+}
+
+.confirm-delete-header .modal-title,
+.confirm-delete-header .confirm-delete-icon-col {
+    color: #7d2c37;
+}
+
+/* The rose chip is light, so the close cross must be dark ink, not white. */
+.confirm-delete-header .btn-close-white {
+    filter: none;
+}
+
+.confirm-delete-btn {
+    background-color: var(--pastel-rose);
+    border-color: var(--pastel-rose);
+    color: #7d2c37;
+}
+
+.confirm-delete-btn:hover,
+.confirm-delete-btn:focus,
+.confirm-delete-btn:active {
+    background-color: #ffa0a9;
+    border-color: #ffa0a9;
+    color: #6d2029;
+}
+
+/* Toast headers are pastel now, so the close button must be dark ink. */
+.toast-header .btn-close-white {
+    filter: none;
+}
+
+/* Surfaces that used to paint white text on the old primary colour. */
+.project-workflow-nav .nav-link.active,
+.map-fullscreen-btn:hover,
+.map-fullscreen-btn:focus,
+.map-fullscreen-btn.active,
+.geometry-map-select-button.active,
+.leaflet-draw-toolbar a.geometry-ruler-button.active {
+    color: var(--pastel-ink);
+}
+

@@ -1,0 +1,404 @@
+{% extends "base.html" %}
+{% from "shared/_macros.html" import bilingual_heading, bilingual_label, bilingual_stack, bilingual_button, bi_button, bi_label, bi_th, th with context %}
+{% block title %}{{ t('sectors') }} · {{ t('app_name') }}{% endblock %}
+{% block content %}
+
+<div class="geometry-sectors-header mb-2">
+  <h1 class="geometry-sectors-title-en h4 mb-0">{{ t_en('sectors') }}</h1>
+  <span class="geometry-sectors-icon"><i class="bi bi-bounding-box-circles"></i></span>
+  <h2 class="geometry-sectors-title-ar ar-text h4 mb-0" lang="ar" dir="rtl">{{ t_ar('sectors') }}</h2>
+</div>
+
+<p class="text-secondary small d-flex justify-content-between flex-wrap gap-2">
+  <span>
+    {{ project.name }} &middot;
+    <span class="latin-number">{{ sectors|length }}</span> sector{{ '' if sectors|length == 1 else 's' }}
+    &middot; total <strong class="latin-number">{{ total_area_ha|round(4) }}</strong> ha
+    {% if land_metrics.get('area_ha') %}
+      (land <span class="latin-number">{{ land_metrics.area_ha }}</span> ha)
+    {% endif %}
+  </span>
+  <span class="ar-text" lang="ar" dir="rtl">
+    {{ project.name }} &middot;
+    <span class="latin-number">{{ sectors|length }}</span> قطاع
+    &middot; الإجمالي <strong class="latin-number">{{ total_area_ha|round(4) }}</strong> هكتار
+    {% if land_metrics.get('area_ha') %}
+      (الأرض <span class="latin-number">{{ land_metrics.area_ha }}</span> هكتار)
+    {% endif %}
+  </span>
+</p>
+
+<div class="page-toolbar justify-content-end mb-3">
+  <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#modal-add">
+    {{ bi_button('add', 'bi-plus-lg') }}
+  </button>
+  <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#modal-generate">
+    {{ bi_button('generate', 'bi-magic') }}
+  </button>
+  <button class="btn btn-outline-secondary" type="button" data-needs-two disabled
+          data-bs-toggle="modal" data-bs-target="#modal-merge">
+    {{ bi_button('merge', 'bi-union') }}
+  </button>
+  <button class="btn btn-outline-secondary" type="button" data-needs-two disabled
+          data-bs-toggle="modal" data-bs-target="#modal-swap">
+    {{ bi_button('swap', 'bi-arrow-left-right') }}
+  </button>
+</div>
+
+<div class="card">
+  {% if not sectors %}
+    <div class="card-body">
+      <p class="empty">
+        {{ bilingual_label('No sectors yet. Use Generate to partition the land boundary.',
+                           'لا توجد قطاعات بعد. استخدم «توليد» لتقسيم حدود الأرض.') }}
+        {% if not land_metrics.get('area_ha') %}
+          <span class="badge text-bg-warning">{{ bilingual_label('no land boundary on this project', 'لا توجد حدود أرض لهذا المشروع') }}</span>
+        {% endif %}
+      </p>
+    </div>
+  {% else %}
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span class="small text-secondary">
+        <span id="selection-count" class="latin-number">0</span> {{ bilingual_label('selected', 'محدد') }}
+      </span>
+      <span class="small text-secondary">{{ bilingual_label('Tick two rows to merge or swap them', 'حدّد صفين للدمج أو التبديل') }}</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th style="width:2rem"></th>
+            {{ bi_th('name') }}
+            {{ th('Area (ha)', 'المساحة (هكتار)', 'text-end') }}
+            {{ th('Area (m²)', 'المساحة (م²)', 'text-end') }}
+            {{ th('Perimeter (m)', 'المحيط (م)', 'text-end') }}
+            {{ th('Vertices', 'الرؤوس', 'text-end') }}
+            {{ th('Zones', 'المناطق', 'text-end') }}
+            {{ bi_th('actions', 'text-end') }}
+          </tr>
+        </thead>
+        <tbody>
+          {% for sector in sectors %}
+            {% set m = sector.metrics or {} %}
+            <tr>
+              <td>
+                <input class="row-select form-check-input" type="checkbox"
+                       value="{{ sector['_id'] }}" aria-label="{{ sector.name }}">
+              </td>
+              <td>{{ sector.name }}</td>
+              <td class="num latin-number">{{ m.get('area_ha', '—') }}</td>
+              <td class="num latin-number">{{ m.get('area_m2', '—') }}</td>
+              <td class="num latin-number">{{ m.get('perimeter_m', '—') }}</td>
+              <td class="num latin-number">{{ m.get('vertices', '—') }}</td>
+              <td class="num latin-number">{{ sector.zone_count }}</td>
+              <td>
+                <div class="actions-row justify-content-end">
+                  <button class="btn btn-outline-primary btn-circle-sm" type="button"
+                          title="{{ t('rename') }}"
+                          data-bs-toggle="modal" data-bs-target="#modal-rename"
+                          data-action="{{ url_for('geometry.rename_sector', project_id=project['_id'], item_id=sector['_id']) }}"
+                          data-name="{{ sector.name }}">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button class="btn btn-outline-secondary btn-circle-sm" type="button"
+                          title="{{ t('edit') }}"
+                          data-bs-toggle="modal" data-bs-target="#modal-edit"
+                          data-action="{{ url_for('geometry.update_sector', project_id=project['_id'], item_id=sector['_id']) }}"
+                          data-name="{{ sector.name }}"
+                          data-boundary="{{ (sector.boundary or [])|map('join', ',')|join(' ') }}"
+                          data-crop="{{ sector.crop or '' }}"
+                          data-soil="{{ sector.soil or '' }}"
+                          data-notes="{{ sector.notes or '' }}">
+                    <i class="bi bi-sliders"></i>
+                  </button>
+                  <button class="btn btn-outline-warning btn-circle-sm" type="button"
+                          title="{{ t('split') }}"
+                          data-bs-toggle="modal" data-bs-target="#modal-split"
+                          data-action="{{ url_for('geometry.split_sector', project_id=project['_id'], item_id=sector['_id']) }}">
+                    <i class="bi bi-scissors"></i>
+                  </button>
+                  <form class="inline" method="post"
+                        action="{{ url_for('geometry.remove_sector', project_id=project['_id'], item_id=sector['_id']) }}"
+                        data-confirm="Remove {{ sector.name }} with its zones, rows and trees? — حذف {{ sector.name }} مع مناطقه وصفوفه وأشجاره؟">
+                    <button class="btn btn-outline-danger btn-circle-sm" type="submit"
+                            title="{{ t('remove') }}">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</div>
+
+{# -------------------------------- add -------------------------------- #}
+<div class="modal fade" id="modal-add" tabindex="-1" aria-labelledby="modal-add-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="{{ url_for('geometry.add_sector', project_id=project['_id']) }}">
+        <div class="modal-header">
+          <h3 class="modal-title h5" id="modal-add-title">
+            {{ bilingual_heading('Add sector', 'إضافة قطاع') }}
+          </h3>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ t('close') }}"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label" for="add-name">{{ bi_label('name') }}</label>
+            <input class="form-control" id="add-name" type="text" name="name" required autofocus>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="add-boundary">
+              {{ bi_label('boundary') }} <span class="text-secondary small">{{ bilingual_label('(optional: x,y x,y …)', '(اختياري: x,y x,y …)') }}</span>
+            </label>
+            <textarea class="form-control font-monospace" id="add-boundary" name="boundary" rows="3"
+                      placeholder="8.1301,36.7213 8.1322,36.7213 …"></textarea>
+          </div>
+          <div class="row g-3">
+            <div class="col-sm-4">
+              <label class="form-label" for="add-crop">{{ bi_label('crop') }}</label>
+              <input class="form-control" id="add-crop" type="text" name="crop">
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label" for="add-soil">{{ bi_label('soil') }}</label>
+              <input class="form-control" id="add-soil" type="text" name="soil">
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label" for="add-system">{{ bi_label('system') }}</label>
+              <input class="form-control" id="add-system" type="text" name="irrigation_system">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">
+            {{ bi_button('cancel') }}
+          </button>
+          <button class="btn btn-primary" type="submit">{{ bi_button('save') }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{# ------------------------------ generate ------------------------------ #}
+<div class="modal fade" id="modal-generate" tabindex="-1" aria-labelledby="modal-generate-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" data-loading
+            action="{{ url_for('geometry.generate_sectors', project_id=project['_id']) }}">
+        <div class="modal-header">
+          <h3 class="modal-title h5" id="modal-generate-title">
+            {{ bilingual_heading('Generate sectors', 'توليد القطاعات') }}
+          </h3>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ t('close') }}"></button>
+        </div>
+        <div class="modal-body">
+          <p class="small text-secondary">
+            {{ bilingual_label('The land boundary is sliced into bands of equal area, so every sector comes out the same size.',
+                               'تُقسَّم حدود الأرض إلى نطاقات متساوية المساحة، فيخرج كل قطاع بالحجم نفسه.') }}
+          </p>
+          <div class="mb-3">
+            <label class="form-label" for="generate-count">
+              {{ bilingual_label('Number of sectors', 'عدد القطاعات') }}
+              <span class="text-secondary small">{{ bilingual_label('(blank = the sector target from settings)', '(فارغ = هدف القطاع من الإعدادات)') }}</span>
+            </label>
+            <input class="form-control" id="generate-count" type="text" name="count"
+                   inputmode="numeric" placeholder="auto">
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="generate-mode">{{ bi_label('cut_direction') }}</label>
+            <select class="form-select" id="generate-mode" name="mode">
+              <option value="auto">Auto (longer axis) · تلقائي (المحور الأطول)</option>
+              <option value="y">Horizontal strips · شرائح أفقية</option>
+              <option value="x">Vertical strips · شرائح رأسية</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">
+            {{ bi_button('cancel') }}
+          </button>
+          <button class="btn btn-primary" type="submit">{{ bi_button('generate') }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{# -------------------------------- split -------------------------------- #}
+<div class="modal fade" id="modal-split" tabindex="-1" aria-labelledby="modal-split-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="">
+        <div class="modal-header">
+          <h3 class="modal-title h5" id="modal-split-title">
+            {{ bilingual_heading('Split', 'تقسيم') }}
+          </h3>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ t('close') }}"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label" for="split-mode">{{ bi_label('cut_direction') }}</label>
+            <select class="form-select" id="split-mode" name="mode">
+              <option value="auto">Auto · تلقائي</option>
+              <option value="x">Vertical · رأسي</option>
+              <option value="y">Horizontal · أفقي</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="split-ratio">
+              {{ bi_label('position') }} <span class="text-secondary small">(0.05 – 0.95)</span>
+            </label>
+            <input class="form-control" id="split-ratio" type="text" name="ratio"
+                   value="0.5" inputmode="decimal">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">
+            {{ bi_button('cancel') }}
+          </button>
+          <button class="btn btn-primary" type="submit">{{ bi_button('split') }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{# -------------------------------- merge -------------------------------- #}
+<div class="modal fade" id="modal-merge" tabindex="-1" aria-labelledby="modal-merge-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" data-needs-two-form
+            action="{{ url_for('geometry.merge_sectors', project_id=project['_id']) }}">
+        <div class="modal-header">
+          <h3 class="modal-title h5" id="modal-merge-title">
+            {{ bilingual_heading('Merge', 'دمج') }}
+          </h3>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ t('close') }}"></button>
+        </div>
+        <div class="modal-body">
+          <p class="small text-secondary">
+            {{ bilingual_label('The two selected sectors are unioned into their largest resulting ring. Zones of the merged-away sector are re-parented.',
+                               'يُدمج القطاعان المحدّدان في أكبر حلقة ناتجة، وتُنقل مناطق القطاع المُدمج إلى القطاع الباقي.') }}
+          </p>
+          <p class="selection-list" data-selection-list></p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">
+            {{ bi_button('cancel') }}
+          </button>
+          <button class="btn btn-primary" type="submit">{{ bi_button('merge') }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{# --------------------------------- swap --------------------------------- #}
+<div class="modal fade" id="modal-swap" tabindex="-1" aria-labelledby="modal-swap-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" data-needs-two-form
+            action="{{ url_for('geometry.swap_sectors', project_id=project['_id']) }}">
+        <div class="modal-header">
+          <h3 class="modal-title h5" id="modal-swap-title">
+            {{ bilingual_heading('Swap', 'تبديل') }}
+          </h3>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ t('close') }}"></button>
+        </div>
+        <div class="modal-body">
+          <p class="small text-secondary">
+            {{ bilingual_label('The two selected sectors exchange boundaries only — names and zones stay with their sector.',
+                               'يتبادل القطاعان المحدّدان الحدود فقط، وتبقى الأسماء والمناطق مع قطاعها.') }}
+          </p>
+          <p class="selection-list" data-selection-list></p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">
+            {{ bi_button('cancel') }}
+          </button>
+          <button class="btn btn-primary" type="submit">{{ bi_button('swap') }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{# ---------------------------- rename / edit ---------------------------- #}
+<div class="modal fade" id="modal-rename" tabindex="-1" aria-labelledby="modal-rename-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="">
+        <div class="modal-header">
+          <h3 class="modal-title h5" id="modal-rename-title">
+            {{ bilingual_heading('Rename', 'إعادة تسمية') }}
+          </h3>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ t('close') }}"></button>
+        </div>
+        <div class="modal-body">
+          <label class="form-label" for="rename-name">{{ bi_label('name') }}</label>
+          <input class="form-control" id="rename-name" type="text" name="name" required>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">
+            {{ bi_button('cancel') }}
+          </button>
+          <button class="btn btn-primary" type="submit">{{ bi_button('save') }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modal-edit" tabindex="-1" aria-labelledby="modal-edit-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <form method="post" action="">
+        <div class="modal-header">
+          <h3 class="modal-title h5" id="modal-edit-title">
+            {{ bilingual_heading('Edit sector', 'تعديل القطاع') }}
+          </h3>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ t('close') }}"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label" for="edit-name">{{ bi_label('name') }}</label>
+            <input class="form-control" id="edit-name" type="text" name="name" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="edit-boundary">
+              {{ bi_label('boundary') }} <span class="text-secondary small">{{ bilingual_label('(x,y x,y … — editing recomputes the area)', '(x,y x,y … — التعديل يعيد حساب المساحة)') }}</span>
+            </label>
+            <textarea class="form-control font-monospace" id="edit-boundary" name="boundary"
+                      rows="4" data-fill="boundary"></textarea>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-sm-6">
+              <label class="form-label" for="edit-crop">{{ bi_label('crop') }}</label>
+              <input class="form-control" id="edit-crop" type="text" name="crop" data-fill="crop">
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label" for="edit-soil">{{ bi_label('soil') }}</label>
+              <input class="form-control" id="edit-soil" type="text" name="soil" data-fill="soil">
+            </div>
+          </div>
+          <div>
+            <label class="form-label" for="edit-notes">{{ bi_label('notes') }}</label>
+            <textarea class="form-control" id="edit-notes" name="notes" rows="2" data-fill="notes"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">
+            {{ bi_button('cancel') }}
+          </button>
+          <button class="btn btn-primary" type="submit">{{ bi_button('save') }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

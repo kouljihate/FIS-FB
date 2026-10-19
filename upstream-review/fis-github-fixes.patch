@@ -1,0 +1,290 @@
+diff --git a/irrigation/auth/routes.py b/irrigation/auth/routes.py
+index e93d3a1..9ab95e3 100644
+--- a/irrigation/auth/routes.py
++++ b/irrigation/auth/routes.py
+@@ -18,7 +18,13 @@ def register():
+             flash('Username and password are required / اسم المستخدم وكلمة المرور مطلوبان', 'danger')
+             return redirect(url_for('auth.register'))
+ 
+-        existing = mongo.db.users.find_one({'$or': [{'username': username}, {'email': email}]})
++        # Email is optional, so a blank one must not take part in the
++        # uniqueness check: matching on '' made every later blank-email
++        # registration look like a duplicate of the first such account.
++        identity = [{'username': username}]
++        if email:
++            identity.append({'email': email})
++        existing = mongo.db.users.find_one({'$or': identity})
+         if existing:
+             flash('User already exists / المستخدم موجود بالفعل', 'danger')
+             return redirect(url_for('auth.register'))
+diff --git a/irrigation/project/routes.py b/irrigation/project/routes.py
+index cdd854d..d6771e9 100644
+--- a/irrigation/project/routes.py
++++ b/irrigation/project/routes.py
+@@ -1,12 +1,15 @@
+ import os
+ import re
++import zipfile
+ from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, current_app, send_file
+ from flask_login import login_required, current_user
++from lxml import etree
+ from werkzeug.utils import secure_filename
+ from irrigation.extensions import mongo
+ from irrigation.models import get_next_id, serialize_doc
+ from irrigation.utils.kml import parse_kml_content, parse_kmz_file, export_project_to_kml
+ from bson import ObjectId
++from bson.errors import InvalidDocument
+ 
+ project_bp = Blueprint('project', __name__)
+ 
+@@ -508,20 +511,38 @@ def upload_kml(project_id):
+         return redirect(url_for('project.detail', project_id=project_id))
+ 
+     filename = secure_filename(file.filename)
++    extension = os.path.splitext(filename)[1].lower()
++    if extension not in ('.kml', '.kmz'):
++        flash('Only .kml and .kmz files can be imported / يمكن استيراد ملفات .kml و .kmz فقط', 'danger')
++        return redirect(url_for('project.detail', project_id=project_id))
++
+     upload_dir = current_app.config.get('UPLOAD_FOLDER', 'uploads')
+     os.makedirs(upload_dir, exist_ok=True)
+     filepath = os.path.join(upload_dir, f'project_{project_id}_{filename}')
+     file.save(filepath)
+ 
++    # A malformed upload is a user error, not a server error: report it and
++    # keep the request alive instead of raising out of the view.
+     features = []
+-    if filename.lower().endswith('.kmz'):
+-        features = parse_kmz_file(filepath)
+-    elif filename.lower().endswith('.kml'):
+-        with open(filepath, 'r', encoding='utf-8') as f:
+-            features = parse_kml_content(f.read())
++    try:
++        if extension == '.kmz':
++            features = parse_kmz_file(filepath)
++        else:
++            with open(filepath, 'r', encoding='utf-8') as f:
++                features = parse_kml_content(f.read())
++    except (zipfile.BadZipFile, etree.XMLSyntaxError, UnicodeDecodeError,
++            ValueError, OSError) as exc:
++        current_app.logger.warning('KML import failed for project %s: %s', project_id, exc)
++        flash('Could not parse KML file / تعذر تحليل ملف KML', 'danger')
++        return redirect(url_for('project.detail', project_id=project_id))
+ 
+     if features:
+-        has_boundary = _store_kml_features(project_id, project, filename, features)
++        try:
++            has_boundary = _store_kml_features(project_id, project, filename, features)
++        except InvalidDocument:
++            current_app.logger.warning('KML import too large for project %s', project_id)
++            flash('KML file holds too many features to store / الملف يحتوي عناصر أكثر من الحد', 'danger')
++            return redirect(url_for('project.detail', project_id=project_id))
+         if has_boundary:
+             flash(f'Loaded {len(features)} features from KML / تم تحميل {len(features)} عنصر', 'success')
+         else:
+@@ -557,11 +578,17 @@ def export_kml(project_id):
+ @project_bp.route('/<int:project_id>/delete', methods=['POST'])
+ @login_required
+ def delete(project_id):
+-    mongo.db.projects.delete_one({'id': project_id, 'user_id': int(current_user.id)})
+-    mongo.db.sectors.delete_many({'project_id': project_id})
+-    mongo.db.zones.delete_many({'project_id': project_id})
+-    mongo.db.network_elements.delete_many({'project_id': project_id})
+-    mongo.db.tree_rows.delete_many({'project_id': project_id})
+-    mongo.db.trees.delete_many({'project_id': project_id})
++    # The ownership filter used to apply to the project row only, so a request
++    # for somebody else's project deleted nothing itself and then cascaded
++    # over that project's sectors, zones, network, rows and trees.  Resolve
++    # the project first and only then touch its children.
++    project = mongo.db.projects.find_one({'id': project_id, 'user_id': int(current_user.id)})
++    if not project:
++        flash('Project not found / المشروع غير موجود', 'danger')
++        return redirect(url_for('project.index'))
++
++    mongo.db.projects.delete_one({'_id': project['_id']})
++    for collection in ('sectors', 'zones', 'network_elements', 'tree_rows', 'trees'):
++        mongo.db[collection].delete_many({'project_id': project_id})
+     flash('Project deleted / تم حذف المشروع', 'info')
+     return redirect(url_for('project.index'))
+diff --git a/irrigation/utils/kml.py b/irrigation/utils/kml.py
+index 7edfc11..5e640e1 100644
+--- a/irrigation/utils/kml.py
++++ b/irrigation/utils/kml.py
+@@ -1,11 +1,9 @@
+ """KML/KMZ parsing and export utilities."""
+ import io
+ import zipfile
+-from fastkml import kml, styles
+-from lxml import etree
++from fastkml import kml
+ 
+ from irrigation.extensions import mongo
+-from irrigation.models import get_next_id
+ 
+ 
+ def parse_kml_content(kml_text):
+@@ -39,12 +37,22 @@ def parse_kml_content(kml_text):
+     return features
+ 
+ 
++# A KMZ is a compressed archive, so the 50 MB upload limit says nothing about
++# how much KML it expands into.  Refuse anything that unpacks beyond this.
++MAX_KML_BYTES = 8 * 1024 * 1024
++
++
+ def parse_kmz_file(kmz_path):
+     """Extract doc.kml from a KMZ file and parse it."""
+     with zipfile.ZipFile(kmz_path, 'r') as zf:
+         kml_files = [f for f in zf.namelist() if f.endswith('.kml')]
+         if not kml_files:
+             return []
++        expanded = zf.getinfo(kml_files[0]).file_size
++        if expanded > MAX_KML_BYTES:
++            raise ValueError(
++                f'KMZ expands to {expanded} bytes, over the {MAX_KML_BYTES} byte limit'
++            )
+         kml_data = zf.read(kml_files[0]).decode('utf-8')
+     return parse_kml_content(kml_data)
+ 
+@@ -58,84 +66,67 @@ def _kml_geom_to_geojson(geom):
+     return mapping(geom)
+ 
+ 
++NS = '{http://www.opengis.net/kml/2.2}'
++
++# folder id, folder title, collection, geometry field, label, id prefix
++_EXPORT_LAYERS = (
++    ('sectors', 'Sectors / القطاعات', 'sectors', 'polygon', 'sector'),
++    ('zones', 'Zones / المناطق', 'zones', 'polygon', 'zone'),
++    ('network', 'Network / الشبكة', 'network_elements', 'geometry', 'elem'),
++    ('rows', 'Tree Rows / صفوف الأشجار', 'tree_rows', 'geometry', 'row'),
++    ('trees', 'Trees / الأشجار', 'trees', 'geometry', 'tree'),
++)
++
++
+ def export_project_to_kml(project_id):
+-    """Build a KML document from a project's geometry elements."""
+-    project = mongo.db.projects.find_one({'_id': project_id})
++    """Build a KML document from a project's geometry elements.
++
++    fastkml 1.x takes keyword arguments (its second positional parameter is the
++    namespace map, not the feature id), sets geometry through the constructor
++    and serialises with ``to_string``.  The positional constructors, the
++    ``Placemark.geometry`` setter and ``to_element`` used here before do not
++    exist in 1.x, so this raised ``TypeError`` under both fastkml 1.0.0 and
++    1.4.0 and no export ever produced a file.
++    """
++    from shapely.geometry import shape as shp_shape
++
++    # Projects are looked up by their own integer ``id``; ``_id`` is the
++    # MongoDB ObjectId, so asking for ``_id`` here never matched a project
++    # and every export silently reported "no geometry".
++    project = mongo.db.projects.find_one({'id': project_id})
+     if not project:
+         return None
+ 
+-    k = kml.KML()
+-    ns = '{http://www.opengis.net/kml/2.2}'
++    def placemark(identifier, name, geojson):
++        return kml.Placemark(ns=NS, id=identifier, name=name, description='',
++                             geometry=shp_shape(geojson))
++
++    def folder(identifier, name):
++        return kml.Folder(ns=NS, id=identifier, name=name, description='')
+ 
+-    # Main document folder
+-    doc = kml.Document(ns, 'project-doc', project.get('name', 'Project'), '')
+-    k.append(doc)
++    document = kml.Document(ns=NS, id='project-doc',
++                            name=project.get('name', 'Project'), description='')
+ 
+-    # Land boundary
+     if project.get('boundary'):
+-        boundary_geom = project['boundary']
+-        from shapely.geometry import shape as shp_shape
+-        shapely_geom = shp_shape(boundary_geom)
+-        pm = kml.Placemark(ns, 'boundary', 'Land Boundary / حدود الأرض', '')
+-        pm.geometry = kml.Geometry(geometry=shapely_geom)
+-        doc.append(pm)
+-
+-    # Sectors
+-    sectors_folder = kml.Folder(ns, 'sectors', 'Sectors / القطاعات', '')
+-    doc.append(sectors_folder)
+-    for sector in mongo.db.sectors.find({'project_id': project_id}):
+-        if sector.get('polygon'):
+-            from shapely.geometry import shape as shp_shape
+-            shapely_geom = shp_shape(sector['polygon'])
+-            name = sector.get('name_en', sector.get('name', ''))
+-            pm = kml.Placemark(ns, f'sector-{sector["id"]}', name, '')
+-            pm.geometry = kml.Geometry(geometry=shapely_geom)
+-            sectors_folder.append(pm)
+-
+-    # Zones
+-    zones_folder = kml.Folder(ns, 'zones', 'Zones / المناطق', '')
+-    doc.append(zones_folder)
+-    for zone in mongo.db.zones.find({'project_id': project_id}):
+-        if zone.get('polygon'):
+-            from shapely.geometry import shape as shp_shape
+-            shapely_geom = shp_shape(zone['polygon'])
+-            name = zone.get('name_en', zone.get('name', ''))
+-            pm = kml.Placemark(ns, f'zone-{zone["id"]}', name, '')
+-            pm.geometry = kml.Geometry(geometry=shapely_geom)
+-            zones_folder.append(pm)
+-
+-    # Network elements (pipes, valves, etc.)
+-    net_folder = kml.Folder(ns, 'network', 'Network / الشبكة', '')
+-    doc.append(net_folder)
+-    for elem in mongo.db.network_elements.find({'project_id': project_id}):
+-        if elem.get('geometry'):
+-            from shapely.geometry import shape as shp_shape
+-            shapely_geom = shp_shape(elem['geometry'])
+-            name = f"{elem.get('type', 'element')}"
+-            pm = kml.Placemark(ns, f'elem-{elem["id"]}', name, '')
+-            pm.geometry = kml.Geometry(geometry=shapely_geom)
+-            net_folder.append(pm)
+-
+-    # Tree rows
+-    rows_folder = kml.Folder(ns, 'rows', 'Tree Rows / صفوف الأشجار', '')
+-    doc.append(rows_folder)
+-    for row in mongo.db.tree_rows.find({'project_id': project_id}):
+-        if row.get('geometry'):
+-            from shapely.geometry import shape as shp_shape
+-            shapely_geom = shp_shape(row['geometry'])
+-            pm = kml.Placemark(ns, f'row-{row["id"]}', 'Tree Row / صف', '')
+-            pm.geometry = kml.Geometry(geometry=shapely_geom)
+-            rows_folder.append(pm)
+-
+-    # Trees
+-    trees_folder = kml.Folder(ns, 'trees', 'Trees / الأشجار', '')
+-    doc.append(trees_folder)
+-    for tree in mongo.db.trees.find({'project_id': project_id}):
+-        if tree.get('geometry'):
+-            from shapely.geometry import shape as shp_shape
+-            shapely_geom = shp_shape(tree['geometry'])
+-            pm = kml.Placemark(ns, f'tree-{tree["id"]}', 'Tree / شجرة', '')
+-            pm.geometry = kml.Geometry(geometry=shapely_geom)
+-            trees_folder.append(pm)
+-
+-    return etree.tostring(doc.to_element(), pretty_print=True).decode('utf-8')
++        document.append(placemark('boundary', 'Land Boundary / حدود الأرض', project['boundary']))
++
++    for folder_id, folder_title, collection, geometry_field, prefix in _EXPORT_LAYERS:
++        layer = folder(folder_id, folder_title)
++        document.append(layer)
++        for record in mongo.db[collection].find({'project_id': project_id}):
++            geometry = record.get(geometry_field)
++            if not geometry:
++                continue
++            if prefix == 'sector' or prefix == 'zone':
++                name = record.get('name_en', record.get('name', ''))
++            elif prefix == 'elem':
++                name = f"{record.get('type', 'element')}"
++            elif prefix == 'row':
++                name = 'Tree Row / صف'
++            else:
++                name = 'Tree / شجرة'
++            layer.append(placemark(f'{prefix}-{record["id"]}', name, geometry))
++
++    root = kml.KML()
++    root.append(document)
++    return root.to_string(prettyprint=True)

@@ -1,0 +1,132 @@
+/* Project extras layered on top of Bootstrap 5 + Bootswatch "Journal".
+ *
+ * Everything structural comes from Bootstrap; everything thematic (fonts,
+ * bilingual labels, workflow tabs, modals) lives in css/app.css.  Only the
+ * handful of rules below are specific to these screens. */
+
+/* Bilingual stacking: Arabic on top, English underneath.
+   Used in tabs, buttons and table headers, so both languages are always
+   readable and neither is ever hidden. */
+.bilingual-stack {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.15;
+}
+
+.bilingual-stack-ar {
+    font-family: var(--font-ar);
+    direction: rtl;
+    font-weight: 700;
+}
+
+.bilingual-stack-en {
+    font-family: var(--font-en);
+    font-size: 0.92em;
+    opacity: 0.85;
+}
+
+th .bilingual-stack {
+    width: 100%;
+    align-items: flex-end;
+}
+
+th:first-child .bilingual-stack,
+th.text-start .bilingual-stack {
+    align-items: flex-start;
+}
+
+.nav-link .bilingual-stack {
+    align-items: center;
+}
+
+/* Buttons carry the same stacked pair; keep them compact. */
+.btn .bilingual-button-text {
+    line-height: 1.1;
+}
+
+.btn .bilingual-button-ar {
+    font-weight: 700;
+}
+
+.btn .bilingual-button-en {
+    font-size: 0.92em;
+    opacity: 0.9;
+}
+
+/* Canvas charts need an explicit height and must span their card. */
+.chart-canvas {
+    display: block;
+    width: 100%;
+    height: 260px;
+}
+
+/* Inline forms sit next to their button without breaking the flex row. */
+.inline {
+    display: inline;
+}
+
+/* Toolbar that groups a page's primary actions. */
+.page-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Row action buttons stay on one line. */
+.actions-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+/* Numeric cells line up on the decimal point. */
+.num {
+    text-align: end;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Selection list inside the merge / swap modals. */
+.selection-list {
+    margin-bottom: 0.5rem;
+}
+
+/* Empty-state text. */
+.empty {
+    color: var(--bs-secondary-color);
+    font-style: italic;
+    margin-bottom: 0;
+}
+
+/* The navbar is sticky, so in-page anchors must not hide behind it. */
+[id] {
+    scroll-margin-top: 4.5rem;
+}
+
+@media print {
+    .navbar,
+    .project-workflow-nav,
+    .project-workflow-subnav,
+    footer,
+    .page-toolbar,
+    .btn,
+    .flash-toast-container {
+        display: none !important;
+    }
+
+    body {
+        padding-bottom: 0;
+    }
+
+    .main-content {
+        padding: 0 !important;
+        padding-bottom: 0 !important;
+    }
+
+    .card {
+        box-shadow: none !important;
+        border-color: #cbd5e1 !important;
+    }
+}

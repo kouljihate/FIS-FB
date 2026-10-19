@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% from "shared/_macros.html" import bilingual_heading, bilingual_label, bilingual_stack, bilingual_button, bi_button, bi_label, bi_th, th with context %}
+{% block title %}{{ t('configuration') }} · {{ t('app_name') }}{% endblock %}
+{% block content %}
+{# `estimation.items` would resolve to the dict method, not the document key. #}
+{% set items = estimation['items'] %}
+
+<div class="wf-page-header mb-2">
+  <h1 class="wf-title-en h4 mb-0">{{ t_en('configuration') }}</h1>
+  <span class="wf-icon"><i class="bi bi-calculator"></i></span>
+  <h2 class="wf-title-ar ar-text h4 mb-0" lang="ar" dir="rtl">{{ t_ar('configuration') }}</h2>
+</div>
+
+<p class="text-secondary small">
+  {{ project.name }} &middot;
+  {{ bilingual_label(items|length ~ ' line item' ~ ('' if items|length == 1 else 's'),
+                     items|length ~ ' بند') }}
+</p>
+
+<div class="page-toolbar justify-content-end mb-3">
+  <form class="inline" method="post"
+        action="{{ url_for('estimation.seed_from_design', project_id=project['_id']) }}">
+    <button class="btn btn-outline-primary" type="submit">
+      {{ bi_button('seed_quantities', 'bi-magic') }}
+    </button>
+  </form>
+  <form class="inline" method="post" action="{{ url_for('estimation.reset', project_id=project['_id']) }}"
+        data-confirm="Reset the item list to the defaults? · إعادة قائمة البنود إلى الإعدادات الافتراضية؟">
+    <button class="btn btn-outline-danger" type="submit">
+      {{ bi_button('reset', 'bi-arrow-counterclockwise') }}
+    </button>
+  </form>
+  <a class="btn btn-primary" href="{{ url_for('estimation.result', project_id=project['_id']) }}">
+    {{ bilingual_button(t_en('result'), t_ar('result'), 'bi-arrow-right') }}
+  </a>
+</div>
+
+<form method="post" action="{{ url_for('estimation.save_configuration', project_id=project['_id']) }}">
+  <div class="card mb-3">
+    <div class="card-header">
+      <h2 class="h6 mb-0">{{ bilingual_heading('Line items', 'بنود التقدير') }}</h2>
+    </div>
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead>
+          <tr>
+            <th style="min-width:200px">{{ bilingual_stack('Item', 'البند') }}</th>
+            <th style="width:110px">{{ bilingual_stack('Unit', 'الوحدة') }}</th>
+            <th class="text-end" style="width:130px">{{ bilingual_stack('Quantity', 'الكمية') }}</th>
+            <th class="text-end" style="width:140px">{{ bilingual_stack('Unit price', 'سعر الوحدة') }}</th>
+            <th class="text-end">{{ bilingual_stack('Line total', 'الإجمالي') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in items %}
+            <tr>
+              <td><input class="form-control form-control-sm" type="text" name="item_name"
+                         value="{{ item.name }}" aria-label="Item · البند"></td>
+              <td><input class="form-control form-control-sm" type="text" name="item_unit"
+                         value="{{ item.unit or '' }}" aria-label="Unit · الوحدة"></td>
+              <td><input class="form-control form-control-sm text-end latin-number" type="text"
+                         name="item_quantity" inputmode="decimal"
+                         value="{{ item.quantity if item.quantity else '' }}" aria-label="Quantity · الكمية"></td>
+              <td><input class="form-control form-control-sm text-end latin-number" type="text"
+                         name="item_price" inputmode="decimal"
+                         value="{{ item.unit_price if item.unit_price else '' }}" aria-label="Unit price · سعر الوحدة"></td>
+              <td class="num latin-number">
+                {% set q = item.quantity or 0 %}{% set p = item.unit_price or 0 %}
+                {{ (q * p)|round(2) }}
+              </td>
+            </tr>
+          {% endfor %}
+          {% for blank in range(3) %}
+            <tr class="table-light">
+              <td><input class="form-control form-control-sm" type="text" name="item_name"
+                         placeholder="(new item) · (بند جديد)" aria-label="New item · بند جديد"></td>
+              <td><input class="form-control form-control-sm" type="text" name="item_unit" aria-label="Unit · الوحدة"></td>
+              <td><input class="form-control form-control-sm text-end" type="text" name="item_quantity"
+                         inputmode="decimal" aria-label="Quantity · الكمية"></td>
+              <td><input class="form-control form-control-sm text-end" type="text" name="item_price"
+                         inputmode="decimal" aria-label="Unit price · سعر الوحدة"></td>
+              <td class="num text-secondary">—</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="card-footer text-secondary small">
+      {{ bilingual_label('Rows with an empty item name are ignored on save.',
+                         'تُهمَل الصفوف التي لا يحتوي بندها على اسم عند الحفظ.') }}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2 class="h6 mb-0">{{ bilingual_heading('Adjustments', 'التعديلات') }}</h2>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-3">
+          <label class="form-label" for="discount-percent">{{ bi_label('discount') }} (%)</label>
+          <input class="form-control text-end latin-number" id="discount-percent" type="text"
+                 name="discount_percent" inputmode="decimal"
+                 value="{{ estimation.discount_percent or 0 }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label" for="tax-percent">{{ bi_label('tax') }} (%)</label>
+          <input class="form-control text-end latin-number" id="tax-percent" type="text"
+                 name="tax_percent" inputmode="decimal" value="{{ estimation.tax_percent or 0 }}">
+        </div>
+      </div>
+      <div class="mt-3">
+        <label class="form-label" for="estimation-notes">{{ bi_label('notes') }}</label>
+        <textarea class="form-control" id="estimation-notes" name="notes" rows="3">{{ estimation.notes or '' }}</textarea>
+      </div>
+      <button class="btn btn-primary mt-3" type="submit">
+        {{ bi_button('save', 'bi-check-lg') }}
+      </button>
+    </div>
+  </div>
+</form>
+{% endblock %}

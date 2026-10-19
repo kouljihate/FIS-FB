@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% from "shared/_macros.html" import bilingual_heading, bilingual_label, bilingual_stack, bilingual_button, bi_button, bi_label, bi_stack, bi_th, th with context %}
+{% block title %}{{ t('result') }} · {{ t('app_name') }}{% endblock %}
+{% block content %}
+
+<div class="wf-page-header mb-2">
+  <h1 class="wf-title-en h4 mb-0">{{ t_en('result') }}</h1>
+  <span class="wf-icon"><i class="bi bi-receipt"></i></span>
+  <h2 class="wf-title-ar ar-text h4 mb-0" lang="ar" dir="rtl">{{ t_ar('result') }}</h2>
+</div>
+
+<p class="text-secondary small">
+  {{ project.name }} &middot;
+  {{ bilingual_label(totals.item_count ~ ' line item' ~ ('' if totals.item_count == 1 else 's'),
+                     totals.item_count ~ ' بند') }}
+</p>
+
+<div class="page-toolbar justify-content-end mb-3">
+  <a class="btn btn-outline-secondary" href="{{ url_for('estimation.configuration', project_id=project['_id']) }}">
+    {{ bilingual_button(t_en('configuration'), t_ar('configuration'), 'bi-arrow-left') }}
+  </a>
+  <button class="btn btn-outline-primary" type="button" onclick="window.print()">
+    {{ bi_button('print_pdf', 'bi-printer') }}
+  </button>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header">
+    <h2 class="h6 mb-0">{{ bilingual_heading('Calculated result', 'النتيجة المحسوبة') }}</h2>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          {{ bi_th('item') }}
+          {{ bi_th('unit') }}
+          {{ bi_th('quantity', 'text-end') }}
+          {{ bi_th('unit_price', 'text-end') }}
+          {{ bi_th('line_total', 'text-end') }}
+        </tr>
+      </thead>
+      <tbody>
+        {% for line in lines %}
+          <tr>
+            <td>{{ line.name }}</td>
+            <td>{{ line.unit or '—' }}</td>
+            <td class="num latin-number">{{ line.quantity }}</td>
+            <td class="num latin-number">{{ line.unit_price }}</td>
+            <td class="num latin-number">{{ line.line_total }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="5" class="empty">{{ bilingual_label('No line items yet.', 'لا توجد بنود بعد.') }}</td></tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="table-group-divider">
+        <tr>
+          <th colspan="4" class="text-end">{{ bilingual_stack(t_en('subtotal'), t_ar('subtotal')) }}</th>
+          <td class="num latin-number">{{ totals.subtotal }}</td>
+        </tr>
+        <tr>
+          <th colspan="4" class="text-end">
+            {{ bilingual_stack(t_en('discount') ~ ' (' ~ totals.discount_percent ~ '%)',
+                               t_ar('discount') ~ ' (' ~ totals.discount_percent ~ '%)') }}
+          </th>
+          <td class="num latin-number">-{{ totals.discount }}</td>
+        </tr>
+        <tr>
+          <th colspan="4" class="text-end">{{ bi_stack('taxable_amount') }}</th>
+          <td class="num latin-number">{{ totals.taxable }}</td>
+        </tr>
+        <tr>
+          <th colspan="4" class="text-end">
+            {{ bilingual_stack(t_en('tax') ~ ' (' ~ totals.tax_percent ~ '%)',
+                               t_ar('tax') ~ ' (' ~ totals.tax_percent ~ '%)') }}
+          </th>
+          <td class="num latin-number">{{ totals.tax }}</td>
+        </tr>
+        <tr class="table-primary">
+          <th colspan="4" class="text-end">{{ bi_stack('total') }}</th>
+          <td class="num latin-number fs-6"><strong>{{ totals.total }}</strong></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+
+{% if estimation.notes %}
+  <div class="card">
+    <div class="card-header">
+      <h2 class="h6 mb-0">{{ bilingual_heading('Notes', 'ملاحظات') }}</h2>
+    </div>
+    <div class="card-body">
+      <p class="small mb-0">{{ estimation.notes }}</p>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}

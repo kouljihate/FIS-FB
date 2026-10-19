@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+{% from "shared/_macros.html" import bilingual_heading, bilingual_label, bilingual_stack, bilingual_button, bi_button, bi_label, bi_th, th with context %}
+{% block title %}{{ t('trees') }} · {{ t('app_name') }}{% endblock %}
+{% block content %}
+
+<div class="wf-page-header mb-2">
+  <h1 class="wf-title-en h4 mb-0">{{ t_en('trees') }}</h1>
+  <span class="wf-icon"><i class="bi bi-tree"></i></span>
+  <h2 class="wf-title-ar ar-text h4 mb-0" lang="ar" dir="rtl">{{ t_ar('trees') }}</h2>
+</div>
+
+<p class="text-secondary small d-flex justify-content-between flex-wrap gap-2">
+  <span>
+    {{ project.name }} &middot;
+    <span class="latin-number">{{ trees|length }}</span> tree{{ '' if trees|length == 1 else 's' }}
+  </span>
+  <span class="ar-text" lang="ar" dir="rtl">
+    {{ project.name }} &middot;
+    <span class="latin-number">{{ trees|length }}</span> شجرة
+  </span>
+</p>
+
+<div class="page-toolbar justify-content-end mb-3">
+  <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#modal-add">
+    {{ bi_button('add', 'bi-plus-lg') }}
+  </button>
+  <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#modal-generate">
+    {{ bilingual_button('Generate trees', 'توليد الأشجار', 'bi-magic') }}
+  </button>
+  <a class="btn btn-outline-secondary" href="{{ url_for('trees.rows', project_id=project['_id']) }}">
+    {{ bilingual_button(t_en('rows'), t_ar('rows'), 'bi-arrow-left') }}
+  </a>
+</div>
+
+<div class="card">
+  {% if not trees %}
+    <div class="card-body">
+      <p class="empty">
+        {{ bilingual_label('No trees yet. Generate places them along each row centreline at the plant spacing.',
+                           'لا توجد أشجار بعد. يقوم «توليد» بتوزيعها على طول محور كل صف حسب تباعد الغرس.') }}
+      </p>
+    </div>
+  {% else %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            {{ bi_th('name') }}
+            {% for label, key in columns %}{{ th(label, tar(label), 'text-end') }}{% endfor %}
+            {{ bi_th('actions', 'text-end') }}
+          </tr>
+        </thead>
+        <tbody>
+          {% for tree in trees %}
+            <tr>
+              <td>{{ tree.name }}</td>
+              {% for label, key in columns %}
+                <td class="num latin-number">{{ tree.get(key) if tree.get(key) is not none else '—' }}</td>
+              {% endfor %}
+              <td>
+                <div class="actions-row justify-content-end">
+                  <button class="btn btn-outline-primary btn-circle-sm" type="button"
+                          title="{{ t('rename') }}"
+                          data-bs-toggle="modal" data-bs-target="#modal-rename"
+                          data-action="{{ url_for('trees.rename_tree', project_id=project['_id'], item_id=tree['_id']) }}"
+                          data-name="{{ tree.name }}">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button class="btn btn-outline-secondary btn-circle-sm" type="button"
+                          title="{{ t('edit') }}"
+                          data-bs-toggle="modal" data-bs-target="#modal-edit"
+                          data-action="{{ url_for('trees.update_tree', project_id=project['_id'], item_id=tree['_id']) }}"
+                          data-name="{{ tree.name }}"
+                          data-species="{{ tree.species or '' }}"
+                          data-spacing_m="{{ tree.spacing_m or '' }}"
+                          data-drippers_count="{{ tree.drippers_count or '' }}">
+                    <i class="bi bi-sliders"></i>
+                  </button>
+                  <form class="inline" method="post"
+                        action="{{ url_for('trees.remove_tree', project_id=project['_id'], item_id=tree['_id']) }}">
+                    <button class="btn btn-outline-danger btn-circle-sm" type="submit"
+                            title="{{ t('remove') }}">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</div>
+
+{# -------------------------------- add -------------------------------- #}
+<div class="modal fade" id="modal-add" tabindex="-1" aria-labelledby="modal-add-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <form method="post" action="{{ url_for('trees.add_tree', project_id=project['_id']) }}">
+        <div class="modal-header">
+          <h3 class="modal-title h5" id="modal-add-title">
+            {{ bilingual_heading('Add tree', 'إضافة شجرة') }}
+          </h3>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ t('close') }}"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label" for="add-name">{{ bi_label('name') }}</label>
+            <input class="form-control" id="add-name" type="text" name="name" required autofocus>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="add-row">{{ bi_label('row') }}</label>
+            <select class="form-select" id="add-row" name="row_id">
+              <option value="">—</option>
+              {% for row in rows %}
+                <option value="{{ row['_id'] }}">{{ row.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="row g-3">
+            <div class="col-sm-6">
+              <label class="form-label" for="add-species">{{ bi_label('species') }}</label>
+              <input class="form-control" id="add-species" type="text" name="species">
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label" for="add-spacing">
+                {{ bilingual_label('Spacing (m)', 'التباعد (م)') }}
+              </label>
+              <input class="form-control" id="add-spacing" type="text" name="spacing_m" inputmode="decimal">
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label" for="add-drippers">{{ bi_label('drippers') }}</label>
+              <input class="form-control" id="add-drippers" type="text" name="drippers_count" inputmode="numeric">
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label" for="add-age">{{ bi_label('age_years') }}</label>
+              <input class="form-control" id="add-age" type="text" name="age_years" inputmode="decimal">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">
+            {{ bi_button('cancel') }}
+          </button>
+          <button class="btn btn-primary" type="submit">{{ bi_button('save') }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{# ------------------------------ generate ------------------------------ #}
+<div class="modal fade" id="modal-generate" tabindex="-1" aria-labelledby="modal-generate-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" data-loading
+            action="{{ url_for('trees.generate_trees', project_id=project['_id']) }}">
+        <div class="modal-header">
+          <h3 class="modal-title h5" id="modal-generate-title">
+            {{ bilingual_heading('Generate trees', 'توليد الأشجار') }}
+          </h3>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ t('close') }}"></button>
+        </div>
+        <div class="modal-body">
+          <p class="small text-secondary">
+            {{ bilingual_label('Points are sampled along the long axis of each row strip and kept only where they fall inside the row, so no tree lands outside the boundary.',
+                               'تُكمَّم النقاط على طول المحور الطويل لكل شريحة صف، وتُحتفظ بها فقط ضمن الصف، فلا تقع أي شجرة خارج الحدود.') }}
+          </p>
+          <div class="mb-3">
+            <label class="form-label" for="generate-row">{{ bi_label('row') }}</label>
+            <select class="form-select" id="generate-row" name="row_id">
+              <option value="">All rows · كل الصفوف</option>
+              {% for row in rows %}
+                <option value="{{ row['_id'] }}">{{ row.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="row g-3">
+            <div class="col-sm-4">
+              <label class="form-label" for="generate-spacing">
+                {{ bilingual_label('Plant spacing (m)', 'تباعد الغرس (م)') }}
+              </label>
+              <input class="form-control" id="generate-spacing" type="text" name="spacing_m"
+                     value="{{ default_spacing }}" inputmode="decimal">
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label" for="generate-species">{{ bi_label('species') }}</label>
+              <input class="form-control" id="generate-species" type="text" name="species">
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label" for="generate-drippers">
+                {{ bilingual_label('Drippers per tree', 'القطّارات لكل شجرة') }}
+              </label>
+              <input class="form-control" id="generate-drippers" type="text" name="drippers_count"
+                     inputmode="numeric">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">
+            {{ bi_button('cancel') }}
+          </button>
+          <button class="btn btn-primary" type="submit">{{ bi_button('generate') }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{# ---------------------------- rename / edit ---------------------------- #}
+<div class="modal fade" id="modal-rename" tabindex="-1" aria-labelledby="modal-rename-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="">
+        <div class="modal-header">
+          <h3 class="modal-title h5" id="modal-rename-title">
+            {{ bilingual_heading('Rename', 'إعادة تسمية') }}
+          </h3>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ t('close') }}"></button>
+        </div>
+        <div class="modal-body">
+          <label class="form-label" for="rename-name">{{ bi_label('name') }}</label>
+          <input class="form-control" id="rename-name" type="text" name="name" required>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">
+            {{ bi_button('cancel') }}
+          </button>
+          <button class="btn btn-primary" type="submit">{{ bi_button('save') }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modal-edit" tabindex="-1" aria-labelledby="modal-edit-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <form method="post" action="">
+        <div class="modal-header">
+          <h3 class="modal-title h5" id="modal-edit-title">
+            {{ bilingual_heading('Edit tree', 'تعديل الشجرة') }}
+          </h3>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ t('close') }}"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label" for="edit-name">{{ bi_label('name') }}</label>
+            <input class="form-control" id="edit-name" type="text" name="name" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="edit-row">{{ bi_label('row') }}</label>
+            <select class="form-select" id="edit-row" name="row_id">
+              <option value="">—</option>
+              {% for row in rows %}
+                <option value="{{ row['_id'] }}">{{ row.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="row g-3">
+            <div class="col-sm-6">
+              <label class="form-label" for="edit-species">{{ bi_label('species') }}</label>
+              <input class="form-control" id="edit-species" type="text" name="species" data-fill="species">
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label" for="edit-spacing">
+                {{ bilingual_label('Spacing (m)', 'التباعد (م)') }}
+              </label>
+              <input class="form-control" id="edit-spacing" type="text" name="spacing_m"
+                     inputmode="decimal" data-fill="spacing_m">
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label" for="edit-drippers">{{ bi_label('drippers') }}</label>
+              <input class="form-control" id="edit-drippers" type="text" name="drippers_count"
+                     inputmode="numeric" data-fill="drippers_count">
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label" for="edit-age">{{ bi_label('age_years') }}</label>
+              <input class="form-control" id="edit-age" type="text" name="age_years" inputmode="decimal">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">
+            {{ bi_button('cancel') }}
+          </button>
+          <button class="btn btn-primary" type="submit">{{ bi_button('save') }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

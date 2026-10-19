@@ -1,0 +1,175 @@
+{% from "shared/_macros.html" import bilingual_button, bilingual_stack, bilingual_label, bi_button with context %}
+{% macro tab_href(endpoint, arg=None) -%}
+  {%- if endpoint == 'project.list_projects' -%}
+    {{ url_for(endpoint) }}
+  {%- elif nav_project_id -%}
+    {{ url_for(endpoint, project_id=nav_project_id, kind=arg) if arg else url_for(endpoint, project_id=nav_project_id) }}
+  {%- else -%}
+    {{ url_for('project.list_projects') }}
+  {%- endif -%}
+{%- endmacro %}
+
+{% set nav_project_id = (project['_id'] if project is defined and project else None) %}
+{% set tab_icons = {
+  'project': 'bi-diagram-3',
+  'water_resource': 'bi-droplet-half',
+  'geometry': 'bi-bounding-box-circles',
+  'hydrology1': 'bi-signpost-split',
+  'trees': 'bi-tree',
+  'hydrology2': 'bi-funnel',
+  'estimation': 'bi-calculator',
+  'report': 'bi-file-earmark-bar-graph',
+} %}
+<!doctype html>
+<html lang="{{ lang }}" dir="{{ 'rtl' if is_rtl else 'ltr' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ t('app_name') }}{% endblock %}</title>
+
+  {# Bootstrap 5 first, then the Bootswatch "Journal" theme, then icons and the
+     project stylesheet (fonts + bilingual helpers) so the theme always wins. #}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='themes/journal.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap-icons.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app-overrides.css') }}">
+  {% block styles %}{% endblock %}
+</head>
+<body class="{{ 'page-rtl' if is_rtl else '' }}">
+
+{# The signed-out screens (login / register) replace this with their own
+   three-column header, see auth/_header.html. #}
+{% block navbar %}
+<nav class="navbar navbar-expand-lg pastel-navbar">
+  <div class="container-fluid planner-navbar">
+    <div class="planner-navbar-en">
+      <a class="navbar-brand d-inline-flex align-items-center gap-2" href="{{ url_for('project.list_projects') }}">
+        <span class="badge text-bg-primary">{{ t_en('app_short') }}</span>
+        <span>{{ t_en('app_name') }}</span>
+      </a>
+    </div>
+
+    <div class="planner-navbar-center">
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+              data-bs-target="#plannerNavbar" aria-controls="plannerNavbar"
+              aria-expanded="false" aria-label="Toggle navigation · تبديل التنقّل">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div class="collapse navbar-collapse" id="plannerNavbar">
+        {# Both languages are always on screen, so there is no language picker. #}
+        <div class="planner-navbar-actions d-flex flex-wrap align-items-center justify-content-center gap-2">
+          {% if current_user.is_authenticated %}
+            <span class="badge text-bg-secondary" title="{{ current_user.role }}">
+              {{ current_user.username }} &middot; {{ current_user.role }}
+            </span>
+            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('auth.profile') }}">
+              {{ bi_button('profile', 'bi-person-circle') }}
+            </a>
+
+            <form class="inline" method="post" action="{{ url_for('auth.logout') }}">
+              <button class="btn btn-outline-secondary btn-sm" type="submit">
+                {{ bi_button('sign_out', 'bi-box-arrow-right') }}
+              </button>
+            </form>
+          {% else %}
+            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('auth.login') }}">
+              {{ bi_button('sign_in', 'bi-box-arrow-in-right') }}
+            </a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="planner-navbar-ar">
+      <span class="ar-text h6 mb-0" lang="ar" dir="rtl">{{ t_ar('app_name') }}</span>
+    </div>
+  </div>
+</nav>
+{% endblock %}
+
+{% if current_user.is_authenticated %}
+<nav class="project-workflow-nav" aria-label="main">
+  <div class="container-fluid">
+    <ul class="nav nav-tabs">
+      {% for tab in main_tabs %}
+        <li class="nav-item">
+          <a class="nav-link {{ 'active' if active_tab_key == tab.key }}"
+             href="{{ tab_href(tab.endpoint) }}">
+            {{ bilingual_button(tab.label['en'], tab.label['ar'], tab_icons.get(tab.key)) }}
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+</nav>
+
+{% for tab in main_tabs %}
+  {% if active_tab_key == tab.key and tab.sub %}
+    <nav class="project-workflow-subnav project-workflow-subnav-centered" aria-label="sub">
+      <div class="container-fluid">
+        <ul class="nav">
+          {% for sub in tab.sub %}
+            {% set sub_active = (request.endpoint == sub.endpoint) and (not sub.arg or request.view_args.get('kind') == sub.arg) %}
+            <li class="nav-item">
+              <a class="nav-link {{ 'active' if sub_active }}"
+                 href="{{ tab_href(sub.endpoint, sub.arg) }}">
+                {{ bilingual_stack(sub.label['en'], sub.label['ar']) }}
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </nav>
+  {% endif %}
+{% endfor %}
+{% endif %}
+
+<main class="main-content {% block main_class %}container-xxl py-4{% endblock %}">
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="d-flex align-items-center justify-content-center gap-2">
+  <a class="link-dark text-decoration-none" href="{{ url_for('project.list_projects') }}">
+    {{ t_en('app_name') }}
+  </a>
+  <span class="badge version-badge">{{ app_version }}</span>
+</footer>
+
+{# Flash messages arrive as auto-dismissing toasts (see static/js/app.js). #}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="flash-toast-container" aria-live="polite" aria-atomic="true">
+      {% for category, message in messages %}
+        {% set tone = {'success': 'success', 'error': 'danger', 'danger': 'danger',
+                       'warning': 'warning', 'info': 'primary'}.get(category, 'primary') %}
+        <div class="toast flash-toast" role="alert" aria-live="assertive" aria-atomic="true">
+          <div class="toast-header text-bg-{{ tone }}">
+            <i class="bi bi-info-circle me-2"></i>
+            <strong class="me-auto">{{ t('app_name') }}</strong>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"
+                    aria-label="{{ t('close') }}"></button>
+          </div>
+          <div class="toast-body">{{ message }}</div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+{# Shown by app.js while a long POST (generate / seed) is in flight. #}
+<div class="global-loading-overlay" id="globalLoading" aria-hidden="true">
+  <div class="global-loading-box">
+    <div class="spinner-border text-primary" role="status" style="width:3rem;height:3rem">
+      <span class="visually-hidden">{{ t('working') }}</span>
+    </div>
+    <div class="global-loading-text">{{ bilingual_label(t_en('working'), t_ar('working')) }}</div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

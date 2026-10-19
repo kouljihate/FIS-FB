@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% from "shared/_macros.html" import bilingual_heading, bilingual_label, bilingual_stack, bilingual_button, bi_button, bi_label, bi_stack, bi_th, th with context %}
+{% block title %}Account · {{ t('app_name') }}{% endblock %}
+{% block content %}
+
+<div class="wf-page-header mb-3">
+  <h1 class="wf-title-en h4 mb-0">Account</h1>
+  <span class="wf-icon"><i class="bi bi-person-circle"></i></span>
+  <h2 class="wf-title-ar ar-text h4 mb-0" lang="ar" dir="rtl">الحساب</h2>
+</div>
+<p class="text-secondary small mb-4">
+  {{ current_user.username }} &middot; <span class="badge text-bg-secondary">{{ current_user.role }}</span>
+</p>
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <h2 class="h6 mb-0">{{ bilingual_heading('Change password', 'تغيير كلمة المرور') }}</h2>
+      </div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('auth.profile') }}">
+          <input type="hidden" name="action" value="password">
+          <div class="mb-3">
+            <label class="form-label" for="current-password">{{ bi_label('current_password') }}</label>
+            <input class="form-control" id="current-password" type="password"
+                   name="current_password" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="new-password">{{ bi_label('new_password') }}</label>
+            <input class="form-control" id="new-password" type="password" name="new_password" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="confirm-new-password">{{ bi_label('confirm_new_password') }}</label>
+            <input class="form-control" id="confirm-new-password" type="password"
+                   name="confirm_password" required>
+          </div>
+          <button class="btn btn-primary" type="submit">{{ bi_button('save') }}</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <h2 class="h6 mb-0">{{ bilingual_heading('Session', 'الجلسة') }}</h2>
+      </div>
+      <div class="card-body">
+        <table class="table table-sm mb-0">
+          <tbody>
+            <tr>
+              <th scope="row">{{ bi_stack('username') }}</th>
+              <td>{{ current_user.username }}</td>
+            </tr>
+            <tr>
+              <th scope="row">{{ bi_stack('email') }}</th>
+              <td>{{ current_user.email or '—' }}</td>
+            </tr>
+            <tr>
+              <th scope="row">{{ bi_stack('full_name') }}</th>
+              <td>{{ current_user.full_name or '—' }}</td>
+            </tr>
+            <tr>
+              <th scope="row">{{ bi_stack('role') }}</th>
+              <td><span class="badge text-bg-info">{{ current_user.role }}</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if current_user.is_superuser and users %}
+  <div class="card mt-3">
+    <div class="card-header">
+      <h2 class="h6 mb-0">
+        {{ bilingual_heading('User profiles (Full Admin only)', 'صلاحيات المستخدمين') }}
+      </h2>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            {{ bi_th('username') }}
+            {{ bi_th('email') }}
+            {{ bi_th('role') }}
+            {{ bi_th('actions') }}
+          </tr>
+        </thead>
+        <tbody>
+          {% for user in users %}
+            <tr>
+              <td>
+                {{ user.username }}
+                {% if user.id == current_user.id %}
+                  <span class="badge text-bg-primary">you</span>
+                {% endif %}
+              </td>
+              <td>{{ user.email or '—' }}</td>
+              <td><span class="badge text-bg-info">{{ user.role }}</span></td>
+              <td>
+                {% if user.id != current_user.id %}
+                  <form class="d-flex gap-2" method="post" action="{{ url_for('auth.profile') }}">
+                    <input type="hidden" name="action" value="role">
+                    <input type="hidden" name="user_id" value="{{ user.id }}">
+                    <select class="form-select form-select-sm" name="role"
+                            aria-label="{{ t('role') }}">
+                      {% for role in profiles %}
+                        <option value="{{ role }}" {{ 'selected' if role == user.role }}>
+                          {{ profile_labels[role].en }}
+                        </option>
+                      {% endfor %}
+                    </select>
+                    <button class="btn btn-sm btn-outline-primary" type="submit">{{ bi_button('apply') }}</button>
+                  </form>
+                {% else %}
+                  <span class="text-secondary">—</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}
