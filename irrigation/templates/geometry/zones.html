@@ -750,20 +750,41 @@
                             value="{{ default_zones_per_sector }}">
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Orientation / الاتجاه</label>
-                        <select name="orientation" class="form-select">
-                            <option value="auto" selected>Auto from slope
-                                (recommended) / تلقائي من الميل (موصى
-                                به)</option>
-                            {% for opt in orientation_options %}
-                            <option value="{{ opt.code }}">{{ opt.en }} / {{ opt.ar }}</option>
+                        <label class="form-label">Orientation by Sector /
+                            الاتجاه لكل قطاع</label>
+                        {% if sectors %}
+                        <div class="border rounded p-2"
+                            style="max-height: 280px; overflow-y: auto;">
+                            {% for s in sectors %}
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <div class="small flex-grow-1" style="min-width: 0;">
+                                    <code>{{ s.short_name or s.id }}</code>
+                                    <span class="text-muted">{{ s.name_en }}</span>
+                                </div>
+                                <div style="width: 58%;">
+                                    <select name="orientation_{{ s.id }}"
+                                        class="form-select form-select-sm">
+                                        <option value="auto" selected>Auto (from
+                                            slope) / تلقائي (من الميل)</option>
+                                        {% for opt in orientation_options %}
+                                        <option value="{{ opt.code }}">{{ opt.en }} / {{ opt.ar }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
                             {% endfor %}
-                        </select>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-warning py-2 small mb-0">
+                            No sectors to generate zones in / لا توجد قطاعات
+                        </div>
+                        {% endif %}
                         <div class="form-text">
-                            Auto derives each zone's downhill direction from
-                            terrain slope; pick a compass point to force it.
-                            / يحدد الاتجاه تلقائيًا من ميل التضاريس؛ اختر جهة
-                            معينة لفرضها.
+                            Auto derives each sector's downhill direction from
+                            its terrain slope; pick a compass point to force
+                            that sector's zones.
+                            / يحدد التلقائي اتجاه الانحدار من ميل كل قطاع؛ اختر
+                            جهة معينة لفرضها على مناطق ذلك القطاع.
                         </div>
                     </div>
                     <div class="form-check form-switch mb-2">

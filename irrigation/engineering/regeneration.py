@@ -683,7 +683,16 @@ def regenerate_sectors(project_id, n_sectors=None, config=None):
     return sectors
 
 
-def regenerate_zones(project_id, sector_id=None, zones_per_sector=None, use_elevation=True, orientation=None):
+def _target_orientation(value):
+    """Normalize an orientation option to a 32-point code, or None for 'auto'."""
+    target = value.upper() if isinstance(value, str) else None
+    if target:
+        target = ORIENTATION_ALIASES.get(target, target)
+    return target if target in COMPASS_POINTS else None
+
+
+def regenerate_zones(project_id, sector_id=None, zones_per_sector=None, use_elevation=True,
+                     orientation=None, sector_orientations=None):
     """AI regeneration: optimally divide sectors into zones.
 
     Uses the same optimization approach but applied within each sector's polygon.
@@ -695,12 +704,13 @@ def regenerate_zones(project_id, sector_id=None, zones_per_sector=None, use_elev
     generated zone is assigned that orientation; when ``'auto'`` the orientation
     of each zone is derived from the terrain aspect (downhill direction) of its
     polygon.
+
+    ``sector_orientations`` optionally maps ``sector_id`` to a compass point (or
+    ``'auto'``/``None``) so each sector can get its own orientation. A sector
+    listed there wins over the global ``orientation`` argument.
     """
-    target_orientation = orientation.upper() if isinstance(orientation, str) else None
-    if target_orientation:
-        target_orientation = ORIENTATION_ALIASES.get(target_orientation, target_orientation)
-    if target_orientation not in COMPASS_POINTS:
-        target_orientation = None
+    target_orientation = _target_orientation(orientation)
+    sector_orientations = sector_orientations or {}
 
     query = {'project_id': project_id}
     if sector_id:
@@ -731,6 +741,10 @@ def regenerate_zones(project_id, sector_id=None, zones_per_sector=None, use_elev
     zone_names = [1, 2, 3, 4]
 
     for sector in sectors:
+        if sector['id'] in sector_orientations:
+            sector_target = _target_orientation(sector_orientations[sector['id']])
+        else:
+            sector_target = target_orientation
         polygon = sector.get('polygon')
         if not polygon or polygon.get('type') != 'Polygon':
             continue
@@ -797,9 +811,9 @@ def regenerate_zones(project_id, sector_id=None, zones_per_sector=None, use_elev
 
             # Orientation: user-chosen compass point, otherwise derived from
             # the terrain aspect (downhill direction) of the zone polygon.
-            if target_orientation:
-                zone_orientation = target_orientation
-                zone_orientation_deg = ORIENTATION_DEGREES.get(target_orientation)
+            if sector_target:
+                zone_orientation = sector_target
+                zone_orientation_deg = ORIENTATION_DEGREES.get(sector_target)
             elif aspect:
                 zone_orientation = aspect['compass']
                 zone_orientation_deg = round(aspect['bearing_deg'], 1)

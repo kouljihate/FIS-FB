@@ -822,9 +822,19 @@ def zone_ai_regenerate(project_id):
     use_elevation = request.form.get('use_elevation') == '1'
     orientation = request.form.get('orientation', '').strip()
 
+    # Per-sector orientation: every sector gets its own 'auto' / compass choice
+    # (fields named orientation_<sector_id>). Sectors without a field fall back
+    # to the legacy single orientation value.
+    sector_orientations = {}
+    for sector in mongo.db.sectors.find({'project_id': project_id}):
+        raw = request.form.get('orientation_%s' % sector['id'])
+        if raw is not None:
+            sector_orientations[sector['id']] = normalize_orientation(raw)
+
     mongo.db.zones.delete_many({'project_id': project_id})
     zones = regenerate_zones(project_id, zones_per_sector=zones_per_sector,
-                             use_elevation=use_elevation, orientation=orientation or None)
+                             use_elevation=use_elevation, orientation=orientation or None,
+                             sector_orientations=sector_orientations or None)
     flash(f'Auto Generated {len(zones)} zones / الذكاء الاصطناعي أنشأ {len(zones)} مناطق', 'success')
     return redirect(url_for('geometry.zones_view', project_id=project_id))
 

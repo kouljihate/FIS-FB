@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.4 - 2026-10-19
+
+### Added
+- the Auto Generate Zones modal lists every sector with its own Auto (from slope) or manual compass orientation choice; each sector's zones are generated with that orientation.
+
+### Changed
+- regenerate_zones accepts a sector_orientations map, and the zone AI route reads orientation_<sector_id> fields while still supporting the legacy single orientation value.
+
 ## 0.4.3 - 2026-10-19
 
 ### Fixed
