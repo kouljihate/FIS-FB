@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.85 - 2026-10-19
+
+### Changed
+- the Valve Name column is gone; Short Name shows just the code (VM1, VS1, VZ1)
+- Type, Assigned To and the totals line show Arabic on top and English underneath
+
+### Fixed
+- valves remain searchable by name through a hidden data attribute
+
 ## 0.3.84 - 2026-10-19
 
 ### Added

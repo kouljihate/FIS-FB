@@ -84,6 +84,20 @@ small, strong, b, em, ul, ol, button, input, select, textarea,
     direction: rtl;
 }
 
+/* Bilingual table-cell value: Arabic on top, English underneath */
+.cell-bilingual {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    line-height: 1.25;
+}
+
+.cell-bilingual .cell-bilingual-en {
+    font-size: 0.88em;
+    opacity: 0.85;
+}
+
 .bilingual-heading {
     display: flex;
     align-items: baseline;

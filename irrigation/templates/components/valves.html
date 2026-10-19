@@ -28,7 +28,7 @@
             <table class="table table-hover mb-0" id="valvesTable">
                 <thead>
                     <tr class="table-light">
-                        <th colspan="9" class="text-center">
+                        <th colspan="8" class="text-center">
                             <button class="btn btn-circle btn-success" id="valveAddBtn" type="button"
                                     data-bs-toggle="modal" data-bs-target="#addValveModal"
                                     title="Add / إضافة">
@@ -61,7 +61,7 @@
                         </th>
                     </tr>
                     <tr class="table-light">
-                        <th colspan="9" class="text-center align-middle">
+                        <th colspan="8" class="text-center align-middle">
                             <div class="input-group input-group-sm search-zone">
                                 <div class="search-field">
                                     <input type="text" id="valveSearch" class="form-control search-input"
@@ -80,7 +80,6 @@
                     <tr>
                         <th width="40"><input type="checkbox" id="selectAllValves" onclick="toggleAllValves(this)"></th>
                         <th>ID</th>
-                        <th class="text-center"> اسم الصمام <br> Valve Name</th>
                         <th class="text-center"> الاسم المختصر <br> Short Name</th>
                         <th class="text-center"> النوع <br> Type</th>
                         <th class="text-center"> مرتبط بـ <br> Assigned To</th>
@@ -91,19 +90,29 @@
                 </thead>
                 <tbody class="align-middle">
                     {% for v in valves %}
-                    <tr data-valve-type="{{ v.type }}">
+                    <tr data-valve-type="{{ v.type }}" data-valve-name="{{ v.name_en }} {{ v.name_ar }}">
                         <td><input type="checkbox" class="valve-checkbox" value="{{ v.id }}"
                                    data-name-en="{{ v.name_en }}" data-name-ar="{{ v.name_ar }}"></td>
                         <td>{{ v.id }}</td>
-                        <td class="text-center">{{ v.name_en }} <span class="ar-text">/ {{ v.name_ar }}</span></td>
                         <td class="text-center text-nowrap">
                             <span class="badge bg-dark valve-short-name">{{ v.short_name }}</span>
-                            <span class="text-muted small">({{ v.name_en }})</span>
                         </td>
                         <td class="text-center">
-                            <span class="badge bg-{{ v.type_badge }}">{{ v.type_label_en }} / {{ v.type_label_ar }}</span>
+                            <span class="badge bg-{{ v.type_badge }} cell-bilingual">
+                                <span class="ar-text">{{ v.type_label_ar }}</span>
+                                <span class="cell-bilingual-en">{{ v.type_label_en }}</span>
+                            </span>
                         </td>
-                        <td class="text-center">{{ v.assignment_en }} <span class="ar-text">/ {{ v.assignment_ar }}</span></td>
+                        <td class="text-center">
+                            {% if v.assignment_ar %}
+                            <span class="cell-bilingual">
+                                <span class="ar-text">{{ v.assignment_ar }}</span>
+                                <span class="cell-bilingual-en">{{ v.assignment_en }}</span>
+                            </span>
+                            {% else %}
+                            <span class="cell-bilingual-en">{{ v.assignment_en }}</span>
+                            {% endif %}
+                        </td>
                         <td class="text-center">
                             {% if v.diameter and v.upstream_diameter and v.upstream_diameter != v.diameter %}
                             <span class="badge bg-secondary"
@@ -141,12 +150,17 @@
                         </td>
                     </tr>
                     {% else %}
-                    <tr><td colspan="9" class="text-center text-muted py-3">No valves yet / لا توجد صمامات — استخدم زر الإنشاء</td></tr>
+                    <tr><td colspan="8" class="text-center text-muted py-3">No valves yet / لا توجد صمامات — استخدم زر الإنشاء</td></tr>
                     {% endfor %}
                 </tbody>
                 <tfoot class="table-light">
                     <tr>
-                        <th colspan="9" class="text-center">Total Valves: {{ valves|length }} / إجمالي الصمامات: {{ valves|length }}</th>
+                        <th colspan="8" class="text-center">
+                            <span class="cell-bilingual">
+                                <span class="ar-text">إجمالي الصمامات: {{ valves|length }}</span>
+                                <span class="cell-bilingual-en">Total Valves: {{ valves|length }}</span>
+                            </span>
+                        </th>
                     </tr>
                 </tfoot>
             </table>
@@ -578,7 +592,7 @@ function applyValveFilters() {
         if (!tr.querySelector('.valve-checkbox')) return;
         const type = tr.dataset.valveType || '';
         const shownType = !valveTypeHidden[type];
-        const haystack = tr.textContent.toLowerCase() + ' ' + type;
+        const haystack = (tr.textContent + ' ' + type + ' ' + (tr.dataset.valveName || '')).toLowerCase();
         const matches = !query || haystack.indexOf(query) !== -1;
         tr.style.display = (shownType && matches) ? '' : 'none';
     });
