@@ -4,8 +4,8 @@
 Irrigation Planning System - A Flask-based web application for irrigation planning and management.
 
 ## Current Version
-- **Version**: 0.3.73
-- **Last Updated**: 2026-10-18
+- **Version**: 0.3.80
+- **Last Updated**: 2026-10-19
 
 ## Architecture Overview
 
@@ -41,8 +41,12 @@ Project - Water Resource - Geometry - Pipes - Trees - Components - Estimation - 
 - **Trees**: Tree management (add, edit, rename, remove, generate)
 
 #### 6. Components
-- **Mandatory**: Mandatory components (Coming Soon placeholder)
-- **Optional**: Optional components (Coming Soon placeholder)
+- **Valves**: Master, sector and zone valves
+- **Connectors**: Connectors to dripline (Coming Soon placeholder)
+- **Reductors**: Diameter reductions (Coming Soon placeholder)
+- **Air Removal**: Air release points (Coming Soon placeholder)
+- **Reduce Pressure**: Pressure reducers (Coming Soon placeholder)
+- **Terminators**: Line terminators (Coming Soon placeholder)
 
 #### 7. Estimation
 - **Pricing**: Estimation pricing configuration (prices, items, notes, discount, tax)
@@ -133,7 +137,7 @@ With sub-tabs:
 - **Geometry**: Sectors - Zones
 - **Pipes**: Main Pipe (MP) - Second Pipe (SP) - Zone Pipe (ZP)
 - **Trees**: Rows - Trees
-- **Components**: Mandatory - Optional (Coming Soon)
+- **Components**: Valves - Connectors - Reductors - Air Removal - Reduce Pressure - Terminators
 - **Estimation**: Pricing - Result (Coming Soon)
 - **Report**: Charts (Coming Soon) - Standard - Technical (DPA)
 
@@ -158,13 +162,21 @@ Key API endpoints for rebuild:
 
 ### Version Control
 - Git branches: `project-settings-v1`
-- Version: 0.3.73
+- Version: 0.3.80
 - Changelog: CHANGELOG.md
 - **ALWAYS bump the version on every change (never forget).** Increment `__version__` in
   `irrigation/__init__.py` (patch `+1`, e.g. `0.3.44` -> `0.3.45`), add a dated `## <version> - YYYY-MM-DD`
   entry at the top of `CHANGELOG.md`, and sync the version in this file (Current Version + Version Control)
   and `README.md`.
 
+### Release
+- Run `python release.py --summary "..." --note "Added: ..." --yes` after **every** change prompt:
+  it bumps the version, writes the dated `CHANGELOG.md` entry, syncs the version in this file and
+  `README.md`, commits as `vX.Y.Z: <summary>`, and pushes the branch to the `fb` remote
+  (`git@github.com:kouljihate/FIS-FB.git`), branch `main`.
+- `python release.py --list` prints every recorded version and the pending changes without touching
+  anything; `--dry-run` prints the plan only; `--no-push` commits locally without pushing.
+- Note format: `--note "Added|Changed|Fixed: text"`; notes without a section land under `Changed`.
 ### Contributing
 - Follow existing code patterns
 - Maintain bilingual (English/Arabic) support

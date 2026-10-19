@@ -725,4 +725,4 @@ def trees_validate(project_id):
         {'$set': {'validated': True}}
     )
     flash('Trees validated / تم التحقق من الأشجار', 'success')
-    return redirect(url_for('hydrology.valves', project_id=project_id))
+    return redirect(url_for('components.valves', project_id=project_id))

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.80 - 2026-10-19
+
+### Added
+- Components section with six sub-tabs (Valves, Connectors, Reductors, Air Removal, Reduce Pressure, Terminators) on their own /components URLs
+- map filter widget that hides sectors, zones, rows, trees and pipes
+- release.py to bump the version, sync the markdown files, commit and push to FIS-FB
+
+### Changed
+- Valves page rebuilt as a Rows-style table with filter, rename and per-row actions
+
+
+
 ## 0.3.78 - 2026-10-18
 
 ### Added

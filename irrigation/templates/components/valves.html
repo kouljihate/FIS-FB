@@ -1,0 +1,379 @@
+{% extends "base.html" %}
+{% block title %}Valves / الصمامات{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="wf-title-en">Valves</h2>
+    <i class="bi bi-valve fs-1" aria-hidden="true"></i>
+    <h2 class="wf-title-ar" lang="ar">الصمامات</h2>
+</div>
+
+<div class="mb-3">
+    <span class="badge bg-primary"><i class="bi bi-folder"></i> {{ project.name }}</span>
+</div>
+
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i>
+    <strong>Master Valve (MV):</strong> between basin and main pipe.
+    <strong>Sector Valve:</strong> one per sector.
+    <strong>Zone Valve (ZV):</strong> one per zone.
+    <br>
+    الصمام الرئيسي: بين الحوض والأنبوب الرئيسي. صمام القطاع: لكل قطاع. صمام المنطقة: لكل منطقة.
+</div>
+
+<!-- Valves Table -->
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" id="valvesTable">
+                <thead>
+                    <tr class="table-light">
+                        <th colspan="7" class="text-center">
+                            <button class="btn btn-circle btn-info" id="valveRenameBtn" type="button"
+                                    onclick="valveRenameSelected()" title="Rename / إعادة تسمية">
+                                <i class="bi bi-input-cursor-text"></i>
+                            </button>
+                            <form method="POST" id="removeValvesForm"
+                                  action="{{ url_for('components.valves_remove', project_id=project.id) }}" class="d-inline">
+                                <button class="btn btn-circle btn-outline-danger" id="valveRemoveBtn" type="button"
+                                        onclick="valvesRemoveSelected()" title="Remove / إزالة">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                            <button class="btn btn-circle btn-success" type="button" onclick="focusValveForm()"
+                                    title="Add / إضافة">
+                                <i class="bi bi-plus-circle"></i>
+                            </button>
+                            <form method="POST" action="{{ url_for('components.valves_validate', project_id=project.id) }}" class="d-inline">
+                                <button type="submit" class="btn btn-circle btn-primary" title="Validate / التحقق">
+                                    <i class="bi bi-check-circle"></i>
+                                </button>
+                            </form>
+                        </th>
+                    </tr>
+                    <tr class="table-light">
+                        <th colspan="7" class="text-center align-middle">
+                            <div class="input-group input-group-sm search-zone">
+                                <div class="search-field">
+                                    <input type="text" id="valveSearch" class="form-control search-input"
+                                           placeholder="Filter by name, type or assignment / تصفية حسب الاسم أو النوع أو الارتباط"
+                                           autocomplete="off" aria-label="Filter valves / تصفية الصمامات">
+                                    <div class="search-suffix">
+                                        <span class="badge rounded-pill text-bg-secondary search-row-count" id="valveRowCount"
+                                              title="Selected / found valves / الصمامات المحددة من إجمالي النتائج">0/0</span>
+                                        <button type="button" class="search-clear d-none" id="valveSearchClear"
+                                                aria-label="Clear / مسح"><i class="bi bi-x-lg"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                        </th>
+                    </tr>
+                    <tr>
+                        <th width="40"><input type="checkbox" id="selectAllValves" onclick="toggleAllValves(this)"></th>
+                        <th>ID</th>
+                        <th class="text-center"> اسم الصمام <br> Valve Name</th>
+                        <th class="text-center"> النوع <br> Type</th>
+                        <th class="text-center"> مرتبط بـ <br> Assigned To</th>
+                        <th class="text-center"> تم التحقق <br> Validated</th>
+                        <th class="text-center"> إجراءات <br> Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="align-middle">
+                    {% for v in valves %}
+                    <tr data-valve-type="{{ v.type }}">
+                        <td><input type="checkbox" class="valve-checkbox" value="{{ v.id }}"
+                                   data-name-en="{{ v.name_en }}" data-name-ar="{{ v.name_ar }}"></td>
+                        <td>{{ v.id }}</td>
+                        <td class="text-center">{{ v.name_en }} <span class="ar-text">/ {{ v.name_ar }}</span></td>
+                        <td class="text-center">
+                            <span class="badge bg-{{ v.type_badge }}">{{ v.type_label_en }} / {{ v.type_label_ar }}</span>
+                        </td>
+                        <td class="text-center">{{ v.assignment_en }} <span class="ar-text">/ {{ v.assignment_ar }}</span></td>
+                        <td class="text-center">
+                            {% if v.validated %}
+                            <span class="badge bg-success"><i class="bi bi-check"></i></span>
+                            {% else %}
+                            <span class="badge bg-warning"><i class="bi bi-clock"></i></span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <button class="btn btn-circle btn-info" data-bs-toggle="modal"
+                                    data-bs-target="#renameValveModal{{ v.id }}" title="Rename / إعادة تسمية">
+                                <i class="bi bi-input-cursor-text"></i>
+                            </button>
+                            <form method="POST" action="{{ url_for('components.valves_remove', project_id=project.id) }}"
+                                  class="d-inline"
+                                  data-confirm-delete="{{ v.name_en }}" data-confirm-delete-ar="{{ v.name_ar }}">
+                                <input type="hidden" name="element_ids" value="{{ v.id }}">
+                                <button type="submit" class="btn btn-circle btn-outline-danger" title="Remove / إزالة">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" class="text-center text-muted py-3">No valves yet / لا توجد صمامات</td></tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot class="table-light">
+                    <tr>
+                        <th colspan="7" class="text-center">Total Valves: {{ valves|length }} / إجمالي الصمامات: {{ valves|length }}</th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% for v in valves %}
+<!-- Rename Valve Modal -->
+<div class="modal fade" id="renameValveModal{{ v.id }}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('components.valve_rename', project_id=project.id, element_id=v.id) }}">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title"><i class="bi bi-input-cursor-text"></i> Rename Valve / إعادة تسمية الصمام</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Name (EN)</label>
+                        <input type="text" name="name_en" class="form-control" value="{{ v.name_en }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Name (AR)</label>
+                        <input type="text" name="name_ar" class="form-control" value="{{ v.name_ar }}">
+                    </div>
+                    <p class="text-muted small mb-0">
+                        {{ v.type_label_en }} / {{ v.type_label_ar }} &middot; {{ v.assignment_kind_en }}: {{ v.assignment_en }}
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close / إغلاق</button>
+                    <button type="submit" class="btn btn-info"><i class="bi bi-check"></i> Rename / إعادة تسمية</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<!-- Add Valve -->
+<div class="card shadow-sm mt-4" id="addValveCard">
+    <div class="card-header bg-success text-white">
+        <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Add Valve / إضافة صمام</h5>
+    </div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('components.valve_add', project_id=project.id) }}">
+            <div class="row align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">Valve Type / نوع الصمام</label>
+                    <select name="valve_type" class="form-select" id="valveType" required onchange="toggleSectorZone(this)">
+                        <option value="master_valve">Master Valve / الصمام الرئيسي</option>
+                        <option value="sector_valve">Sector Valve / صمام القطاع</option>
+                        <option value="zone_valve">Zone Valve / صمام المنطقة</option>
+                    </select>
+                </div>
+                <div class="col-md-3" id="sectorSelect" style="display:none;">
+                    <label class="form-label">Sector / القطاع</label>
+                    <select name="sector_id" class="form-select">
+                        {% for s in sectors %}
+                        <option value="{{ s.id }}">{{ s.name_en }} ({{ s.name_ar }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3" id="zoneSelect" style="display:none;">
+                    <label class="form-label">Zone / المنطقة</label>
+                    <select name="zone_id" class="form-select">
+                        {% for z in zones %}
+                        <option value="{{ z.id }}">{{ z.name_en }} ({{ z.name_ar }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Location (JSON) / الموقع</label>
+                    <input type="text" name="coordinates" id="valveCoords" class="form-control"
+                           placeholder='[lng,lat]' required>
+                </div>
+            </div>
+            <div class="mt-3 d-flex align-items-center gap-2">
+                <button type="submit" class="btn btn-success">
+                    <i class="bi bi-check"></i> Add Valve / إضافة صمام
+                </button>
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="startDrawPoint()">
+                    <i class="bi bi-pencil-square"></i> Place Point on map / وضع نقطة على الخريطة
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Map -->
+<div class="card shadow-sm mt-4">
+    {% set map_title_en = "Map - Valves" %}{% set map_title_ar = "الخريطة - الصمامات" %}
+    {% include "_map_header.html" %}
+    <div class="card-body">
+        <div class="mb-2">
+            <button class="btn btn-outline-primary btn-sm" onclick="startDrawPoint()">
+                <i class="bi bi-pencil-square"></i> Place Point / وضع نقطة
+            </button>
+            <button class="btn btn-outline-danger btn-sm" onclick="clearDrawn()">
+                <i class="bi bi-eraser"></i> Clear / مسح
+            </button>
+        </div>
+        <div id="map"></div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const geojsonUrl = '{{ url_for("api.get_geometry", project_id=project.id) }}';
+    initMap('map', geojsonUrl, {
+        center: [34.0, -6.0], zoom: 14,
+        selectable: { type: ['master_valve', 'sector_valve', 'zone_valve'], checkboxSelector: '.valve-checkbox', toggleOnClick: true },
+        labelTypes: ['sector', 'zone', 'tree_row', 'tree'],
+        mapFilters: ['sector', 'zone', 'tree_row', 'tree', 'pipe'],
+        mapDelete: { onClick: valvesRemoveSelected }
+    });
+
+    document.addEventListener('change', function(event) {
+        if (event.target && event.target.matches && event.target.matches('.valve-checkbox')) {
+            updateValvesToolbar();
+        }
+    });
+    updateValvesToolbar();
+    setupValveSearch();
+});
+
+function valveRowVisible(checkbox) {
+    const tr = checkbox.closest('tr');
+    return !tr || tr.style.display !== 'none';
+}
+
+function updateValvesToolbar() {
+    const checked = document.querySelectorAll('.valve-checkbox:checked');
+    const renameBtn = document.getElementById('valveRenameBtn');
+    const removeBtn = document.getElementById('valveRemoveBtn');
+    if (renameBtn) renameBtn.disabled = checked.length !== 1;
+    if (removeBtn) removeBtn.disabled = checked.length === 0;
+    updateValveRowCount();
+}
+
+// Badge inside the search input: checked valves / valves currently found.
+function updateValveRowCount() {
+    const badge = document.getElementById('valveRowCount');
+    if (!badge) return;
+    let total = 0;
+    let selected = 0;
+    document.querySelectorAll('#valvesTable tbody .valve-checkbox').forEach(function (cb) {
+        if (!valveRowVisible(cb)) return;
+        total += 1;
+        if (cb.checked) selected += 1;
+    });
+    badge.textContent = selected + '/' + total;
+    badge.classList.toggle('text-bg-primary', selected > 0);
+    badge.classList.toggle('text-bg-secondary', selected === 0);
+}
+
+function toggleAllValves(source) {
+    document.querySelectorAll('.valve-checkbox').forEach(function (cb) {
+        if (!valveRowVisible(cb)) return;
+        cb.checked = source.checked;
+        cb.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+}
+
+function valveRenameSelected() {
+    const selected = document.querySelectorAll('.valve-checkbox:checked');
+    if (selected.length !== 1) return;
+    const modal = document.getElementById('renameValveModal' + selected[0].value);
+    if (modal) bootstrap.Modal.getOrCreateInstance(modal).show();
+}
+
+function valvesRemoveSelected() {
+    const selected = document.querySelectorAll('.valve-checkbox:checked');
+    if (!selected.length) {
+        alert('Select at least one valve first / اختر صماماً واحداً على الأقل أولا');
+        return;
+    }
+    const namesEn = Array.from(selected).map(cb => cb.dataset.nameEn).filter(Boolean);
+    const namesAr = Array.from(selected).map(cb => cb.dataset.nameAr).filter(Boolean);
+    const nameEn = namesEn.join(', ') || 'valve(s)';
+    const nameAr = namesAr.join('، ') || 'صمام';
+    const doSubmit = function () {
+        const form = document.getElementById('removeValvesForm');
+        form.querySelectorAll('input[name="element_ids"]').forEach(el => el.remove());
+        selected.forEach(cb => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'element_ids';
+            input.value = cb.value;
+            form.appendChild(input);
+        });
+        form.requestSubmit();
+    };
+    if (window.confirmDelete) {
+        window.confirmDelete(nameEn, nameAr, doSubmit);
+    } else if (window.confirm('Delete ' + nameEn + ' ?')) {
+        doSubmit();
+    }
+}
+
+// Narrow the table to the valves matching the typed text (name, type, assignment, id).
+function setupValveSearch() {
+    const input = document.getElementById('valveSearch');
+    if (!input) return;
+    const clearBtn = document.getElementById('valveSearchClear');
+
+    function applyFilter() {
+        const query = input.value.trim().toLowerCase();
+        if (clearBtn) clearBtn.classList.toggle('d-none', !query);
+        document.querySelectorAll('#valvesTable tbody tr').forEach(function (tr) {
+            if (!tr.querySelector('.valve-checkbox')) return;
+            const haystack = tr.textContent.toLowerCase() + ' ' + (tr.dataset.valveType || '');
+            tr.style.display = (!query || haystack.indexOf(query) !== -1) ? '' : 'none';
+        });
+        updateValveRowCount();
+    }
+
+    input.addEventListener('input', applyFilter);
+    input.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+            input.value = '';
+            applyFilter();
+        }
+    });
+    if (clearBtn) {
+        clearBtn.addEventListener('click', function () {
+            input.value = '';
+            applyFilter();
+            input.focus();
+        });
+    }
+    applyFilter();
+}
+
+function focusValveForm() {
+    const card = document.getElementById('addValveCard');
+    if (!card) return;
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const typeSelect = document.getElementById('valveType');
+    if (typeSelect) typeSelect.focus({ preventScroll: true });
+}
+
+function toggleSectorZone(select) {
+    const type = select.value;
+    document.getElementById('sectorSelect').style.display = (type === 'sector_valve') ? 'block' : 'none';
+    document.getElementById('zoneSelect').style.display = (type === 'zone_valve') ? 'block' : 'none';
+}
+
+function startDrawPoint() {
+    initDrawTools('point', function(coords, coordsStr) {
+        document.getElementById('valveCoords').value = coordsStr;
+    });
+}
+</script>
+{% endblock %}

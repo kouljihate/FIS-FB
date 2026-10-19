@@ -437,93 +437,6 @@ def pipe_remove(project_id, pipe_type):
     return redirect(url_for(_pipe_page_endpoint(pipe_type), project_id=project_id))
 
 
-# === VALVES ===
-
-@hydrology_bp.route('/<int:project_id>/valves')
-@login_required
-def valves(project_id):
-    project = get_project_or_redirect(project_id)
-    if not project:
-        return redirect(url_for('project.index'))
-
-    sectors = list(mongo.db.sectors.find({'project_id': project_id}))
-    zones = list(mongo.db.zones.find({'project_id': project_id}))
-    for s in sectors + zones:
-        s['_id'] = str(s['_id'])
-
-    master_valves = list(mongo.db.network_elements.find({'project_id': project_id, 'type': 'master_valve'}))
-    sector_valves = list(mongo.db.network_elements.find({'project_id': project_id, 'type': 'sector_valve'}))
-    zone_valves = list(mongo.db.network_elements.find({'project_id': project_id, 'type': 'zone_valve'}))
-    for v in master_valves + sector_valves + zone_valves:
-        v['_id'] = str(v['_id'])
-
-    return render_template('hydrology2/valves.html', project=project,
-                           sectors=sectors, zones=zones,
-                           master_valves=master_valves,
-                           sector_valves=sector_valves,
-                           zone_valves=zone_valves)
-
-
-@hydrology_bp.route('/<int:project_id>/valves/add', methods=['POST'])
-@login_required
-def valve_add(project_id):
-    valve_type = request.form.get('valve_type', '')
-    coords = request.form.get('coordinates', '').strip()
-    sector_id = request.form.get('sector_id', type=int)
-    zone_id = request.form.get('zone_id', type=int)
-
-    if not coords or not valve_type:
-        flash('Valve type and location required / نوع وموقع الصمام مطلوبان', 'danger')
-        return redirect(url_for('hydrology.valves', project_id=project_id))
-
-    try:
-        coord = json.loads(coords)
-        if isinstance(coord, list) and len(coord) == 2:
-            geometry = {'type': 'Point', 'coordinates': coord}
-        else:
-            flash('Invalid coordinates / إحداثيات غير صالحة', 'danger')
-            return redirect(url_for('hydrology.valves', project_id=project_id))
-    except Exception:
-        flash('Invalid coordinates / إحداثيات غير صالحة', 'danger')
-        return redirect(url_for('hydrology.valves', project_id=project_id))
-
-    name_map = {
-        'master_valve': ('Master Valve', 'الصمام الرئيسي'),
-        'sector_valve': ('Sector Valve', 'صمام القطاع'),
-        'zone_valve': ('Zone Valve', 'صمام المنطقة'),
-    }
-
-    if valve_type not in name_map:
-        flash('Invalid valve type / نوع صمام غير صالح', 'danger')
-        return redirect(url_for('hydrology.valves', project_id=project_id))
-
-    count = mongo.db.network_elements.count_documents({'project_id': project_id, 'type': valve_type})
-    name_en, name_ar = name_map[valve_type]
-    props = {}
-    if sector_id:
-        props['sector_id'] = sector_id
-    if zone_id:
-        props['zone_id'] = zone_id
-
-    add_network_element(project_id, valve_type,
-                        f'{name_en} {count+1}', f'{name_ar} {count+1}',
-                        geometry, props)
-
-    flash(f'{name_en} added / تمت إضافة {name_ar}', 'success')
-    return redirect(url_for('hydrology.valves', project_id=project_id))
-
-
-@hydrology_bp.route('/<int:project_id>/valves/validate', methods=['POST'])
-@login_required
-def valves_validate(project_id):
-    mongo.db.network_elements.update_many(
-        {'project_id': project_id, 'type': {'$in': ['master_valve', 'sector_valve', 'zone_valve']}},
-        {'$set': {'validated': True}}
-    )
-    flash('Valves validated / تم التحقق من الصمامات', 'success')
-    return redirect(url_for('hydrology.dripline', project_id=project_id))
-
-
 # === DRIP LINE ===
 
 @hydrology_bp.route('/<int:project_id>/dripline')
@@ -686,15 +599,6 @@ def _remove_network_elements(project_id, allowed_types, redirect_endpoint):
     return redirect(url_for(redirect_endpoint, project_id=project_id))
 
 
-VALVE_TYPES = ['master_valve', 'sector_valve', 'zone_valve']
-
-
-@hydrology_bp.route('/<int:project_id>/valves/remove', methods=['POST'])
-@login_required
-def valves_remove(project_id):
-    return _remove_network_elements(project_id, VALVE_TYPES, 'hydrology.valves')
-
-
 @hydrology_bp.route('/<int:project_id>/dripline/remove', methods=['POST'])
 @login_required
 def dripline_remove(project_id):
@@ -708,44 +612,3 @@ def network_remove(project_id):
         project_id,
         ['check_valve', 'air_release', 'pressure_reducer', 'reduction', 'other'],
         'hydrology.network_elements')
-
-
-# ============================================================================
-# Components Placeholder Routes
-# ============================================================================
-
-@hydrology_bp.route('/<int:project_id>/connectors')
-@login_required
-def connectors(project_id):
-    project = get_project_or_redirect(project_id)
-    if not project:
-        return redirect(url_for('project.index'))
-    flash('Connectors page coming soon / صفحة الوصلات قادمة قريباً', 'info')
-    return render_template('hydrology2/placeholder.html', project=project, title='Connectors / الوصلات', icon='bi-link-45deg')
-
-@hydrology_bp.route('/<int:project_id>/reductors')
-@login_required
-def reductors(project_id):
-    project = get_project_or_redirect(project_id)
-    if not project:
-        return redirect(url_for('project.index'))
-    flash('Reductors page coming soon / صفحة المخفضات قادمة قريباً', 'info')
-    return render_template('hydrology2/placeholder.html', project=project, title='Reductors / المخفضات', icon='bi-arrow-left-right')
-
-@hydrology_bp.route('/<int:project_id>/air_removal')
-@login_required
-def air_removal(project_id):
-    project = get_project_or_redirect(project_id)
-    if not project:
-        return redirect(url_for('project.index'))
-    flash('Air Removal page coming soon / صفحة إزالة الهواء قادمة قريباً', 'info')
-    return render_template('hydrology2/placeholder.html', project=project, title='Air Removal / إزالة الهواء', icon='bi-wind')
-
-@hydrology_bp.route('/<int:project_id>/terminators')
-@login_required
-def terminators(project_id):
-    project = get_project_or_redirect(project_id)
-    if not project:
-        return redirect(url_for('project.index'))
-    flash('Terminators page coming soon / صفحة النهايات قادمة قريباً', 'info')
-    return render_template('hydrology2/placeholder.html', project=project, title='Terminators / النهايات', icon='bi-stop-circle')

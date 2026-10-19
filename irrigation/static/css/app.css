@@ -865,6 +865,41 @@ body.map-fullscreen-lock {
     line-height: 1;
 }
 
+/* Map geometry filter widget (funnel: Sectors / Zones / Rows / Trees / Pipes) */
+.map-filter-toggle {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 18px;
+    background: #fff;
+}
+
+.map-filter-toggle-head {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 24px;
+    color: #495057;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.map-filter-toggle-button {
+    width: 30px;
+    height: 30px;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    border-radius: 50%;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.map-filter-toggle-button:not(.active) {
+    background: #f8f9fa;
+    color: #adb5bd;
+}
+
 .geometry-map-select-mode .leaflet-interactive {
     cursor: pointer;
 }

@@ -3,7 +3,7 @@ from flask import Flask, render_template
 from irrigation.extensions import mongo, login_manager
 from irrigation.utils.logger import setup_logging
 
-__version__ = '0.3.73'
+__version__ = '0.3.80'
 
 
 def create_app():
@@ -36,6 +36,7 @@ def create_app():
     from irrigation.project.routes import project_bp
     from irrigation.geometry.routes import geometry_bp
     from irrigation.hydrology.routes import hydrology_bp
+    from irrigation.components.routes import components_bp
     from irrigation.trees.routes import trees_bp
     from irrigation.api.routes import api_bp
     from irrigation.engineering.routes import engineering_bp
@@ -46,6 +47,7 @@ def create_app():
     app.register_blueprint(project_bp)
     app.register_blueprint(geometry_bp)
     app.register_blueprint(hydrology_bp)
+    app.register_blueprint(components_bp)
     app.register_blueprint(trees_bp)
     app.register_blueprint(api_bp)
     app.register_blueprint(engineering_bp, url_prefix='/engineering')

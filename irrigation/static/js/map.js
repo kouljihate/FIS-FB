@@ -151,6 +151,99 @@ function setupLabelToggleWidget(targetMap, labelTypes) {
     control.addTo(targetMap);
 }
 
+// ---------- Optional geometry filter widget ----------
+// Pages that pass `mapFilters` get a funnel widget that hides whole geometry
+// categories (sectors, zones, rows, trees, pipes) without reloading the map.
+const FILTER_CATEGORIES = [
+    { key: 'sector', letter: 'S', label: 'Sectors / القطاعات', types: ['sector'] },
+    { key: 'zone', letter: 'Z', label: 'Zones / المناطق', types: ['zone'] },
+    { key: 'tree_row', letter: 'R', label: 'Rows / الصفوف', types: ['tree_row'] },
+    { key: 'tree', letter: 'T', label: 'Trees / الأشجار', types: ['tree'] },
+    { key: 'pipe', letter: 'P', label: 'Pipes / الأنابيب', types: ['main_pipe', 'second_pipe', 'sub_pipe', 'dripline'] }
+];
+const filterState = { sector: true, zone: true, tree_row: true, tree: true, pipe: true };
+
+// Which filter category a feature belongs to (null = never filtered).
+function featureFilterKey(properties) {
+    const type = (properties && properties.type) || '';
+    if (!type) return null;
+    const category = FILTER_CATEGORIES.find(function(item) {
+        return item.types.indexOf(type) !== -1;
+    });
+    return category ? category.key : null;
+}
+
+// Add/remove every feature of one category from the map.
+function applyGeometryFilter(key, show) {
+    if (!map || !featureLayer) return;
+    featureLayer.eachLayer(function(layer) {
+        if (!layer.feature || featureFilterKey(layer.feature.properties) !== key) return;
+        if (show) {
+            if (!map.hasLayer(layer)) layer.addTo(map);
+        } else if (map.hasLayer(layer)) {
+            if (layer.isPopupOpen && layer.isPopupOpen()) map.closePopup();
+            map.removeLayer(layer);
+        }
+    });
+    // Keep the matching labels in sync with their geometry.
+    if (labelLayers && labelLayers[key]) {
+        if (!show) {
+            if (map.hasLayer(labelLayers[key])) map.removeLayer(labelLayers[key]);
+        } else {
+            applyLabelVisibility(key);
+        }
+    }
+}
+
+function applyAllGeometryFilters() {
+    // Fast path: pages without the widget (or with every filter on) keep all layers.
+    if (FILTER_CATEGORIES.every(function(category) { return filterState[category.key]; })) return;
+    FILTER_CATEGORIES.forEach(function(category) {
+        applyGeometryFilter(category.key, filterState[category.key]);
+    });
+}
+
+// Funnel widget with one circle button per filterable category.
+function setupGeometryFilterWidget(targetMap, filterKeys) {
+    const categories = FILTER_CATEGORIES.filter(function(category) {
+        return filterKeys.indexOf(category.key) !== -1;
+    });
+    if (!categories.length) return;
+
+    const control = L.control({ position: 'bottomleft' });
+    control.onAdd = function() {
+        const group = L.DomUtil.create('div', 'leaflet-bar map-filter-toggle');
+        L.DomEvent.disableClickPropagation(group);
+        L.DomEvent.disableScrollPropagation(group);
+
+        const head = L.DomUtil.create('div', 'map-filter-toggle-head', group);
+        head.innerHTML = '<i class="bi bi-funnel"></i>';
+        head.title = 'Map filters / عوامل تصفية الخريطة';
+
+        categories.forEach(function(category) {
+            const button = L.DomUtil.create('button', 'geometry-map-select-button map-filter-toggle-button', group);
+            button.type = 'button';
+            button.textContent = category.letter;
+            button.title = 'Hide ' + category.label;
+            button.setAttribute('aria-label', 'Toggle ' + category.label);
+            button.setAttribute('aria-pressed', 'true');
+            button.classList.add('active');
+            L.DomEvent.on(button, 'click', function(event) {
+                L.DomEvent.stop(event);
+                filterState[category.key] = !filterState[category.key];
+                const visible = filterState[category.key];
+                button.classList.toggle('active', visible);
+                button.setAttribute('aria-pressed', String(visible));
+                button.title = (visible ? 'Hide ' : 'Show ') + category.label;
+                applyGeometryFilter(category.key, visible);
+            });
+        });
+
+        return group;
+    };
+    control.addTo(targetMap);
+}
+
 // Reload the current geometry without a page navigation (rows/orientation edits).
 window.reloadMapGeometry = function() {
     if (!currentGeojsonUrl || !featureLayer) return Promise.resolve(false);
@@ -164,6 +257,7 @@ window.reloadMapGeometry = function() {
             }
             featureLayer.clearLayers();
             featureLayer.addData(data);
+            applyAllGeometryFilters();
             syncTreeLabels();
             return true;
         })
@@ -381,6 +475,11 @@ function initMap(elementId, geojsonUrl, options = {}) {
     // Circle-button widget to toggle each label category.
     setupLabelToggleWidget(map, labelTypes);
 
+    // Optional funnel widget that hides whole geometry categories.
+    if (Array.isArray(options.mapFilters) && options.mapFilters.length) {
+        setupGeometryFilterWidget(map, options.mapFilters);
+    }
+
     if (options.selectable) {
         const selectionControl = L.control({ position: 'topright' });
         selectionControl.onAdd = function() {
@@ -550,6 +649,7 @@ function initMap(elementId, geojsonUrl, options = {}) {
                 if (data.features && data.features.length > 0) {
                     map.fitBounds(featureLayer.getBounds(), { padding: [50, 50] });
                 }
+                applyAllGeometryFilters();
                 syncTreeLabels();
             })
             .catch(err => console.error('Error loading geometry:', err));

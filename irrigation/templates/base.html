@@ -20,8 +20,9 @@
     <link rel="preload" href="{{ url_for('static', filename='fonts/Comfortaa-Regular.ttf') }}" as="font" type="font/ttf" crossorigin
     <link rel="preload" href="{{ url_for('static', filename='fonts/VIP-Rawy-Regular.ttf') }}" as="font" type="font/ttf" crossorigin
 
-    <!-- Bootstrap JS Bundle (for dropdowns, modals, etc.) -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    {# Bootstrap's JS bundle is loaded once, at the end of <body>.  Loading a
+       second copy here made every dropdown listen twice and toggle twice per
+       click (open then close), so the Components menu never appeared. #}
 
     {% block extra_head %}{% endblock %}
 </head>
@@ -108,23 +109,14 @@
                         <i class="bi bi-tree"></i> Trees / الأشجار
                     {% if workflow_project_id %}</a>{% else %}</span>{% endif %}
                 </li>
-                <li class="nav-item dropdown">
+                <li class="nav-item">
                     {% if workflow_project_id %}
-                    <a class="nav-link dropdown-toggle{% if workflow_endpoint in ['hydrology.valves', 'hydrology.connectors', 'hydrology.reductors', 'hydrology.air_removal', 'hydrology.terminators'] %} active{% endif %}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="bi bi-gear"></i> Components / المكونات
-                    </a>
-                    <ul class="dropdown-menu">
-                        <li><a class="dropdown-item{% if workflow_endpoint == 'hydrology.valves' %} active{% endif %}" href="{{ url_for('hydrology.valves', project_id=workflow_project_id) }}"><i class="bi bi-valve"></i> Valves / الصمامات</a></li>
-                        <li><a class="dropdown-item{% if workflow_endpoint == 'hydrology.connectors' %} active{% endif %}" href="{{ url_for('hydrology.connectors', project_id=workflow_project_id) }}"><i class="bi bi-link-45deg"></i> Connectors / الوصلات</a></li>
-                        <li><a class="dropdown-item{% if workflow_endpoint == 'hydrology.reductors' %} active{% endif %}" href="{{ url_for('hydrology.reductors', project_id=workflow_project_id) }}"><i class="bi bi-arrow-left-right"></i> Reductors / المخفضات</a></li>
-                        <li><a class="dropdown-item{% if workflow_endpoint == 'hydrology.air_removal' %} active{% endif %}" href="{{ url_for('hydrology.air_removal', project_id=workflow_project_id) }}"><i class="bi bi-wind"></i> Air Removal / إزالة الهواء</a></li>
-                        <li><a class="dropdown-item{% if workflow_endpoint == 'hydrology.terminators' %} active{% endif %}" href="{{ url_for('hydrology.terminators', project_id=workflow_project_id) }}"><i class="bi bi-stop-circle"></i> Terminators / النهايات</a></li>
-                    </ul>
+                    <a class="nav-link{% if workflow_endpoint in ['components.valves', 'components.connectors', 'components.reductors', 'components.air_removal', 'components.pressure_reduction', 'components.terminators'] %} active{% endif %}" href="{{ url_for('components.valves', project_id=workflow_project_id) }}">
                     {% else %}
                     <span class="nav-link disabled" aria-disabled="true" title="Open a project first">
-                        <i class="bi bi-gear"></i> Components / المكونات
-                    </span>
                     {% endif %}
+                        <i class="bi bi-gear"></i> Components / المكونات
+                    {% if workflow_project_id %}</a>{% else %}</span>{% endif %}
                 </li>
                 <li class="nav-item">
                     {% if workflow_project_id %}
@@ -176,17 +168,14 @@
                 ('estimation.quote_view', url_for('estimation.quote_view', project_id=workflow_project_id), 'Pricing / التسعير', 'bi-calculator', False),
                 (None, None, 'Result / النتيجة', 'bi-file-earmark-bar-graph', True)
             ] %}
-        {% elif workflow_endpoint in ['hydrology.valves'] %}
+        {% elif workflow_endpoint in ['components.valves', 'components.connectors', 'components.reductors', 'components.air_removal', 'components.pressure_reduction', 'components.terminators'] %}
             {% set workflow_subnav = [
-                ('hydrology.valves', url_for('hydrology.valves', project_id=workflow_project_id), 'Valves / الصمامات', 'bi-valve', False)
-            ] %}
-        {% elif workflow_endpoint in ['hydrology.connectors', 'hydrology.reductors', 'hydrology.air_removal', 'hydrology.terminators'] %}
-            {% set workflow_subnav = [
-                ('hydrology.valves', url_for('hydrology.valves', project_id=workflow_project_id), 'Valves / الصمامات', 'bi-valve', False),
-                ('hydrology.connectors', url_for('hydrology.connectors', project_id=workflow_project_id), 'Connectors / الوصلات', 'bi-link-45deg', False),
-                ('hydrology.reductors', url_for('hydrology.reductors', project_id=workflow_project_id), 'Reductors / المخفضات', 'bi-arrow-left-right', False),
-                ('hydrology.air_removal', url_for('hydrology.air_removal', project_id=workflow_project_id), 'Air Removal / إزالة الهواء', 'bi-wind', False),
-                ('hydrology.terminators', url_for('hydrology.terminators', project_id=workflow_project_id), 'Terminators / النهايات', 'bi-stop-circle', False)
+                ('components.valves', url_for('components.valves', project_id=workflow_project_id), 'Valves / الصمامات', 'bi-valve', False),
+                ('components.connectors', url_for('components.connectors', project_id=workflow_project_id), 'Connectors / الوصلات', 'bi-link-45deg', False),
+                ('components.reductors', url_for('components.reductors', project_id=workflow_project_id), 'Reductors / المخفضات', 'bi-arrow-left-right', False),
+                ('components.air_removal', url_for('components.air_removal', project_id=workflow_project_id), 'Air Removal / إزالة الهواء', 'bi-wind', False),
+                ('components.pressure_reduction', url_for('components.pressure_reduction', project_id=workflow_project_id), 'Reduce Pressure / خفض الضغط', 'bi-arrow-down-circle', False),
+                ('components.terminators', url_for('components.terminators', project_id=workflow_project_id), 'Terminators / النهايات', 'bi-stop-circle', False)
             ] %}
         {% elif workflow_endpoint in ['engineering.validation_view', 'engineering.technical_report_view'] %}
             {% set workflow_subnav = [
