@@ -28,7 +28,7 @@
                     <col style="width: 120px">
                     <col style="width: 120px">
                     <col style="width: 120px">
-                    <col style="width: 150px">
+                    <col style="width: 210px">
                 </colgroup>
                 <thead>
                     <tr class="table-light">
@@ -200,8 +200,8 @@
                             {% endif %}
                         </td>
                         <td class="text-center">
-                            {% set _deg =
-                            orientation_degrees.get(item.zone.orientation) %}
+                            {% set _zone_deg = item.zone.get('orientation_deg') %}
+                            {% set _deg = _zone_deg if _zone_deg is not none else orientation_degrees.get(item.zone.orientation) %}
                             {% if _deg is not none %}{{ _deg }}°{% else %}<span
                                 class="text-muted">&mdash;</span>{% endif %}
                         </td>
@@ -211,6 +211,12 @@
                                 data-bs-target="#editZoneModal{{ item.zone.id }}"
                                 title="Edit / تعديل">
                                 <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-circle btn-sm btn-secondary"
+                                data-bs-toggle="modal"
+                                data-bs-target="#orientationZoneModal{{ item.zone.id }}"
+                                title="Edit orientation in degrees / تعديل الاتجاه بالدرجات">
+                                <i class="bi bi-compass"></i>
                             </button>
                             <button class="btn btn-circle btn-sm btn-info"
                                 data-bs-toggle="modal"
@@ -263,7 +269,8 @@
                                             </div>
                                         </div>
                                         {% set z_orient = {'ES': 'SE', 'WN': 'NW'}.get(item.zone.orientation, item.zone.orientation) %}
-                                        {% set z_deg = orientation_degrees.get(z_orient) %}
+                                        {% set z_stored_deg = item.zone.get('orientation_deg') %}
+                                        {% set z_deg = z_stored_deg if z_stored_deg is not none else orientation_degrees.get(z_orient) %}
                                         <div class="row g-2 mb-3">
                                             <div class="col-md-8">
                                                 <label
@@ -308,6 +315,42 @@
                                             class="btn btn-primary"><i
                                                 class="bi bi-check"></i> Save /
                                             حفظ</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Orientation (degrees) Modal -->
+                    <div class="modal fade" id="orientationZoneModal{{ item.zone.id }}" tabindex="-1">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <form method="POST"
+                                    action="{{ url_for('geometry.zone_orientation', project_id=project.id, zone_id=item.zone.id) }}">
+                                    <div class="modal-header bg-secondary text-white">
+                                        <h5 class="modal-title"><i class="bi bi-compass"></i> Edit Orientation (°) / تعديل الاتجاه</h5>
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        {% set _zone_odeg = item.zone.get('orientation_deg') %}
+                                        {% set _odeg = _zone_odeg if _zone_odeg is not none else orientation_degrees.get(z_orient) %}
+                                        <div class="mb-3">
+                                            <label class="form-label" for="orientationZoneDeg{{ item.zone.id }}">Orientation (°) / الاتجاه (درجة)</label>
+                                            <input type="number" class="form-control zone-orientation-input"
+                                                   id="orientationZoneDeg{{ item.zone.id }}" name="orientation_deg"
+                                                   data-hint="orientationZoneHint{{ item.zone.id }}"
+                                                   min="0" max="359.9" step="0.1" required
+                                                   value="{{ _odeg|round(1) if _odeg is not none else 0 }}">
+                                            <div class="form-text">
+                                                0° = North, clockwise. Saved as the nearest of the 32 compass points.
+                                                / 0° = الشمال، مع عقارب الساعة، ويُحفظ كأقرب نقطة من 32 نقطة.
+                                            </div>
+                                            <div class="fw-semibold mt-2" id="orientationZoneHint{{ item.zone.id }}"></div>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close / إغلاق</button>
+                                        <button type="submit" class="btn btn-primary"><i class="bi bi-check"></i> Save / حفظ</button>
                                     </div>
                                 </form>
                             </div>
@@ -758,6 +801,23 @@ document.addEventListener('change', function(event) {
     if (!deg) return;
     const value = ZONE_ORIENTATION_DEGREES[sel.value];
     deg.value = (value === undefined || value === null) ? '' : value + '°';
+});
+
+// Orientation (°) modal: preview which compass point the angle maps to
+const ZONE_ORIENTATION_OPTIONS = {{ orientation_options | tojson }};
+document.querySelectorAll('.zone-orientation-input').forEach(function (input) {
+    const hint = document.getElementById(input.dataset.hint);
+    if (!hint) return;
+    const updateHint = function () {
+        const raw = parseFloat(input.value);
+        if (!isFinite(raw)) { hint.textContent = ''; return; }
+        const step = 360 / ZONE_ORIENTATION_OPTIONS.length;
+        const index = Math.round((((raw % 360) + 360) % 360) / step) % ZONE_ORIENTATION_OPTIONS.length;
+        const opt = ZONE_ORIENTATION_OPTIONS[index];
+        hint.textContent = '→ ' + opt.en + ' / ' + opt.ar + ' (' + opt.deg + '°) ' + opt.code;
+    };
+    input.addEventListener('input', updateHint);
+    updateHint();
 });
 
 document.addEventListener('DOMContentLoaded', function() {

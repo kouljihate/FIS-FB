@@ -108,19 +108,13 @@
                             {% endif %}
                         </td>
                         <td class="text-center">
-                            {% set _sector_deg = s.get('orientation_deg') %}
-                            {% set _deg = _sector_deg if _sector_deg is not none else orientation_degrees.get(s.orientation) %}
+                            {% set _deg = orientation_degrees.get(s.orientation) %}
                             {% if _deg is not none %}{{ _deg }}°{% else %}<span class="text-muted">&mdash;</span>{% endif %}
                         </td>
 <td class="text-center">
                             <button class="btn btn-circle btn-sm btn-primary" data-bs-toggle="modal"
                                     data-bs-target="#editModal{{ s.id }}" title="Edit /_ENABLED">
                                 <i class="bi bi-pencil"></i>
-                            </button>
-                            <button class="btn btn-circle btn-sm btn-secondary" data-bs-toggle="modal"
-                                    data-bs-target="#orientationModal{{ s.id }}"
-                                    title="Edit orientation in degrees / تعديل الاتجاه بالدرجات">
-                                <i class="bi bi-compass"></i>
                             </button>
                             <button class="btn btn-circle btn-sm btn-info" data-bs-toggle="modal"
                                     data-bs-target="#renameModal{{ s.id }}" title="Rename /_ENABLED">
@@ -165,41 +159,6 @@
                                                 <option value="{{ opt.code }}"{% if s_orient == opt.code %} selected{% endif %}>{{ opt.en }} / {{ opt.ar }}</option>
                                                 {% endfor %}
                                             </select>
-                                        </div>
-                                    </div>
-                                    <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close / إغلاق</button>
-                                        <button type="submit" class="btn btn-primary"><i class="bi bi-check"></i> Save / حفظ</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Orientation (degrees) Modal -->
-                    <div class="modal fade" id="orientationModal{{ s.id }}" tabindex="-1">
-                        <div class="modal-dialog">
-                            <div class="modal-content">
-                                <form method="POST" action="{{ url_for('geometry.sector_orientation', project_id=project.id, sector_id=s.id) }}">
-                                    <div class="modal-header bg-secondary text-white">
-                                        <h5 class="modal-title"><i class="bi bi-compass"></i> Edit Orientation (°) / تعديل الاتجاه</h5>
-                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                                    </div>
-                                    <div class="modal-body">
-                                        {% set _sector_odeg = s.get('orientation_deg') %}
-                                        {% set _odeg = _sector_odeg if _sector_odeg is not none else orientation_degrees.get(s.orientation) %}
-                                        <div class="mb-3">
-                                            <label class="form-label" for="orientationDeg{{ s.id }}">Orientation (°) / الاتجاه (درجة)</label>
-                                            <input type="number" class="form-control sector-orientation-input"
-                                                   id="orientationDeg{{ s.id }}" name="orientation_deg"
-                                                   data-hint="orientationHint{{ s.id }}"
-                                                   min="0" max="359.9" step="0.1" required
-                                                   value="{{ _odeg|round(1) if _odeg is not none else 0 }}">
-                                            <div class="form-text">
-                                                0° = North, clockwise. Saved as the nearest of the 32 compass points.
-                                                / 0° = الشمال، مع عقارب الساعة، ويُحفظ كأقرب نقطة من 32 نقطة.
-                                            </div>
-                                            <div class="fw-semibold mt-2" id="orientationHint{{ s.id }}"></div>
                                         </div>
                                     </div>
                                     <div class="modal-footer">
@@ -568,23 +527,6 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('polygonCoords').value = JSON.stringify(coords);
             bootstrap.Modal.getOrCreateInstance(document.getElementById('addSectorModal')).show();
         }
-    });
-
-    // Orientation (°) modal: preview which compass point the angle maps to
-    const sectorOrientationOptions = {{ orientation_options | tojson }};
-    document.querySelectorAll('.sector-orientation-input').forEach(function (input) {
-        const hint = document.getElementById(input.dataset.hint);
-        if (!hint) return;
-        const updateHint = function () {
-            const raw = parseFloat(input.value);
-            if (!isFinite(raw)) { hint.textContent = ''; return; }
-            const step = 360 / sectorOrientationOptions.length;
-            const index = Math.round((((raw % 360) + 360) % 360) / step) % sectorOrientationOptions.length;
-            const opt = sectorOrientationOptions[index];
-            hint.textContent = '→ ' + opt.en + ' / ' + opt.ar + ' (' + opt.deg + '°) ' + opt.code;
-        };
-        input.addEventListener('input', updateHint);
-        updateHint();
     });
 
     // Merge modal: collect selected sector IDs
