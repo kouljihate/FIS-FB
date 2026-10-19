@@ -11,11 +11,12 @@ first-class tab like Trees, with its own URL space
 from __future__ import annotations
 
 import json
+import re
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
-from irrigation.components.valve_generator import generate_valves
+from irrigation.components.valve_generator import VALVE_SHORT_PREFIXES, generate_valves
 from irrigation.extensions import mongo
 
 components_bp = Blueprint("components", __name__, url_prefix="/components")
@@ -35,6 +36,37 @@ VALVE_TYPE_BADGES = {
     "sector_valve": ("Sector", "قطاع", "warning"),
     "zone_valve": ("Zone", "منطقة", "info"),
 }
+
+# Short names: VM1 = Valve Master 1, VS1 = Valve Sector 1, VZ1 = Valve Zone 1.
+# The prefixes live in the generator so both sides always agree.
+def valve_short_name(valve_type, number):
+    """``master_valve``/3 -> ``VM3``."""
+    return "%s%d" % (VALVE_SHORT_PREFIXES.get(valve_type, "V"), number)
+
+
+def _trailing_number(text):
+    match = re.search(r"(\d+)\s*$", text or "")
+    return int(match.group(1)) if match else None
+
+
+def _next_valve_number(project_id, valve_type):
+    """Number above every valve of this type already in the project.
+
+    Counting the valves would reuse a number after a deletion (VS1, VS2 ->
+    delete VS1 -> the next valve is VS2 again), so the highest short name / name
+    number wins instead.
+    """
+    numbers = [
+        _trailing_number((doc.get("properties") or {}).get("short_name"))
+        or _trailing_number(doc.get("name_en"))
+        or 0
+        for doc in mongo.db.network_elements.find(
+            {"project_id": project_id, "type": valve_type},
+            {"properties.short_name": 1, "name_en": 1},
+        )
+    ]
+    return (max(numbers) if numbers else 0) + 1
+
 
 #: Sub-tabs that do not have their own grid yet, in navigation order.
 PLACEHOLDERS = {
@@ -127,10 +159,13 @@ def valves(project_id):
     zone_names = {zone["id"]: zone for zone in zones}
 
     valves = []
+    type_counters: dict = {}
     for valve in mongo.db.network_elements.find(
         {"project_id": project_id, "type": {"$in": VALVE_TYPES}}
     ).sort("id", 1):
         valve["_id"] = str(valve["_id"])
+        valve_type = valve.get("type")
+        type_counters[valve_type] = type_counters.get(valve_type, 0) + 1
         label_en, label_ar, badge = VALVE_TYPE_BADGES.get(
             valve.get("type"), ("Valve", "صمام", "secondary")
         )
@@ -139,6 +174,10 @@ def valves(project_id):
         valve["type_badge"] = badge
 
         properties = valve.get("properties") or {}
+        # Short name: stored when the valve was created, otherwise derived from the
+        # type and the number already in the name (older valves have neither).
+        number = _trailing_number(valve.get("name_en")) or type_counters[valve_type]
+        valve["short_name"] = properties.get("short_name") or valve_short_name(valve_type, number)
         valve["diameter"] = properties.get("diameter")
         valve["upstream_diameter"] = properties.get("upstream_diameter")
         valve["upstream_type"] = properties.get("upstream_type") or properties.get("upstream")
@@ -208,12 +247,11 @@ def valve_add(project_id):
         flash("Invalid valve type / نوع صمام غير صالح", "danger")
         return redirect(url_for("components.valves", project_id=project_id))
 
-    count = mongo.db.network_elements.count_documents(
-        {"project_id": project_id, "type": valve_type}
-    )
+    number = _next_valve_number(project_id, valve_type)
     name_en, name_ar = VALVE_NAMES[valve_type]
     diameter = request.form.get("diameter", type=int)
-    properties = {"source": "manual"}
+    properties = {"source": "manual",
+                  "short_name": valve_short_name(valve_type, number)}
     if sector_id:
         properties["sector_id"] = sector_id
     if zone_id:
@@ -224,8 +262,8 @@ def valve_add(project_id):
     add_network_element(
         project_id,
         valve_type,
-        f"{name_en} {count + 1}",
-        f"{name_ar} {count + 1}",
+        f"{name_en} {number}",
+        f"{name_ar} {number}",
         geometry,
         properties,
     )
@@ -282,6 +320,12 @@ def valve_edit(project_id, element_id):
     diameter = request.form.get("diameter", type=int)
     if diameter:
         properties["diameter"] = diameter
+    # Keep the short name in step with the type: the number is preserved, the
+    # prefix follows the valve kind (VM / VS / VZ).
+    number = _trailing_number(properties.get("short_name")) or _trailing_number(name_en) \
+        or mongo.db.network_elements.count_documents(
+            {"project_id": project_id, "type": valve_type})
+    properties["short_name"] = valve_short_name(valve_type, number)
     updates["properties"] = properties
 
     coords = request.form.get("coordinates", "").strip()

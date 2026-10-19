@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.84 - 2026-10-19
+
+### Added
+- Short Name column (VM1 / VS1 / VZ1 with the valve name) and searchable short names
+- valve-type filter for the map and the table (VM / VS / VZ)
+
+### Changed
+- valve and geometry filters share one left-hand map widget so they can no longer overlap
+
+### Fixed
+- the duplicate label widget in the map's bottom-right corner
+- adding a valve after a deletion reuses a free number instead of duplicating one
+
 ## 0.3.83 - 2026-10-19
 
 ### Added

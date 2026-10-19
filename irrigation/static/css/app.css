@@ -865,8 +865,8 @@ body.map-fullscreen-lock {
     line-height: 1;
 }
 
-/* Map geometry filter widget (funnel: Sectors / Zones / Rows / Trees / Pipes) */
-.map-filter-toggle {
+/* Map filter widget (one left-hand column: valve kinds, then geometry) */
+.map-filter-widget {
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -875,7 +875,7 @@ body.map-fullscreen-lock {
     background: #fff;
 }
 
-.map-filter-toggle-head {
+.map-filter-head {
     display: grid;
     place-items: center;
     width: 30px;
@@ -885,17 +885,26 @@ body.map-fullscreen-lock {
     border-bottom: 1px solid rgba(0, 0, 0, 0.15);
 }
 
-.map-filter-toggle-button {
+.map-filter-divider {
+    width: 22px;
+    height: 1px;
+    margin: 1px auto;
+    background: rgba(0, 0, 0, 0.18);
+}
+
+.map-filter-button {
     width: 30px;
     height: 30px;
+    padding: 0;
     border: 1px solid rgba(0, 0, 0, 0.2);
     border-radius: 50%;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
+    letter-spacing: -0.03em;
     line-height: 1;
 }
 
-.map-filter-toggle-button:not(.active) {
+.map-filter-button:not(.active) {
     background: #f8f9fa;
     color: #adb5bd;
 }

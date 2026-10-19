@@ -45,6 +45,13 @@ VALVE_LABELS = {
     "zone_valve": ("Zone Valve", "صمام المنطقة"),
 }
 
+#: Master Valve 1 -> VM1, Sector Valve 1 -> VS1, Zone Valve 1 -> VZ1.
+VALVE_SHORT_PREFIXES = {
+    "master_valve": "VM",
+    "sector_valve": "VS",
+    "zone_valve": "VZ",
+}
+
 
 class _Pipe:
     """One stored pipe, projected to metres for geometric work."""
@@ -160,6 +167,8 @@ def _zone_of_point(zones: list[dict], point: Point) -> tuple[dict | None, float]
 def _valve_doc(project_id: int, valve_type: str, index: int, point: Point, crs: Any,
                properties: dict) -> dict:
     name_en, name_ar = VALVE_LABELS[valve_type]
+    properties = dict(properties)
+    properties["short_name"] = "%s%d" % (VALVE_SHORT_PREFIXES.get(valve_type, "V"), index)
     return {
         "id": get_next_id("network_elements"),
         "project_id": project_id,

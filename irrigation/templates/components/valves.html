@@ -28,7 +28,7 @@
             <table class="table table-hover mb-0" id="valvesTable">
                 <thead>
                     <tr class="table-light">
-                        <th colspan="8" class="text-center">
+                        <th colspan="9" class="text-center">
                             <button class="btn btn-circle btn-success" id="valveAddBtn" type="button"
                                     data-bs-toggle="modal" data-bs-target="#addValveModal"
                                     title="Add / إضافة">
@@ -61,11 +61,11 @@
                         </th>
                     </tr>
                     <tr class="table-light">
-                        <th colspan="8" class="text-center align-middle">
+                        <th colspan="9" class="text-center align-middle">
                             <div class="input-group input-group-sm search-zone">
                                 <div class="search-field">
                                     <input type="text" id="valveSearch" class="form-control search-input"
-                                           placeholder="Filter by name, type, assignment or diameter / تصفية"
+                                           placeholder="Filter by name, short name, type, assignment or diameter / تصفية"
                                            autocomplete="off" aria-label="Filter valves / تصفية الصمامات">
                                     <div class="search-suffix">
                                         <span class="badge rounded-pill text-bg-secondary search-row-count" id="valveRowCount"
@@ -81,6 +81,7 @@
                         <th width="40"><input type="checkbox" id="selectAllValves" onclick="toggleAllValves(this)"></th>
                         <th>ID</th>
                         <th class="text-center"> اسم الصمام <br> Valve Name</th>
+                        <th class="text-center"> الاسم المختصر <br> Short Name</th>
                         <th class="text-center"> النوع <br> Type</th>
                         <th class="text-center"> مرتبط بـ <br> Assigned To</th>
                         <th class="text-center"> القطر (مم) <br> Diameter (mm)</th>
@@ -95,6 +96,10 @@
                                    data-name-en="{{ v.name_en }}" data-name-ar="{{ v.name_ar }}"></td>
                         <td>{{ v.id }}</td>
                         <td class="text-center">{{ v.name_en }} <span class="ar-text">/ {{ v.name_ar }}</span></td>
+                        <td class="text-center text-nowrap">
+                            <span class="badge bg-dark valve-short-name">{{ v.short_name }}</span>
+                            <span class="text-muted small">({{ v.name_en }})</span>
+                        </td>
                         <td class="text-center">
                             <span class="badge bg-{{ v.type_badge }}">{{ v.type_label_en }} / {{ v.type_label_ar }}</span>
                         </td>
@@ -136,12 +141,12 @@
                         </td>
                     </tr>
                     {% else %}
-                    <tr><td colspan="8" class="text-center text-muted py-3">No valves yet / لا توجد صمامات — استخدم زر الإنشاء</td></tr>
+                    <tr><td colspan="9" class="text-center text-muted py-3">No valves yet / لا توجد صمامات — استخدم زر الإنشاء</td></tr>
                     {% endfor %}
                 </tbody>
                 <tfoot class="table-light">
                     <tr>
-                        <th colspan="8" class="text-center">Total Valves: {{ valves|length }} / إجمالي الصمامات: {{ valves|length }}</th>
+                        <th colspan="9" class="text-center">Total Valves: {{ valves|length }} / إجمالي الصمامات: {{ valves|length }}</th>
                     </tr>
                 </tfoot>
             </table>
@@ -382,6 +387,12 @@ document.addEventListener('DOMContentLoaded', function() {
         selectable: { type: ['master_valve', 'sector_valve', 'zone_valve'], checkboxSelector: '.valve-checkbox', toggleOnClick: true },
         labelTypes: ['sector', 'zone', 'tree_row', 'tree'],
         mapFilters: ['sector', 'zone', 'tree_row', 'tree', 'pipe'],
+        componentFilters: [
+            { key: 'master_valve', letter: 'VM', label: 'Main Valve / الصمام الرئيسي', types: ['master_valve'] },
+            { key: 'sector_valve', letter: 'VS', label: 'Sector Valve / صمام القطاع', types: ['sector_valve'] },
+            { key: 'zone_valve', letter: 'VZ', label: 'Zone Valve / صمام المنطقة', types: ['zone_valve'] }
+        ],
+        onComponentFilterChange: function (type, show) { setValveTypeVisible(type, show); },
         mapDelete: { onClick: valvesRemoveSelected }
     });
 
@@ -547,6 +558,33 @@ function addValvePlacePoint() {
     });
 }
 
+// Valve types hidden by the map widget on the left (M / S / Z buttons).
+const valveTypeHidden = { master_valve: false, sector_valve: false, zone_valve: false };
+
+// Called by the map widget: the table follows the same type filter as the map.
+function setValveTypeVisible(type, show) {
+    if (!(type in valveTypeHidden)) return;
+    valveTypeHidden[type] = !show;
+    applyValveFilters();
+}
+
+// Rows visible = matches the typed text AND its valve type is switched on.
+function applyValveFilters() {
+    const input = document.getElementById('valveSearch');
+    const clearBtn = document.getElementById('valveSearchClear');
+    const query = input ? input.value.trim().toLowerCase() : '';
+    if (clearBtn) clearBtn.classList.toggle('d-none', !query);
+    document.querySelectorAll('#valvesTable tbody tr').forEach(function (tr) {
+        if (!tr.querySelector('.valve-checkbox')) return;
+        const type = tr.dataset.valveType || '';
+        const shownType = !valveTypeHidden[type];
+        const haystack = tr.textContent.toLowerCase() + ' ' + type;
+        const matches = !query || haystack.indexOf(query) !== -1;
+        tr.style.display = (shownType && matches) ? '' : 'none';
+    });
+    updateValveRowCount();
+}
+
 // Narrow the table to the valves matching the typed text.
 function setupValveSearch() {
     const input = document.getElementById('valveSearch');
@@ -554,14 +592,7 @@ function setupValveSearch() {
     const clearBtn = document.getElementById('valveSearchClear');
 
     function applyFilter() {
-        const query = input.value.trim().toLowerCase();
-        if (clearBtn) clearBtn.classList.toggle('d-none', !query);
-        document.querySelectorAll('#valvesTable tbody tr').forEach(function (tr) {
-            if (!tr.querySelector('.valve-checkbox')) return;
-            const haystack = tr.textContent.toLowerCase() + ' ' + (tr.dataset.valveType || '');
-            tr.style.display = (!query || haystack.indexOf(query) !== -1) ? '' : 'none';
-        });
-        updateValveRowCount();
+        applyValveFilters();
     }
 
     input.addEventListener('input', applyFilter);

@@ -203,30 +203,97 @@ function applyAllGeometryFilters() {
     });
 }
 
-// Funnel widget with one circle button per filterable category.
-function setupGeometryFilterWidget(targetMap, filterKeys) {
-    const categories = FILTER_CATEGORIES.filter(function(category) {
-        return filterKeys.indexOf(category.key) !== -1;
-    });
-    if (!categories.length) return;
+// ---------- Optional component (valve / fitting) filter ----------
+// A page can pass `componentFilters` to show or hide one kind of fitting
+// (valves here, later connectors, reductors, ...). Both filter groups share one
+// left-hand widget: two stacked Leaflet controls overlap on a short map, and a
+// second set of buttons on the right only repeated the first.
+// The page is told about every change through `onComponentFilterChange` so it can
+// filter its table the same way.
+let componentFilterListener = null;
+const componentFilterState = {};
 
-    const control = L.control({ position: 'bottomleft' });
+function applyComponentFilter(category, show) {
+    if (!map || !featureLayer) return;
+    featureLayer.eachLayer(function(layer) {
+        if (!layer.feature) return;
+        const type = (layer.feature.properties || {}).type || '';
+        if (category.types.indexOf(type) === -1) return;
+        if (show) {
+            if (!map.hasLayer(layer)) layer.addTo(map);
+        } else if (map.hasLayer(layer)) {
+            if (layer.isPopupOpen && layer.isPopupOpen()) map.closePopup();
+            map.removeLayer(layer);
+        }
+    });
+    if (typeof componentFilterListener === 'function') {
+        componentFilterListener(category.key, show);
+    }
+}
+
+function applyAllComponentFilters(categories) {
+    categories.forEach(function(category) {
+        if (componentFilterState[category.key]) return;  // everything visible by default
+        applyComponentFilter(category, false);
+    });
+}
+
+// One left-hand widget (under the zoom buttons): fitting kinds first, a divider,
+// then the geometry categories. Either group may be empty.
+function setupMapFilterWidget(targetMap, filterKeys, componentCategories, listener) {
+    const geometryCategories = FILTER_CATEGORIES.filter(function(category) {
+        return (filterKeys || []).indexOf(category.key) !== -1;
+    });
+    const fittingCategories = componentCategories || [];
+    if (!geometryCategories.length && !fittingCategories.length) return;
+
+    componentFilterListener = listener || null;
+    fittingCategories.forEach(function(category) {
+        if (componentFilterState[category.key] === undefined) componentFilterState[category.key] = true;
+    });
+
+    const control = L.control({ position: 'topleft' });
     control.onAdd = function() {
-        const group = L.DomUtil.create('div', 'leaflet-bar map-filter-toggle');
+        const group = L.DomUtil.create('div', 'leaflet-bar map-filter-widget');
         L.DomEvent.disableClickPropagation(group);
         L.DomEvent.disableScrollPropagation(group);
 
-        const head = L.DomUtil.create('div', 'map-filter-toggle-head', group);
+        const head = L.DomUtil.create('div', 'map-filter-head', group);
         head.innerHTML = '<i class="bi bi-funnel"></i>';
         head.title = 'Map filters / عوامل تصفية الخريطة';
 
-        categories.forEach(function(category) {
-            const button = L.DomUtil.create('button', 'geometry-map-select-button map-filter-toggle-button', group);
+        fittingCategories.forEach(function(category) {
+            const button = L.DomUtil.create('button', 'geometry-map-select-button map-filter-button', group);
+            button.type = 'button';
+            button.textContent = category.letter;
+            button.title = category.label;
+            button.setAttribute('aria-label', 'Toggle ' + category.label);
+            button.setAttribute('aria-pressed', 'true');
+            button.dataset.filterKey = category.key;
+            button.classList.add('active');
+            L.DomEvent.on(button, 'click', function(event) {
+                L.DomEvent.stop(event);
+                const visible = !componentFilterState[category.key];
+                componentFilterState[category.key] = visible;
+                button.classList.toggle('active', visible);
+                button.setAttribute('aria-pressed', String(visible));
+                button.title = (visible ? 'Hide ' : 'Show ') + category.label;
+                applyComponentFilter(category, visible);
+            });
+        });
+
+        if (fittingCategories.length && geometryCategories.length) {
+            L.DomUtil.create('div', 'map-filter-divider', group);
+        }
+
+        geometryCategories.forEach(function(category) {
+            const button = L.DomUtil.create('button', 'geometry-map-select-button map-filter-button', group);
             button.type = 'button';
             button.textContent = category.letter;
             button.title = 'Hide ' + category.label;
             button.setAttribute('aria-label', 'Toggle ' + category.label);
             button.setAttribute('aria-pressed', 'true');
+            button.dataset.filterKey = category.key;
             button.classList.add('active');
             L.DomEvent.on(button, 'click', function(event) {
                 L.DomEvent.stop(event);
@@ -242,6 +309,9 @@ function setupGeometryFilterWidget(targetMap, filterKeys) {
         return group;
     };
     control.addTo(targetMap);
+
+    applyAllGeometryFilters();
+    applyAllComponentFilters(fittingCategories);
 }
 
 // Reload the current geometry without a page navigation (rows/orientation edits).
@@ -258,6 +328,7 @@ window.reloadMapGeometry = function() {
             featureLayer.clearLayers();
             featureLayer.addData(data);
             applyAllGeometryFilters();
+            applyAllComponentFilters(Array.isArray(options.componentFilters) ? options.componentFilters : []);
             syncTreeLabels();
             return true;
         })
@@ -472,12 +543,17 @@ function initMap(elementId, geojsonUrl, options = {}) {
     // Tree labels only appear from a high zoom level to keep orchard maps readable.
     map.on('zoomend', syncTreeLabels);
 
-    // Circle-button widget to toggle each label category.
-    setupLabelToggleWidget(map, labelTypes);
+    // Optional left-hand filter widget (valve kinds and/or geometry categories).
+    const geometryFilters = Array.isArray(options.mapFilters) ? options.mapFilters : [];
+    const componentFilters = Array.isArray(options.componentFilters) ? options.componentFilters : [];
+    if (geometryFilters.length || componentFilters.length) {
+        setupMapFilterWidget(map, geometryFilters, componentFilters, options.onComponentFilterChange);
+    }
 
-    // Optional funnel widget that hides whole geometry categories.
-    if (Array.isArray(options.mapFilters) && options.mapFilters.length) {
-        setupGeometryFilterWidget(map, options.mapFilters);
+    // The label widget would repeat the geometry buttons, so a page that filters
+    // geometry on the left gets no second set on the right.
+    if (!geometryFilters.length) {
+        setupLabelToggleWidget(map, labelTypes);
     }
 
     if (options.selectable) {
@@ -650,6 +726,7 @@ function initMap(elementId, geojsonUrl, options = {}) {
                     map.fitBounds(featureLayer.getBounds(), { padding: [50, 50] });
                 }
                 applyAllGeometryFilters();
+                applyAllComponentFilters(Array.isArray(options.componentFilters) ? options.componentFilters : []);
                 syncTreeLabels();
             })
             .catch(err => console.error('Error loading geometry:', err));
