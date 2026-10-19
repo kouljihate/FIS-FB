@@ -1,18 +1,43 @@
 import re
+import threading
 
 from irrigation.extensions import mongo
+from irrigation.storage import max_embedded_id
+
+_ID_COUNTERS = {}
+_ID_LOCK = threading.Lock()
+
+
+def _highest_known_id(collection_name):
+    """Highest id already stored, used to seed the in-process counter."""
+    if collection_name in ('users', 'user'):
+        docs = mongo.db.users.find({}, {'id': 1})
+    elif collection_name in ('projects', 'project'):
+        docs = mongo.db.projects.find({}, {'id': 1})
+    else:
+        return max_embedded_id(collection_name)
+
+    best = 0
+    for doc in docs:
+        try:
+            best = max(best, int(doc.get('id') or 0))
+        except (TypeError, ValueError):
+            continue
+    return best
 
 
 def get_next_id(collection_name):
-    """Auto-increment integer ID for a collection."""
-    counters = mongo.db.counters
-    counter = counters.find_one_and_update(
-        {'_id': collection_name},
-        {'$inc': {'seq': 1}},
-        upsert=True,
-        return_document=True
-    )
-    return counter['seq']
+    """Auto-increment integer ID for a collection.
+
+    The two-collection model has no ``counters`` collection, so the counter is
+    kept in memory and seeded once from the highest stored id.  That keeps ids
+    unique across restarts without adding a third collection.
+    """
+    with _ID_LOCK:
+        if collection_name not in _ID_COUNTERS:
+            _ID_COUNTERS[collection_name] = _highest_known_id(collection_name)
+        _ID_COUNTERS[collection_name] += 1
+        return _ID_COUNTERS[collection_name]
 
 
 def serialize_doc(doc):

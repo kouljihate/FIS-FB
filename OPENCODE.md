@@ -4,7 +4,7 @@
 Irrigation Planning System - A Flask-based web application for irrigation planning and management.
 
 ## Current Version
-- **Version**: 0.3.85
+- **Version**: 0.4.0
 - **Last Updated**: 2026-10-19
 
 ## Architecture Overview
@@ -77,8 +77,10 @@ Project - Water Resource - Geometry - Pipes - Trees - Components - Estimation - 
 - **irrigation/estimation**: Estimation calculations
 
 ### Database
-- **MongoDB**: Document database
-- **Collections**: projects, sectors, zones, trees, trees_rows, water_resources, etc.
+- **MongoDB**: Document database `FIS`
+- **Collections**: `user` and `project` only
+- **Model**: land/water/sector/zone/row/tree/pipes/components/reports are embedded in each project document; see `DATABASE.md`
+- **Roles**: Admin, Project Admin, Project Owner (enforced in `irrigation/access.py`)
 
 ### Key Features
 - Bilingual interface (English/Arabic)
@@ -162,7 +164,7 @@ Key API endpoints for rebuild:
 
 ### Version Control
 - Git branches: `project-settings-v1`
-- Version: 0.3.85
+- Version: 0.4.0
 - Changelog: CHANGELOG.md
 - **ALWAYS bump the version on every change (never forget).** Increment `__version__` in
   `irrigation/__init__.py` (patch `+1`, e.g. `0.3.44` -> `0.3.45`), add a dated `## <version> - YYYY-MM-DD`

@@ -3,12 +3,36 @@ import re
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, current_app, send_file
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
+from irrigation.access import (ROLE_PROJECT_ADMIN, find_project,
+                               project_query, require_project)
 from irrigation.extensions import mongo
 from irrigation.models import get_next_id, serialize_doc
 from irrigation.utils.kml import parse_kml_content, parse_kmz_file, export_project_to_kml
 from bson import ObjectId
 
 project_bp = Blueprint('project', __name__)
+
+
+def _empty_components():
+    return {
+        'valves': [],
+        'connectors': [],
+        'reductions': [],
+        'air_removal': [],
+        'pressure_reduction': [],
+        'terminators': [],
+    }
+
+
+def _land(project):
+    """Land section of the two-collection model (kept in sync with the app)."""
+    spec = _get_spec(project)
+    return {
+        'map': project.get('boundary'),
+        'kml_file': project.get('kml_file'),
+        'kml_features': project.get('kml_features') or [],
+        'documents': spec.get('land_documents') or [],
+    }
 
 
 def _default_spec():
@@ -153,6 +177,38 @@ def _spec_from_form(request):
     }
 
 
+def _project_admins():
+    """Active users with the Project Admin profile, sorted by name."""
+    return list(mongo.db.users.find({
+        'profile': ROLE_PROJECT_ADMIN,
+        'is_active': True,
+    }).sort('full_name', 1))
+
+
+def _admin_from_form():
+    """Project Admin selected in the request, or ``None`` if not valid."""
+    raw = request.form.get('admin_user_id', '').strip()
+    if not raw.isdigit():
+        return None
+    return mongo.db.users.find_one({
+        'id': int(raw),
+        'profile': ROLE_PROJECT_ADMIN,
+        'is_active': True,
+    })
+
+
+def _default_admin_id(admins):
+    """Admin to preselect: the one just created, else the current user, else
+    the first available Project Admin."""
+    ids = [admin['id'] for admin in admins]
+    requested = request.args.get('admin_user_id', '').strip()
+    if requested.isdigit() and int(requested) in ids:
+        return int(requested)
+    if getattr(current_user, 'profile', None) == ROLE_PROJECT_ADMIN and int(current_user.id) in ids:
+        return int(current_user.id)
+    return ids[0] if ids else None
+
+
 def _land_documents_from_request(project_id, previous_docs=None):
     """Parse the Land Documents rows (category/name/reference/notes/file) from
     the settings form, save uploaded files, and return the new document list."""
@@ -202,8 +258,19 @@ def _land_documents_from_request(project_id, previous_docs=None):
 @project_bp.route('/')
 @login_required
 def index():
-    projects = list(mongo.db.projects.find({'user_id': int(current_user.id)}).sort('created_at', -1))
+    projects = list(mongo.db.projects.find(project_query()).sort('created_at', -1))
+    owner_ids = {int(p['user_id']) for p in projects if p.get('user_id')}
+    owners = {
+        user['id']: user.get('full_name') or user.get('username') or ''
+        for user in mongo.db.users.find({'id': {'$in': list(owner_ids)}})
+    }
     for p in projects:
+        spec_owner = (p.get('spec') or {}).get('owner') or {}
+        p['owner_name'] = (
+            owners.get(int(p.get('user_id') or 0))
+            or spec_owner.get('name')
+            or ''
+        )
         p['_id'] = str(p['_id'])
     return render_template('project/index.html', projects=projects)
 
@@ -212,6 +279,11 @@ def index():
 @login_required
 def create():
     if request.method == 'POST':
+        project_admin = _admin_from_form()
+        if not project_admin:
+            flash('Select a Project Admin for the project / اختر مسؤولاً للمشروع', 'danger')
+            return redirect(url_for('project.create'))
+
         name = request.form.get('name', '').strip()
         location = request.form.get('location', '').strip()
         description = request.form.get('description', '').strip()
@@ -226,6 +298,7 @@ def create():
         project_doc = {
             'id': get_next_id('projects'),
             'user_id': int(current_user.id),
+            'admin_user_id': project_admin['id'],
             'name': name,
             'location': location,
             'description': description,
@@ -234,14 +307,31 @@ def create():
             'kml_file': None,
             'status': 'created',
             'spec': spec,
+            'land': {'map': None, 'kml_file': None, 'kml_features': [], 'documents': []},
+            'water': spec.get('water_sources') or [],
+            'network': {'pipes': [], 'components': _empty_components()},
+            'sectors': [],
+            'reports': {},
+            'elevation_models': [],
             'created_at': __import__('datetime').datetime.utcnow()
         }
 
         if water_source_lat and water_source_lng:
+            lat, lng = float(water_source_lat), float(water_source_lng)
             project_doc['water_source'] = {
                 'type': 'Point',
-                'coordinates': [float(water_source_lng), float(water_source_lat)]
+                'coordinates': [lng, lat]
             }
+            spec['water_sources'] = [{
+                'type': 'well',
+                'name': 'Water source',
+                'lat': lat,
+                'lng': lng,
+                'flow_lpm': None,
+                'notes': 'Created with the project / أُنشئ مع المشروع',
+            }]
+            project_doc['spec'] = spec
+            project_doc['water'] = spec['water_sources']
 
         if boundary_coords:
             try:
@@ -251,6 +341,7 @@ def create():
                     'type': 'Polygon',
                     'coordinates': [coords]
                 }
+                project_doc['land']['map'] = project_doc['boundary']
             except Exception:
                 flash('Invalid boundary coordinates / إحداثيات الحدود غير صالحة', 'danger')
 
@@ -260,15 +351,17 @@ def create():
         flash('Project created successfully / تم إنشاء المشروع بنجاح', 'success')
         return redirect(url_for('project.detail', project_id=project_id))
 
-    return render_template('project/create.html')
+    project_admins = _project_admins()
+    return render_template('project/create.html',
+                           project_admins=project_admins,
+                           selected_admin_id=_default_admin_id(project_admins))
 
 
 @project_bp.route('/<int:project_id>')
 @login_required
 def detail(project_id):
-    project = mongo.db.projects.find_one({'id': project_id, 'user_id': int(current_user.id)})
+    project = require_project(project_id)
     if not project:
-        flash('Project not found / المشروع غير موجود', 'danger')
         return redirect(url_for('project.index'))
 
     project['_id'] = str(project['_id'])
@@ -284,8 +377,14 @@ def detail(project_id):
     for s in sectors + zones + network + tree_rows + trees:
         s['_id'] = str(s['_id'])
 
+    project_admin = None
+    if project.get('admin_user_id'):
+        project_admin = mongo.db.users.find_one({'id': int(project['admin_user_id'])})
+
     return render_template('project/detail.html',
                            project=project,
+                           project_admin=project_admin,
+                           project_admins=_project_admins(),
                            spec=spec,
                            sectors=sectors,
                            zones=zones,
@@ -297,9 +396,8 @@ def detail(project_id):
 @project_bp.route('/<int:project_id>/settings', methods=['POST'])
 @login_required
 def settings(project_id):
-    project = mongo.db.projects.find_one({'id': project_id, 'user_id': int(current_user.id)})
+    project = require_project(project_id)
     if not project:
-        flash('Project not found / المشروع غير موجود', 'danger')
         return redirect(url_for('project.index'))
 
     spec = _spec_from_form(request)
@@ -309,7 +407,11 @@ def settings(project_id):
 
     # Keep the legacy single Point (used by regeneration/hydrology/elevation
     # and KML export) in sync with the first water source that has a position.
-    update_fields = {'spec': spec}
+    update_fields = {
+        'spec': spec,
+        'land': _land({**project, 'spec': spec}),
+        'water': spec.get('water_sources') or [],
+    }
     for w in spec['water_sources']:
         if w.get('lat') is not None and w.get('lng') is not None:
             update_fields['water_source'] = {
@@ -319,9 +421,15 @@ def settings(project_id):
             break
     if 'location' in request.form:
         update_fields['location'] = request.form.get('location', '').strip()
+    if 'admin_user_id' in request.form:
+        project_admin = _admin_from_form()
+        if project_admin:
+            update_fields['admin_user_id'] = project_admin['id']
+        else:
+            flash('Project Admin not updated / لم يتم تحديث مسؤول المشروع', 'warning')
 
     mongo.db.projects.update_one(
-        {'id': project_id, 'user_id': int(current_user.id)},
+        {'id': project_id},
         {'$set': update_fields}
     )
     flash('Project settings saved / تم حفظ إعدادات المشروع', 'success')
@@ -331,9 +439,8 @@ def settings(project_id):
 @project_bp.route('/<int:project_id>/land_documents/<int:doc_index>/download')
 @login_required
 def download_land_document(project_id, doc_index):
-    project = mongo.db.projects.find_one({'id': project_id, 'user_id': int(current_user.id)})
+    project = require_project(project_id)
     if not project:
-        flash('Project not found / المشروع غير موجود', 'danger')
         return redirect(url_for('project.index'))
 
     docs = (project.get('spec') or {}).get('land_documents') or []
@@ -474,6 +581,7 @@ def _store_kml_features(project_id, project, filename, features):
         'kml_file': filename,
         'kml_features': features,
         'spec': spec,
+        'water': spec.get('water_sources') or [],
     }
     if boundary_feature:
         update['boundary'] = boundary_feature['geometry']
@@ -483,6 +591,7 @@ def _store_kml_features(project_id, project, filename, features):
             'type': 'Point',
             'coordinates': [first['lng'], first['lat']]
         }
+    update['land'] = _land({**project, **update})
     mongo.db.projects.update_one(
         {'id': project_id, 'user_id': project['user_id']},
         {'$set': update}
@@ -493,9 +602,8 @@ def _store_kml_features(project_id, project, filename, features):
 @project_bp.route('/<int:project_id>/upload_kml', methods=['POST'])
 @login_required
 def upload_kml(project_id):
-    project = mongo.db.projects.find_one({'id': project_id, 'user_id': int(current_user.id)})
+    project = require_project(project_id)
     if not project:
-        flash('Project not found / المشروع غير موجود', 'danger')
         return redirect(url_for('project.index'))
 
     if 'kml_file' not in request.files:
@@ -535,9 +643,8 @@ def upload_kml(project_id):
 @project_bp.route('/<int:project_id>/export_kml')
 @login_required
 def export_kml(project_id):
-    project = mongo.db.projects.find_one({'id': project_id, 'user_id': int(current_user.id)})
+    project = require_project(project_id)
     if not project:
-        flash('Project not found / المشروع غير موجود', 'danger')
         return redirect(url_for('project.index'))
 
     kml_content = export_project_to_kml(project_id)
@@ -557,11 +664,14 @@ def export_kml(project_id):
 @project_bp.route('/<int:project_id>/delete', methods=['POST'])
 @login_required
 def delete(project_id):
-    mongo.db.projects.delete_one({'id': project_id, 'user_id': int(current_user.id)})
-    mongo.db.sectors.delete_many({'project_id': project_id})
-    mongo.db.zones.delete_many({'project_id': project_id})
-    mongo.db.network_elements.delete_many({'project_id': project_id})
-    mongo.db.tree_rows.delete_many({'project_id': project_id})
-    mongo.db.trees.delete_many({'project_id': project_id})
+    project = find_project(project_id)
+    if not project:
+        flash('Project not found / المشروع غير موجود', 'danger')
+        return redirect(url_for('project.index'))
+    mongo.db.projects.delete_one({'id': project_id})
+    try:
+        mongo.db.discard(project_id)
+    except AttributeError:
+        pass
     flash('Project deleted / تم حذف المشروع', 'info')
     return redirect(url_for('project.index'))

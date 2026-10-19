@@ -1,6 +1,6 @@
 # FIS (Farming Irrigation System)
 
-Version: **0.3.85**
+Version: **0.4.0**
 
 FIS is a Flask irrigation-planning application for organizing farm projects, field geometry, irrigation networks, trees, and engineering validation.
 
@@ -35,12 +35,16 @@ FIS is a Flask irrigation-planning application for organizing farm projects, fie
 python -m venv venv
 .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-$env:MONGO_URI = 'mongodb://localhost:27017/irrigation_db'
+$env:MONGO_URI = 'mongodb://localhost:27017/FIS'
 $env:SECRET_KEY = 'set-a-unique-random-secret-before-use'
 python app.py
 ```
 
 The application is served at `http://127.0.0.1:5000`. If `SECRET_KEY` is unset, a random key is generated for local development and sessions reset when the process restarts. Set a unique, persistent `SECRET_KEY` and configure MongoDB appropriately before deployment.
+
+## Database
+
+The app uses the **`FIS`** database with exactly two collections, `user` and `project`. Project geometry, pipes, components and reports are embedded in the project document. The schema, validators and indexes are created automatically at startup; the first registered account becomes the `Admin`. See [DATABASE.md](DATABASE.md) for the full model and role rules.
 
 ## Release notes
 

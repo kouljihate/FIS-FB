@@ -11,7 +11,9 @@ api_bp = Blueprint('api', __name__, url_prefix='/api')
 @login_required
 def get_geometry(project_id):
     """Return all geometry elements for a project as GeoJSON FeatureCollection."""
-    project = mongo.db.projects.find_one({'id': project_id, 'user_id': int(current_user.id)})
+    from irrigation.access import find_project
+
+    project = find_project(project_id)
     if not project:
         return jsonify({'error': 'Project not found'}), 404
 

@@ -19,9 +19,10 @@ engineering_bp = Blueprint('engineering', __name__)
 
 
 def get_project_or_redirect(project_id):
-    project = mongo.db.projects.find_one({'id': project_id, 'user_id': int(current_user.id)})
+    from irrigation.access import require_project
+
+    project = require_project(project_id)
     if not project:
-        flash('Project not found / المشروع غير موجود', 'danger')
         return None
     project['_id'] = str(project['_id'])
     return project
@@ -182,7 +183,9 @@ def ai_regenerate_zones(project_id):
 @login_required
 def report(project_id):
     """API endpoint returning validation as JSON."""
-    project = mongo.db.projects.find_one({'id': project_id, 'user_id': int(current_user.id)})
+    from irrigation.access import find_project
+
+    project = find_project(project_id)
     if not project:
         return jsonify({'error': 'Project not found'}), 404
 
@@ -200,9 +203,10 @@ def report(project_id):
 @login_required
 def fetch_elevation(project_id):
     """Fetch and cache terrain elevation data for a project."""
-    project = mongo.db.projects.find_one({'id': project_id, 'user_id': int(current_user.id)})
+    from irrigation.access import require_project
+
+    project = require_project(project_id)
     if not project:
-        flash('Project not found / المشروع غير موجود', 'danger')
         return redirect(url_for('engineering.validation_view', project_id=project_id))
 
     spacing = request.form.get('spacing_m', default=30, type=int)
@@ -229,7 +233,9 @@ def fetch_elevation(project_id):
 @login_required
 def elevation_heatmap(project_id):
     """Return elevation sample points as GeoJSON for map display."""
-    project = mongo.db.projects.find_one({'id': project_id, 'user_id': int(current_user.id)})
+    from irrigation.access import find_project
+
+    project = find_project(project_id)
     if not project:
         return jsonify({'error': 'Project not found'}), 404
 

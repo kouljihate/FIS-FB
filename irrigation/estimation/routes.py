@@ -8,9 +8,10 @@ estimation_bp = Blueprint('estimation', __name__)
 
 
 def get_project_or_redirect(project_id):
-    project = mongo.db.projects.find_one({'id': project_id, 'user_id': int(current_user.id)})
+    from irrigation.access import require_project
+
+    project = require_project(project_id)
     if not project:
-        flash('Project not found / المشروع غير موجود', 'danger')
         return None
     project['_id'] = str(project['_id'])
     return project
@@ -204,7 +205,7 @@ def quote_save(project_id):
         'tax_pct': _float(request.form.get('tax_pct'), 0),
     }
     mongo.db.projects.update_one(
-        {'id': project_id, 'user_id': int(current_user.id)},
+        {'id': project_id},
         {'$set': {'spec.estimation': estimation}}
     )
     flash('Estimation saved / تم حفظ التقدير', 'success')

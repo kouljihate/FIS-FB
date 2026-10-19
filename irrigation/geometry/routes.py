@@ -65,9 +65,10 @@ def _global_area_m2(project, items):
 
 
 def get_project_or_redirect(project_id):
-    project = mongo.db.projects.find_one({'id': project_id, 'user_id': int(current_user.id)})
+    from irrigation.access import require_project
+
+    project = require_project(project_id)
     if not project:
-        flash('Project not found / المشروع غير موجود', 'danger')
         return None
     project['_id'] = str(project['_id'])
     return project

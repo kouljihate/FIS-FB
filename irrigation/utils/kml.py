@@ -60,82 +60,63 @@ def _kml_geom_to_geojson(geom):
 
 def export_project_to_kml(project_id):
     """Build a KML document from a project's geometry elements."""
-    project = mongo.db.projects.find_one({'_id': project_id})
+    project = mongo.db.projects.find_one({'id': project_id})
     if not project:
         return None
 
-    k = kml.KML()
-    ns = '{http://www.opengis.net/kml/2.2}'
+    from shapely.geometry import shape as shp_shape
 
-    # Main document folder
-    doc = kml.Document(ns, 'project-doc', project.get('name', 'Project'), '')
+    k = kml.KML()
+    doc = kml.Document(id='project-doc', name=project.get('name', 'Project'),
+                       description='')
     k.append(doc)
+
+    def add_feature(folder, feature_id, name, geojson):
+        if not geojson:
+            return
+        try:
+            geom = shp_shape(geojson)
+        except Exception:
+            return
+        folder.append(kml.Placemark(id=feature_id, name=name, description='', geometry=geom))
 
     # Land boundary
     if project.get('boundary'):
-        boundary_geom = project['boundary']
-        from shapely.geometry import shape as shp_shape
-        shapely_geom = shp_shape(boundary_geom)
-        pm = kml.Placemark(ns, 'boundary', 'Land Boundary / حدود الأرض', '')
-        pm.geometry = kml.Geometry(geometry=shapely_geom)
-        doc.append(pm)
+        add_feature(doc, 'boundary', 'Land Boundary / حدود الأرض', project['boundary'])
 
     # Sectors
-    sectors_folder = kml.Folder(ns, 'sectors', 'Sectors / القطاعات', '')
+    sectors_folder = kml.Folder(id='sectors', name='Sectors / القطاعات')
     doc.append(sectors_folder)
     for sector in mongo.db.sectors.find({'project_id': project_id}):
-        if sector.get('polygon'):
-            from shapely.geometry import shape as shp_shape
-            shapely_geom = shp_shape(sector['polygon'])
-            name = sector.get('name_en', sector.get('name', ''))
-            pm = kml.Placemark(ns, f'sector-{sector["id"]}', name, '')
-            pm.geometry = kml.Geometry(geometry=shapely_geom)
-            sectors_folder.append(pm)
+        add_feature(sectors_folder, f'sector-{sector["id"]}',
+                    sector.get('name_en', sector.get('name', '')), sector.get('polygon'))
 
     # Zones
-    zones_folder = kml.Folder(ns, 'zones', 'Zones / المناطق', '')
+    zones_folder = kml.Folder(id='zones', name='Zones / المناطق')
     doc.append(zones_folder)
     for zone in mongo.db.zones.find({'project_id': project_id}):
-        if zone.get('polygon'):
-            from shapely.geometry import shape as shp_shape
-            shapely_geom = shp_shape(zone['polygon'])
-            name = zone.get('name_en', zone.get('name', ''))
-            pm = kml.Placemark(ns, f'zone-{zone["id"]}', name, '')
-            pm.geometry = kml.Geometry(geometry=shapely_geom)
-            zones_folder.append(pm)
+        add_feature(zones_folder, f'zone-{zone["id"]}',
+                    zone.get('name_en', zone.get('name', '')), zone.get('polygon'))
 
     # Network elements (pipes, valves, etc.)
-    net_folder = kml.Folder(ns, 'network', 'Network / الشبكة', '')
+    net_folder = kml.Folder(id='network', name='Network / الشبكة')
     doc.append(net_folder)
     for elem in mongo.db.network_elements.find({'project_id': project_id}):
-        if elem.get('geometry'):
-            from shapely.geometry import shape as shp_shape
-            shapely_geom = shp_shape(elem['geometry'])
-            name = f"{elem.get('type', 'element')}"
-            pm = kml.Placemark(ns, f'elem-{elem["id"]}', name, '')
-            pm.geometry = kml.Geometry(geometry=shapely_geom)
-            net_folder.append(pm)
+        add_feature(net_folder, f'elem-{elem["id"]}',
+                    f"{elem.get('type', 'element')}", elem.get('geometry'))
 
     # Tree rows
-    rows_folder = kml.Folder(ns, 'rows', 'Tree Rows / صفوف الأشجار', '')
+    rows_folder = kml.Folder(id='rows', name='Tree Rows / صفوف الأشجار')
     doc.append(rows_folder)
     for row in mongo.db.tree_rows.find({'project_id': project_id}):
-        if row.get('geometry'):
-            from shapely.geometry import shape as shp_shape
-            shapely_geom = shp_shape(row['geometry'])
-            pm = kml.Placemark(ns, f'row-{row["id"]}', 'Tree Row / صف', '')
-            pm.geometry = kml.Geometry(geometry=shapely_geom)
-            rows_folder.append(pm)
+        add_feature(rows_folder, f'row-{row["id"]}',
+                    'Tree Row / صف', row.get('geometry'))
 
     # Trees
-    trees_folder = kml.Folder(ns, 'trees', 'Trees / الأشجار', '')
+    trees_folder = kml.Folder(id='trees', name='Trees / الأشجار')
     doc.append(trees_folder)
     for tree in mongo.db.trees.find({'project_id': project_id}):
-        if tree.get('geometry'):
-            from shapely.geometry import shape as shp_shape
-            shapely_geom = shp_shape(tree['geometry'])
-            pm = kml.Placemark(ns, f'tree-{tree["id"]}', 'Tree / شجرة', '')
-            pm.geometry = kml.Geometry(geometry=shapely_geom)
-            trees_folder.append(pm)
+        add_feature(trees_folder, f'tree-{tree["id"]}',
+                    'Tree / شجرة', tree.get('geometry'))
 
-    return etree.tostring(doc.to_element(), pretty_print=True).decode('utf-8')
+    return etree.tostring(k.etree_element(), pretty_print=True, encoding='utf-8').decode('utf-8')

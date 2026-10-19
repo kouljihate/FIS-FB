@@ -3,7 +3,7 @@ from flask import Flask, render_template
 from irrigation.extensions import mongo, login_manager
 from irrigation.utils.logger import setup_logging
 
-__version__ = '0.3.85'
+__version__ = '0.4.0'
 
 
 def create_app():
@@ -15,6 +15,17 @@ def create_app():
     # Extensions
     mongo.init_app(app)
     login_manager.init_app(app)
+
+    # The new model stores everything in two collections (user / project).
+    # Wrap mongo.db so existing collection-style queries keep working.
+    from irrigation.storage import install_storage
+    install_storage(mongo, app)
+
+    from irrigation.schema import ensure_schema, real_database
+    try:
+        ensure_schema(real_database(mongo))
+    except Exception:
+        app.logger.exception("Database schema setup failed")
 
     # Logging
     setup_logging(app)

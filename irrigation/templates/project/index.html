@@ -4,11 +4,15 @@
 {% block content %}
 <div class="projects-page">
     <div class="projects-page-header mb-4">
-        <h2 class="projects-page-title-en"><i class="bi bi-folder-fill"></i> Projects</h2>
-        <a href="{{ url_for('project.create') }}" class="btn btn-success projects-page-create">
-            <i class="bi bi-plus-circle"></i> Create Project / إنشاء مشروع
-        </a>
-        <h2 class="projects-page-title-ar ar-text" lang="ar">المشاريع</h2>
+        <div class="projects-page-titles">
+            <h2 class="projects-page-title-en"><i class="bi bi-folder-fill"></i> Projects</h2>
+            <a href="{{ url_for('project.create') }}" class="btn btn-success projects-page-create">
+                <i class="bi bi-plus-circle"></i> Create Project / إنشاء مشروع
+            </a>
+            <h2 class="projects-page-title-ar ar-text" lang="ar">المشاريع</h2>
+            
+        </div>
+        
     </div>
 
 {% if projects %}
@@ -20,6 +24,7 @@
                     <tr>
                         <th>ID</th>
                         <th>Name / الاسم</th>
+                        <th>Owner / المالك</th>
                         <th>Location / الموقع</th>
                         <th>Status / الحالة</th>
                         <th>KML / ملف</th>
@@ -31,6 +36,13 @@
                     <tr>
                         <td>{{ p.id }}</td>
                         <td>{{ p.name }}</td>
+                        <td>
+                            {% if p.owner_name %}
+                            {{ p.owner_name }}
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
                         <td>{{ p.location or '-' }}</td>
                         <td>
                             <span class="badge bg-info">{{ p.status or 'created' }}</span>

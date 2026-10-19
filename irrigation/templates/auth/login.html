@@ -20,7 +20,7 @@
                     <div class="tab-pane fade {{ 'show active' if active_tab == 'login' else '' }}" id="login-pane" role="tabpanel" aria-labelledby="login-tab" tabindex="0">
                         <form method="POST" action="{{ url_for('auth.login') }}">
                             <div class="mb-3">
-                                <label class="form-label">Username / اسم المستخدم</label>
+                                <label class="form-label">Username or Email / اسم المستخدم أو البريد</label>
                                 <input type="text" name="username" class="form-control" required autofocus>
                             </div>
                             <div class="mb-3">
@@ -35,14 +35,32 @@
                         </form>
                     </div>
                     <div class="tab-pane fade {{ 'show active' if active_tab == 'register' else '' }}" id="register-pane" role="tabpanel" aria-labelledby="register-tab" tabindex="0">
-                        <form method="POST" action="{{ url_for('auth.register') }}">
+                        <form method="POST" action="{{ url_for('auth.register') }}" enctype="multipart/form-data">
+                            <div class="mb-3">
+                                <label class="form-label">Full Name / الاسم الكامل</label>
+                                <input type="text" name="full_name" class="form-control" required>
+                            </div>
                             <div class="mb-3">
                                 <label class="form-label">Username / اسم المستخدم</label>
                                 <input type="text" name="username" class="form-control" required>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Email / البريد الإلكتروني</label>
-                                <input type="email" name="email" class="form-control">
+                                <input type="email" name="email" class="form-control" required>
+                            </div>
+                            <div class="row g-2 mb-3">
+                                <div class="col-6">
+                                    <label class="form-label">Phone / الهاتف</label>
+                                    <input type="text" name="phone" class="form-control">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label">CIN / البطاقة الوطنية</label>
+                                    <input type="text" name="cin" class="form-control">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Photo / الصورة</label>
+                                <input type="file" name="photo" class="form-control" accept="image/*">
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Password / كلمة المرور</label>

@@ -48,6 +48,45 @@
                         <textarea name="description" class="form-control" rows="2"></textarea>
                     </div>
 
+                    <div class="mb-3">
+                        <label class="form-label" for="admin_user_id">Project Admin / مسؤول المشروع</label>
+                        <div class="input-group">
+                            <select name="admin_user_id" id="admin_user_id" class="form-select"
+                                    {% if not project_admins %}disabled{% endif %} required>
+                                {% if not project_admins %}
+                                <option value="">No Project Admin yet / لا يوجد مسؤول مشروع بعد</option>
+                                {% else %}
+                                {% for admin in project_admins %}
+                                <option value="{{ admin.id }}" {% if admin.id == selected_admin_id %}selected{% endif %}>
+                                    {{ admin.full_name or admin.username }}{% if admin.email %} — {{ admin.email }}{% endif %}
+                                </option>
+                                {% endfor %}
+                                {% endif %}
+                            </select>
+                            {% if current_user.is_admin %}
+                            <button class="btn btn-outline-success" type="button"
+                                    data-bs-toggle="modal" data-bs-target="#newProjectAdminModal">
+                                <i class="bi bi-person-plus"></i> New / جديد
+                            </button>
+                            {% endif %}
+                        </div>
+                        <div class="form-text">
+                            The project is linked to this Project Admin / يرتبط المشروع بمسؤول المشروع
+                        </div>
+                    </div>
+                    {% if not project_admins %}
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        {% if current_user.is_admin %}
+                        No Project Admin exists yet — create one to continue /
+                        لا يوجد مسؤول مشروع بعد — أنشئ واحداً للمتابعة
+                        {% else %}
+                        No Project Admin exists yet — ask an Admin to create one /
+                        لا يوجد مسؤول مشروع بعد — اطلب من المسؤول إنشاء واحد
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
                     <details class="mb-3">
                         <summary class="text-primary"><i class="bi bi-gear"></i> Project Settings (optional) / إعدادات المشروع (اختياري)</summary>
                         <div class="card card-body mt-2">
@@ -109,4 +148,74 @@
             </div>
         </div>
 </div>
+
+{% if current_user.is_admin %}
+<!-- New Project Admin Modal -->
+<div class="modal fade" id="newProjectAdminModal" tabindex="-1" aria-labelledby="newProjectAdminTitle"
+     aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('auth.create_project_admin') }}">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title" id="newProjectAdminTitle">
+                        <i class="bi bi-person-plus"></i> New Project Admin / مسؤول مشروع جديد
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                            aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-2">
+                        <label class="form-label">Full Name / الاسم الكامل</label>
+                        <input type="text" name="full_name" class="form-control">
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <label class="form-label">Username / اسم المستخدم</label>
+                            <input type="text" name="username" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">E-mail / البريد</label>
+                            <input type="email" name="email" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="row g-2 mt-1">
+                        <div class="col-md-6">
+                            <label class="form-label">Phone / الهاتف</label>
+                            <input type="text" name="phone" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">CIN / البطاقة الوطنية</label>
+                            <input type="text" name="cin" class="form-control">
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <label class="form-label">Password / كلمة المرور</label>
+                        <input type="password" name="password" class="form-control" required>
+                    </div>
+                    <p class="text-muted small mt-2 mb-0">
+                        Profile / الدور: <strong>Project Admin</strong>
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel / إلغاء</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-check-circle"></i> Create / إنشاء
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if not project_admins and current_user.is_admin %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var modal = document.getElementById('newProjectAdminModal');
+        if (modal) {
+            bootstrap.Modal.getOrCreateInstance(modal).show();
+        }
+    });
+</script>
+{% endif %}
 {% endblock %}

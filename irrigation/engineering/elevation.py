@@ -208,31 +208,20 @@ def fetch_open_meteo_elevations(points):
     return elevations
 
 
+# The two-collection model has no elevation_samples collection.  Raw samples
+# are only a short-lived lookup cache (the per-project elevation model is
+# persisted inside the project), so keep them in process memory.
+_ELEVATION_SAMPLE_CACHE = {}
+
+
 def get_cached_elevation(lat, lng):
     """Check if elevation for a coordinate is already cached."""
-    rounded_lat = round(lat, 5)
-    rounded_lng = round(lng, 5)
-    cached = mongo.db.elevation_samples.find_one({
-        'lat_round': rounded_lat,
-        'lng_round': rounded_lng,
-        'source': 'open-meteo'
-    })
-    if cached:
-        return cached.get('elevation_m')
-    return None
+    return _ELEVATION_SAMPLE_CACHE.get((round(lat, 5), round(lng, 5)))
 
 
 def cache_elevation(lat, lng, elevation_m):
-    """Cache a single elevation sample."""
-    mongo.db.elevation_samples.insert_one({
-        'lat_round': round(lat, 5),
-        'lng_round': round(lng, 5),
-        'lat': lat,
-        'lng': lng,
-        'elevation_m': elevation_m,
-        'source': 'open-meteo',
-        'fetched_at': datetime.utcnow()
-    })
+    """Cache a single elevation sample for the life of the process."""
+    _ELEVATION_SAMPLE_CACHE[(round(lat, 5), round(lng, 5))] = elevation_m
 
 
 def get_or_build_elevation_model(project_id, project_doc, spacing_m=None, max_points=None):

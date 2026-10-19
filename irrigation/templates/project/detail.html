@@ -59,23 +59,32 @@
 <!-- Project Info -->
 <div class="card shadow-sm mb-4">
     <div class="card-header bg-info text-white">
-        <div class="row align-items-center g-0">
-            <!-- Title (90%) -->
-            <div class="col" style="flex: 0 0 90%; max-width: 90%;">
-                <h5 class="mb-0">
-                    <i class="bi bi-folder-fill"></i> Project / المشروع
-                </h5>
-            </div>
+        <div class="project-info-header">
+            <!-- English title (15%) -->
+            <h5 class="project-info-title-en mb-0">
+                <i class="bi bi-folder-fill"></i> Project
+            </h5>
 
-            <!-- Button (10%) -->
-            <div class="col"
-                style="flex: 0 0 10%; max-width: 10%; text-align: end;">
+            <!-- Edit / Delete buttons (70%) -->
+            <div class="project-info-actions">
                 <button class="btn btn-sm btn-outline-light"
                     data-bs-toggle="modal"
-                    data-bs-target="#editSpecModal">
+                    data-bs-target="#editSpecModal"
+                    title="Edit project / تعديل المشروع"
+                    aria-label="Edit project / تعديل المشروع">
                     <i class="bi bi-pencil"></i> Edit / تعديل
                 </button>
+                <button class="btn btn-sm btn-outline-light"
+                    data-bs-toggle="modal"
+                    data-bs-target="#deleteProjectModal"
+                    title="Delete project / حذف المشروع"
+                    aria-label="Delete project / حذف المشروع">
+                    <i class="bi bi-trash"></i> Delete / حذف
+                </button>
             </div>
+
+            <!-- Arabic title (15%) -->
+            <h5 class="project-info-title-ar ar-text mb-0" lang="ar">المشروع</h5>
         </div>
     </div>
     <div class="card-body">
@@ -100,6 +109,17 @@
                                         project.name }}</td>
                                     <th
                                         style="width: 30%; text-align: right;">الاسم</th>
+                                </tr>
+                                <tr>
+                                    <th style="text-align: left;">Project Admin</th>
+                                    <td style="text-align: center;">
+                                        {% if project_admin %}
+                                        {{ project_admin.full_name or project_admin.username }}
+                                        {% else %}
+                                        <span class="text-muted">Not set / غير محدد</span>
+                                        {% endif %}
+                                    </td>
+                                    <th style="text-align: right;">مسؤول المشروع</th>
                                 </tr>
                                 <tr>
                                     <th style="text-align: left;">Location</th>
@@ -456,6 +476,23 @@
                 <!-- Constrain height so scrolling works -->
                 <div class="modal-body"
                     style="max-height: 70vh; overflow-y: auto;">
+                    <h6 class="text-primary"><i class="bi bi-person-badge"></i>
+                        Project Admin / مسؤول المشروع</h6>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <select name="admin_user_id" class="form-select">
+                                {% for admin in project_admins %}
+                                <option value="{{ admin.id }}"
+                                    {% if admin.id == project.get('admin_user_id') %}selected{% endif %}>
+                                    {{ admin.full_name or admin.username }}{% if admin.email %} — {{ admin.email }}{% endif %}
+                                </option>
+                                {% else %}
+                                <option value="">No Project Admin available / لا يوجد مسؤول مشروع</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
                     <h6 class="text-primary"><i class="bi bi-person-circle"></i>
                         Owner / المالك</h6>
                     <div class="row g-2 mb-3">
@@ -902,4 +939,40 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+
+<!-- Delete Project Modal -->
+<div class="modal fade" id="deleteProjectModal" tabindex="-1" aria-labelledby="deleteProjectTitle"
+    aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="POST"
+                action="{{ url_for('project.delete', project_id=project.id) }}">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="deleteProjectTitle">
+                        <i class="bi bi-trash"></i> Delete Project / حذف المشروع
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white"
+                        data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">
+                        Delete <strong>{{ project.name }}</strong> and everything inside it
+                        (sectors, zones, rows, trees, pipes, components and reports)?
+                    </p>
+                    <p class="text-muted small mb-0 ar-text" lang="ar" dir="rtl">
+                        سيتم حذف هذا المشروع وكل ما يحتويه (القطاعات، المناطق، الصفوف،
+                        الأشجار، الأنابيب، المكونات والتقارير). لا يمكن التراجع.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary"
+                        data-bs-dismiss="modal">Cancel / إلغاء</button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash"></i> Delete / حذف
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 {% endblock %}

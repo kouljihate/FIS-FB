@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.4.0 - 2026-10-19
+
+### Added
+- JSON-schema validators and indexes for `user` and `project`, created automatically at startup
+- profile page (details, photo, password) and an Admin-only users/role page
+- `DATABASE.md` describing the model and its limits
+- Create Project now links each project to a Project Admin (`admin_user_id`), with a modal to create one when no Project Admin exists yet
+- Delete button next to Edit on the project page, deleting the whole project after a modal confirmation
+- Admin-only Users tab placed first in the navigation, listing every user with their profile and active state
+- Owner column in the Projects table, resolved with a single lookup per page
+
+### Changed
+- new two-collection MongoDB model on the `FIS` database: `user` and `project`
+- land map, water sources, sector -> zone -> row -> tree geometry, pipes, components, piping reports and validations now live inside the project document
+- user records carry full name, phone, CIN, photo and profile; login accepts a username or an email
+- role enforcement for Admin, Project Admin and Project Owner across pages, the JSON API and file downloads
+
+### Fixed
+- KML export with the pinned fastkml 1.0 API
+- the estimation page failing on its custom-items list
+
 ## 0.3.85 - 2026-10-19
 
 ### Changed
