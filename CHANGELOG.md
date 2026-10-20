@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.6 - 2026-10-20
+
+### Added
+- Map Overview tab - one full-page project map with in-map sector shortcuts, a filter covering every element type and an Edit/Rename/Delete panel for the selected object, starting on sectors only.
+- shared component page template, so Connectors, Reductors, Air Removal, Reduce Pressure and Terminators get the same table, modals and map tools as Valves.
+- Auto Generate Zones works on a multi-sector map selection, with a per-sector orientation in degrees.
+
+### Changed
+- zone and row orientations are stored and applied in exact degrees; rows of a zone follow its bearing.
+- geometry projection uses one CRS per shape, so shapes near a UTM zone boundary no longer jump.
+
+### Fixed
+- unclosed preload links in the base template swallowed every page's extra head, losing page CSS/JS and the overview map sizing.
+
 ## 0.4.5 - 2026-10-19
 
 ### Changed

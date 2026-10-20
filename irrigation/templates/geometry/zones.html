@@ -269,16 +269,15 @@
                     <div class="modal fade" id="editZoneModal{{ item.zone.id }}"
                         tabindex="-1">
                         <div class="modal-dialog">
-                            <div class="modal-content">
+                            <div class="modal-content modal-green">
                                 <form method="POST"
                                     action="{{ url_for('geometry.zone_edit', project_id=project.id, zone_id=item.zone.id) }}">
-                                    <div
-                                        class="modal-header bg-primary text-white">
+                                    <div class="modal-header">
                                         <h5 class="modal-title"><i
                                                 class="bi bi-pencil"></i> Edit
                                             Zone / تعديل المنطقة</h5>
                                         <button type="button"
-                                            class="btn-close btn-close-white"
+                                            class="btn-close"
                                             data-bs-dismiss="modal"></button>
                                     </div>
                                     <div class="modal-body">
@@ -356,12 +355,12 @@
                     <!-- Orientation (degrees) Modal -->
                     <div class="modal fade" id="orientationZoneModal{{ item.zone.id }}" tabindex="-1">
                         <div class="modal-dialog">
-                            <div class="modal-content">
+                            <div class="modal-content modal-green">
                                 <form method="POST"
                                     action="{{ url_for('geometry.zone_orientation', project_id=project.id, zone_id=item.zone.id) }}">
-                                    <div class="modal-header bg-secondary text-white">
+                                    <div class="modal-header">
                                         <h5 class="modal-title"><i class="bi bi-compass"></i> Edit Orientation (°) / تعديل الاتجاه</h5>
-                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                     </div>
                                     <div class="modal-body">
                                         {% set _zone_odeg = item.zone.get('orientation_deg') %}
@@ -393,17 +392,16 @@
                     <div class="modal fade"
                         id="renameZoneModal{{ item.zone.id }}" tabindex="-1">
                         <div class="modal-dialog">
-                            <div class="modal-content">
+                            <div class="modal-content modal-green">
                                 <form method="POST"
                                     action="{{ url_for('geometry.zone_rename', project_id=project.id, zone_id=item.zone.id) }}">
-                                    <div
-                                        class="modal-header bg-info text-white">
+                                    <div class="modal-header">
                                         <h5 class="modal-title"><i
                                                 class="bi bi-input-cursor-text"></i>
                                             Rename Zone / إعادة تسمية
                                             المنطقة</h5>
                                         <button type="button"
-                                            class="btn-close btn-close-white"
+                                            class="btn-close"
                                             data-bs-dismiss="modal"></button>
                                     </div>
                                     <div class="modal-body">
@@ -442,11 +440,10 @@
                     <div class="modal fade"
                         id="splitZoneModal{{ item.zone.id }}" tabindex="-1">
                         <div class="modal-dialog">
-                            <div class="modal-content">
+                            <div class="modal-content modal-green">
                                 <form method="POST"
                                     action="{{ url_for('geometry.zone_split', project_id=project.id, zone_id=item.zone.id) }}">
-                                    <div
-                                        class="modal-header bg-warning text-dark">
+                                    <div class="modal-header">
                                         <h5 class="modal-title"><i
                                                 class="bi bi-scissors"></i>
                                             Split Zone / تقسيم المنطقة</h5>
@@ -496,13 +493,13 @@
 <!-- Add Zone Modal -->
 <div class="modal fade" id="addZoneModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
-        <div class="modal-content">
+        <div class="modal-content modal-green">
             <form method="POST"
                 action="{{ url_for('geometry.zone_add', project_id=project.id) }}">
-                <div class="modal-header bg-success text-white">
+                <div class="modal-header">
                     <h5 class="modal-title"><i class="bi bi-plus-circle"></i>
                         Add Zone / إضافة منطقة</h5>
-                    <button type="button" class="btn-close btn-close-white"
+                    <button type="button" class="btn-close"
                         data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -548,7 +545,7 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary"
                         data-bs-dismiss="modal">Close / إغلاق</button>
-                    <button type="submit" class="btn btn-success"><i
+                    <button type="submit" class="btn btn-primary"><i
                             class="bi bi-check"></i> Add / إضافة</button>
                 </div>
             </form>
@@ -559,14 +556,14 @@
 <!-- Merge Zone Modal -->
 <div class="modal fade" id="mergeZoneModal" tabindex="-1">
     <div class="modal-dialog">
-        <div class="modal-content">
+        <div class="modal-content modal-green">
             <form method="POST"
                 action="{{ url_for('geometry.zone_merge', project_id=project.id) }}"
                 id="zoneMergeForm">
-                <div class="modal-header bg-primary text-white">
+                <div class="modal-header">
                     <h5 class="modal-title"><i class="bi bi-union"></i> Merge
                         Zones / دمج المناطق</h5>
-                    <button type="button" class="btn-close btn-close-white"
+                    <button type="button" class="btn-close"
                         data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -588,10 +585,10 @@
 <!-- Split Selected Zones Modal -->
 <div class="modal fade" id="splitZoneSelectedModal" tabindex="-1">
     <div class="modal-dialog">
-        <div class="modal-content">
+        <div class="modal-content modal-green">
             <form method="POST"
                 action="{{ url_for('geometry.zone_split_selected', project_id=project.id) }}">
-                <div class="modal-header bg-warning text-dark">
+                <div class="modal-header">
                     <h5 class="modal-title"><i class="bi bi-scissors"></i> Split
                         Selected Zones / تقسيم المناطق المحددة</h5>
                     <button type="button" class="btn-close"
@@ -622,24 +619,23 @@
     </div>
 </div>
 
-<!-- Split Single Sector into Zones (map magic widget) -->
+<!-- Split Selected Sectors into Zones (map magic widget) -->
 <div class="modal fade" id="splitSectorZonesModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content modal-green">
             <form method="POST"
                 action="{{ url_for('geometry.zone_generate_for_sector', project_id=project.id) }}">
-                <input type="hidden" name="sector_id" id="splitSectorId">
-                <div class="modal-header bg-warning">
-                    <h5 class="modal-title"><i class="bi bi-magic"></i> Split Sector into
-                        Zones / تقسيم القطاع إلى مناطق</h5>
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-magic"></i> Split Sectors into
+                        Zones / تقسيم القطاعات إلى مناطق</h5>
                     <button type="button" class="btn-close"
                         data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <p id="splitSectorLabel" class="text-muted small mb-3"></p>
                     <div class="mb-3">
-                        <label class="form-label">Number of parts / عدد
-                            الأجزاء</label>
+                        <label class="form-label">Number of parts per sector / عدد
+                            الأجزاء لكل قطاع</label>
                         <select name="parts" class="form-select">
                             <option value="2">2</option>
                             <option value="3" selected>3</option>
@@ -647,15 +643,15 @@
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Orientation / الاتجاه</label>
-                        <select name="orientation" class="form-select">
-                            <option value="auto" selected>Auto (from slope) /
-                                تلقائي (من الميل)</option>
-                            {% for opt in orientation_options %}
-                            <option value="{{ opt.code }}">{{ opt.en }} / {{
-                                opt.ar }}</option>
-                            {% endfor %}
-                        </select>
+                        <label class="form-label">Orientation by Sector /
+                            الاتجاه لكل قطاع</label>
+                        <div id="splitSectorList"
+                            class="border rounded p-2"
+                            style="max-height: 280px; overflow-y: auto;"></div>
+                        <div class="form-text">
+                            Enter orientation in degrees (0-359.9) for each sector. Leave empty for auto from slope.
+                            / أدخل الاتجاه بالدرجات (0-359.9) لكل قطاع. اتركه فارغاً للتلقائي من الميل.
+                        </div>
                     </div>
                     <div class="form-check form-switch mb-2">
                         <input class="form-check-input" type="checkbox"
@@ -665,10 +661,11 @@
                             for="splitSectorUseElevation">Use elevation data /
                             استخدام بيانات الارتفاع</label>
                     </div>
-                    <div class="form-text">The sector is split into equal-area
-                        zones that follow the terrain slope / fall line. /
-                        يُقسّم القطاع إلى مناطق متساوية المساحة تتبع ميل
-                        التضاريس.</div>
+                    <div class="form-text">Each selected sector is split into equal-area
+                        zones that follow the terrain slope / fall line. Existing
+                        zones of those sectors are rebuilt. /
+                        يُقسّم كل قطاع محدد إلى مناطق متساوية المساحة تتبع ميل
+                        التضاريس، وتُعاد مناطق تلك القطاعات من الصفر.</div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary"
@@ -684,14 +681,14 @@
 <!-- Swap Zones Modal -->
 <div class="modal fade" id="swapZoneModal" tabindex="-1">
     <div class="modal-dialog">
-        <div class="modal-content">
+        <div class="modal-content modal-green">
             <form method="POST"
                 action="{{ url_for('geometry.zone_swap', project_id=project.id) }}">
-                <div class="modal-header bg-primary text-white">
+                <div class="modal-header">
                     <h5 class="modal-title"><i
                             class="bi bi-arrow-left-right"></i> Swap Zones /
                         تبديل المناطق</h5>
-                    <button type="button" class="btn-close btn-close-white"
+                    <button type="button" class="btn-close"
                         data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -730,12 +727,12 @@
 
 <!-- Auto Generate Zones Modal -->
 <div class="modal fade" id="aiGenerateZoneModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-lg">
+        <div class="modal-content modal-green">
             <form method="POST"
                 action="{{ url_for('geometry.zone_ai_regenerate', project_id=project.id) }}"
                 data-confirm="AI will rebuild all zones. Continue? / سيعيد الذكاء الاصطناعي بناء المناطق. متابعة؟">
-                <div class="modal-header bg-warning">
+                <div class="modal-header">
                     <h5 class="modal-title"><i class="bi bi-magic"></i> Auto
                         Generate Zones / إنشاء المناطق بالذكاء الاصطناعي</h5>
                     <button type="button" class="btn-close"
@@ -753,24 +750,21 @@
                         <label class="form-label">Orientation by Sector /
                             الاتجاه لكل قطاع</label>
                         {% if sectors %}
-                        <div class="border rounded p-2"
-                            style="max-height: 280px; overflow-y: auto;">
+                        <div class="border rounded p-2" style="max-height: 280px; overflow-y: auto;">
                             {% for s in sectors %}
                             <div class="d-flex align-items-center gap-2 mb-2">
                                 <div class="small flex-grow-1" style="min-width: 0;">
                                     <code>{{ s.short_name or s.id }}</code>
                                     <span class="text-muted">{{ s.name_en }}</span>
                                 </div>
-                                <div style="width: 58%;">
-                                    <select name="orientation_{{ s.id }}"
-                                        class="form-select form-select-sm">
-                                        <option value="auto" selected>Auto (from
-                                            slope) / تلقائي (من الميل)</option>
-                                        {% for opt in orientation_options %}
-                                        <option value="{{ opt.code }}">{{ opt.en }} / {{ opt.ar }}</option>
-                                        {% endfor %}
-                                    </select>
+                                <div style="width: 45%;">
+                                    <input type="number" name="orientation_deg_{{ s.id }}"
+                                        class="form-control form-control-sm orientation-deg-input"
+                                        min="0" max="359.9" step="0.1"
+                                        placeholder="Auto (from slope)"
+                                        title="0° = North, clockwise">
                                 </div>
+                                <div class="orientation-deg-hint small text-muted" style="width: 150px;"></div>
                             </div>
                             {% endfor %}
                         </div>
@@ -780,11 +774,8 @@
                         </div>
                         {% endif %}
                         <div class="form-text">
-                            Auto derives each sector's downhill direction from
-                            its terrain slope; pick a compass point to force
-                            that sector's zones.
-                            / يحدد التلقائي اتجاه الانحدار من ميل كل قطاع؛ اختر
-                            جهة معينة لفرضها على مناطق ذلك القطاع.
+                            Enter orientation in degrees (0-359.9) for each sector. Leave empty for auto from slope.
+                            / أدخل الاتجاه بالدرجات (0-359.9) لكل قطاع. اتركه فارغاً للتلقائي من الميل.
                         </div>
                     </div>
                     <div class="form-check form-switch mb-2">
@@ -822,6 +813,17 @@
 <script>
 const ZONE_ORIENTATION_DEGREES = {{ orientation_degrees | tojson }};
 
+// Sector labels used by the map widget's split modal (one row per selected sector).
+const ZONE_PAGE_SECTORS = {
+{% for s in sectors %}
+    "{{ s.id }}": {
+        short: {{ (s.short_name or s.id) | tojson }},
+        en: {{ (s.name_en or '') | tojson }},
+        ar: {{ (s.name_ar or '') | tojson }}
+    },
+{% endfor %}
+};
+
 document.addEventListener('change', function(event) {
     const sel = event.target;
     if (!sel || !sel.matches || !sel.matches('.zone-orientation-select')) return;
@@ -848,6 +850,31 @@ document.querySelectorAll('.zone-orientation-input').forEach(function (input) {
     updateHint();
 });
 
+// Degree input -> compass point preview, shared by every orientation field.
+function compassHintFor(raw) {
+    const value = parseFloat(raw);
+    if (!isFinite(value)) return '';
+    const step = 360 / ZONE_ORIENTATION_OPTIONS.length;
+    const index = Math.round((((value % 360) + 360) % 360) / step) % ZONE_ORIENTATION_OPTIONS.length;
+    const opt = ZONE_ORIENTATION_OPTIONS[index];
+    return '→ ' + opt.en + ' / ' + opt.ar + ' (' + opt.deg + '°) ' + opt.code;
+}
+
+// Auto Generate Zones modal: preview compass point for degree inputs
+function bindOrientationHint(input) {
+    const parent = input.parentElement;
+    const hint = (parent && parent.querySelector('.orientation-deg-hint'))
+        || (parent && parent.parentElement
+            ? parent.parentElement.querySelector('.orientation-deg-hint')
+            : null);
+    if (!hint) return;
+    const updateHint = function () { hint.textContent = compassHintFor(input.value); };
+    input.addEventListener('input', updateHint);
+    updateHint();
+}
+
+document.querySelectorAll('.orientation-deg-input').forEach(bindOrientationHint);
+
 document.addEventListener('DOMContentLoaded', function() {
     const geojsonUrl = '{{ url_for("api.get_geometry", project_id=project.id) }}';
     initMap('map', geojsonUrl, {
@@ -862,11 +889,10 @@ document.addEventListener('DOMContentLoaded', function() {
             actions: [
                 {
                     icon: 'bi-magic',
-                    title: 'Split selected sector into zones by slope / تقسيم القطاع إلى مناطق حسب الميل',
-                    enabledWhen: function(count) { return count === 1; },
+                    title: 'Split selected sectors into zones by slope / تقسيم القطاعات المحددة إلى مناطق حسب الميل',
+                    enabledWhen: function(count) { return count >= 1; },
                     onClick: function(ids) {
-                        if (ids.length !== 1) return;
-                        openSplitSectorZones(ids[0]);
+                        openSplitSectorsZones(ids);
                     }
                 }
             ]
@@ -924,11 +950,70 @@ function updateZoneToolbar() {
     if (removeBtn) removeBtn.disabled = count === 0;
 }
 
-function openSplitSectorZones(sectorId) {
-    if (!sectorId) return;
-    document.getElementById('splitSectorId').value = sectorId;
-    document.getElementById('splitSectorLabel').textContent =
-        'Sector ID: ' + sectorId + ' / القطاع رقم: ' + sectorId;
+// Map widget: split one or several selected sectors into zones, with an
+// orientation field per sector so each one can be cut at its own bearing.
+function openSplitSectorsZones(sectorIds) {
+    const ids = (sectorIds || []).map(String).filter(function (id) { return id; });
+    if (!ids.length) return;
+
+    const list = document.getElementById('splitSectorList');
+    const label = document.getElementById('splitSectorLabel');
+    list.innerHTML = '';
+
+    ids.forEach(function (id) {
+        const info = ZONE_PAGE_SECTORS[id] || {};
+
+        // The route reads one ``sector_ids`` value per selected sector.
+        const idField = document.createElement('input');
+        idField.type = 'hidden';
+        idField.name = 'sector_ids';
+        idField.value = id;
+        list.appendChild(idField);
+
+        const row = document.createElement('div');
+        row.className = 'd-flex align-items-center gap-2 mb-2';
+
+        const name = document.createElement('div');
+        name.className = 'small flex-grow-1';
+        name.style.minWidth = '0';
+        const code = document.createElement('code');
+        code.textContent = info.short || id;
+        name.appendChild(code);
+        name.appendChild(document.createTextNode(' '));
+        const nameText = document.createElement('span');
+        nameText.className = 'text-muted';
+        nameText.textContent = info.en || ('Sector ' + id);
+        name.appendChild(nameText);
+
+        const field = document.createElement('div');
+        field.style.width = '45%';
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.name = 'orientation_deg_' + id;
+        input.className = 'form-control form-control-sm orientation-deg-input';
+        input.min = '0';
+        input.max = '359.9';
+        input.step = '0.1';
+        input.placeholder = 'Auto (from slope)';
+        input.title = '0° = North, clockwise';
+        field.appendChild(input);
+
+        const hint = document.createElement('div');
+        hint.className = 'orientation-deg-hint small text-muted';
+        hint.style.width = '150px';
+
+        row.appendChild(name);
+        row.appendChild(field);
+        row.appendChild(hint);
+        list.appendChild(row);
+
+        bindOrientationHint(input);
+    });
+
+    label.textContent = ids.length === 1
+        ? '1 sector selected / قطاع واحد محدد'
+        : ids.length + ' sectors selected / ' + ids.length + ' قطاعات محددة';
+
     bootstrap.Modal.getOrCreateInstance(document.getElementById('splitSectorZonesModal')).show();
 }
 

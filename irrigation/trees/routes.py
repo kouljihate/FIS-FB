@@ -62,6 +62,43 @@ def _trace_rows_in_poly(poly, spacing_m, angle_deg=None):
     return rows
 
 
+def _zone_bearing_deg(zone):
+    """True bearing (0-360) the zone's rows must follow, or ``None`` for auto."""
+    from irrigation.engineering.elevation import ORIENTATION_DEGREES
+    degrees = zone.get('orientation_deg')
+    if degrees is None:
+        degrees = ORIENTATION_DEGREES.get(zone.get('orientation'))
+    try:
+        return None if degrees is None else float(degrees) % 360.0
+    except (TypeError, ValueError):
+        return None
+
+
+def _row_angle_for_bearing(bearing_deg, lng, lat):
+    """Projected-plane angle that traces rows along ``bearing_deg``.
+
+    Zones are cut so their strips run along their orientation bearing, and the
+    rows of a zone must run the same way. On the UTM plane a line at true
+    bearing B is ``B - convergence`` clockwise from north, i.e.
+    ``90 - (B - convergence)`` counter-clockwise from +x -- the angle
+    ``_trace_rows_in_poly`` expects.
+    """
+    from irrigation.engineering.projection import meridian_convergence
+    grid_bearing = (float(bearing_deg) - meridian_convergence(lng, lat)) % 180.0
+    return (90.0 - grid_bearing) % 180.0
+
+
+def _apply_zone_orientation(project_id, zone_id, bearing_deg):
+    """Store ``bearing_deg`` on the zone so rows and zone cannot disagree."""
+    from irrigation.engineering.elevation import compass_from_bearing
+    degrees = round(float(bearing_deg) % 360.0, 1)
+    mongo.db.zones.update_one(
+        {'id': zone_id, 'project_id': project_id},
+        {'$set': {'orientation': compass_from_bearing(degrees),
+                  'orientation_deg': degrees}}
+    )
+
+
 def get_project_or_redirect(project_id):
     from irrigation.access import require_project
 
@@ -101,24 +138,35 @@ def rows_view(project_id):
         z['_id'] = str(z['_id'])
     zone_by_id = {z['id']: z for z in zones}
 
-    zone_options = [
-        {
+    rows = list(mongo.db.tree_rows.find({'project_id': project_id}))
+    rows.sort(key=_short_name_key)
+
+    rows_per_zone = {}
+    for r in rows:
+        rows_per_zone[r.get('zone_id')] = rows_per_zone.get(r.get('zone_id'), 0) + 1
+
+    zone_options = []
+    bearing_by_zone = {}
+    for z in zones:
+        bearing = _zone_bearing_deg(z)
+        bearing_by_zone[z.get('id')] = bearing
+        zone_options.append({
             'id': z.get('id'),
             'code': z.get('short_name') or '',
             'en': z.get('name_en') or '',
             'ar': z.get('name_ar') or '',
-        }
-        for z in zones
-    ]
+            'orientation': z.get('orientation'),
+            'orientation_deg': bearing,
+            'rows': rows_per_zone.get(z.get('id'), 0),
+        })
     zone_options.sort(key=lambda z: _short_name_key({'short_name': z['code'], 'id': z['id']}))
 
-    rows = list(mongo.db.tree_rows.find({'project_id': project_id}))
-    rows.sort(key=_short_name_key)
     for r in rows:
         r['_id'] = str(r['_id'])
         zz = zone_by_id.get(r.get('zone_id'))
         r['zone_name_en'] = zz['name_en'] if zz else f"Zone {r.get('zone_id')}"
         r['zone_name_ar'] = zz['name_ar'] if zz else ''
+        r['zone_orientation_deg'] = bearing_by_zone.get(r.get('zone_id'))
 
     return render_template('trees/rows.html', project=project, rows=rows, zone_options=zone_options)
 
@@ -194,7 +242,12 @@ def rows_generate(project_id):
             continue
         if poly.is_empty:
             continue
-        for line, orientation in _trace_rows_in_poly(poly, spacing):
+        # Rows follow the zone orientation; only zones with none fall back to
+        # their dominant axis (the reported traced angle).
+        zone_bearing = _zone_bearing_deg(z)
+        angle_deg = (None if zone_bearing is None
+                     else _row_angle_for_bearing(zone_bearing, lng, lat))
+        for line, traced_angle in _trace_rows_in_poly(poly, spacing, angle_deg=angle_deg):
             count += 1
             row = {
                 'id': get_next_id('tree_rows'),
@@ -204,14 +257,16 @@ def rows_generate(project_id):
                 'name_ar': f'صف {count}',
                 'geometry': unproject_shape(line, lng, lat),
                 'spacing_m': round(spacing, 2),
-                'orientation': round(orientation, 1),
+                'orientation': round(zone_bearing if zone_bearing is not None
+                                     else traced_angle, 1),
                 'validated': False,
                 'auto_generated': True
             }
             mongo.db.tree_rows.insert_one(row)
             total += 1
 
-    flash(f'Generated {total} rows / تم إنشاء {total} صف', 'success')
+    flash(f'Generated {total} rows along the zone orientations'
+          f' / تم إنشاء {total} صف وفق اتجاهات المناطق', 'success')
     return redirect(url_for('trees.rows_view', project_id=project_id))
 
 
@@ -267,11 +322,15 @@ def rows_change_orientation(project_id):
 
     for zone in zones:
         zone_selected = selected_by_zone.get(zone['id']) or []
-        base_orientation = zone_selected[0].get('orientation') or 0.0
+        # Row orientation is a true bearing (0 = north), same scale as the zone.
+        try:
+            base_bearing = float(zone_selected[0].get('orientation') or 0.0)
+        except (TypeError, ValueError):
+            base_bearing = 0.0
         if forced_angle is not None:
-            new_angle = forced_angle
+            new_bearing = forced_angle % 180.0
         else:
-            new_angle = (float(base_orientation) + 90.0) % 180.0
+            new_bearing = (base_bearing + 90.0) % 180.0
 
         poly = None
         geom = zone.get('polygon')
@@ -289,8 +348,9 @@ def rows_change_orientation(project_id):
             # No geometry to re-trace: keep the DB consistent by rotating the stored angle.
             mongo.db.tree_rows.update_many(
                 {'project_id': project_id, 'zone_id': zone['id']},
-                {'$set': {'orientation': round(new_angle, 1)}}
+                {'$set': {'orientation': round(new_bearing, 1)}}
             )
+            _apply_zone_orientation(project_id, zone['id'], new_bearing)
             changed_zones += 1
             continue
 
@@ -299,7 +359,8 @@ def rows_change_orientation(project_id):
         spacing = (zone_row or {}).get('spacing_m') or 5.0
         spacing = spacing if spacing >= 1 else 5.0
 
-        traced = _trace_rows_in_poly(poly, spacing, angle_deg=new_angle)
+        traced = _trace_rows_in_poly(
+            poly, spacing, angle_deg=_row_angle_for_bearing(new_bearing, lng, lat))
 
         removed_trees += mongo.db.trees.delete_many(
             {'project_id': project_id, 'zone_id': zone['id']}).deleted_count
@@ -307,7 +368,7 @@ def rows_change_orientation(project_id):
             {'project_id': project_id, 'zone_id': zone['id']})
 
         count = mongo.db.tree_rows.count_documents({'project_id': project_id})
-        for line, orientation in traced:
+        for line, _traced_angle in traced:
             count += 1
             mongo.db.tree_rows.insert_one({
                 'id': get_next_id('tree_rows'),
@@ -317,11 +378,12 @@ def rows_change_orientation(project_id):
                 'name_ar': f'صف {count}',
                 'geometry': unproject_shape(line, lng, lat),
                 'spacing_m': round(spacing, 2),
-                'orientation': round(orientation, 1),
+                'orientation': round(new_bearing, 1),
                 'validated': False,
                 'auto_generated': True
             })
             replaced_rows += 1
+        _apply_zone_orientation(project_id, zone['id'], new_bearing)
         changed_zones += 1
 
     if not changed_zones:
@@ -354,7 +416,8 @@ def rows_edit(project_id, row_id):
     spacing = request.form.get('spacing', default=0, type=float)
     if spacing >= 1:
         update['spacing_m'] = round(spacing, 2)
-    update['orientation'] = request.form.get('orientation', default=0, type=float)
+    # Orientation is owned by the zone (rows must follow it), so it is not
+    # editable per row; use the Change Orientation action instead.
     mongo.db.tree_rows.update_one(
         {'id': row_id, 'project_id': project_id},
         {'$set': update}
@@ -575,9 +638,10 @@ VARIETY_SLOTS = 3
 
 
 def _zone_setup_from_form(form, zone_id):
-    """Read one zone's setup: spacing, drips and up to VARIETY_SLOTS variety/percentage entries."""
+    """Read one zone's setup: spacing, drips, first-tree offset and variety/percentage entries."""
     spacing = form.get(f'spacing_{zone_id}', type=float)
     drips = form.get(f'drips_{zone_id}', type=int)
+    offset = form.get(f'offset_{zone_id}', type=float)
 
     varieties = []
     for slot in range(1, VARIETY_SLOTS + 1):
@@ -598,6 +662,7 @@ def _zone_setup_from_form(form, zone_id):
     return {
         'spacing_m': round(spacing, 2) if spacing and spacing >= 1 else None,
         'drips_per_tree': drips if drips and drips >= 1 else 2,
+        'offset_m': round(offset, 2) if offset is not None and offset >= 0 else None,
         'varieties': varieties
     }
 
@@ -642,6 +707,10 @@ def trees_generate(project_id):
 
     # Shared "All Sectors / Zones" setup, used for zones without their own.
     all_setup = _zone_setup_from_form(request.form, 'all')
+    # The first-tree offset is only offered in the shared card, so a zone with
+    # its own spacing/variety setup still uses the shared offset unless it sets
+    # one of its own.
+    shared_offset = (all_setup or {}).get('offset_m') or 0.0
 
     # Legacy form-level values, used when a zone has no stored setup.
     fallback_spacing = request.form.get('spacing', default=4, type=float)
@@ -668,6 +737,8 @@ def trees_generate(project_id):
         tree_spacing = setup.get('spacing_m') or fallback_spacing
         drips = setup.get('drips_per_tree') or 2
         varieties = setup.get('varieties') or []
+        offset = setup.get('offset_m')
+        offset = max(0.0, float(shared_offset if offset is None else offset))
         if tree_spacing <= 0:
             continue
 
@@ -677,12 +748,15 @@ def trees_generate(project_id):
         for row in zone_rows:
             row_geom = projected_shape(row['geometry'], lng, lat)
             length = row_geom.length  # Now in meters, not degrees
-            if length <= 0:
+            # Trees start "offset" metres into the row and fill the rest at the
+            # requested spacing, so no tree sits on the row end.
+            usable = length - offset
+            if usable <= 0:
                 continue
-            num_trees = max(1, int(length / tree_spacing))
+            num_trees = max(1, int(usable / tree_spacing))
             for i in range(num_trees + 1):
                 fraction = i / num_trees if num_trees > 0 else 0
-                point = row_geom.interpolate(fraction * length)
+                point = row_geom.interpolate(offset + fraction * usable)
                 points.append((row, i, unproject_shape(point, lng, lat)))
 
         for index, (row, i, point_geojson) in enumerate(points):
@@ -709,6 +783,7 @@ def trees_generate(project_id):
                 'variety_pct': variety_pct,
                 'spacing_m': tree_spacing,
                 'drips_per_tree': drips,
+                'offset_m': round(offset, 2),
                 'validated': False
             }
             mongo.db.trees.insert_one(tree)

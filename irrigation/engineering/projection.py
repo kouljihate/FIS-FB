@@ -36,6 +36,24 @@ def get_utm_crs(lon: float, lat: float) -> pyproj.CRS:
     return pyproj.CRS(f"EPSG:{epsg}")
 
 
+@lru_cache(maxsize=128)
+def meridian_convergence(lon: float, lat: float) -> float:
+    """Grid convergence at a point, in degrees: ``true = grid + convergence``.
+
+    A UTM grid squares up with its central meridian, not with true north, so a
+    line drawn at 90° in the projected plane is tilted by the convergence angle
+    once it is back in lon/lat and drawn on the map. Away from the central
+    meridian that is ~1-2°, enough to make an orientation the user typed look
+    slightly off. Callers add this back when converting a map bearing into a
+    projected-plane angle.
+    """
+    try:
+        proj = pyproj.Proj(get_utm_crs(lon, lat))
+        return float(proj.get_factors(lon, lat).meridian_convergence)
+    except Exception:
+        return 0.0
+
+
 def transform_coords(
     coords: Union[List[Any], Tuple[Any, ...]],
     transformer: pyproj.Transformer = None,
@@ -122,11 +140,16 @@ def project_geometry(
     if not geom_geojson or "coordinates" not in geom_geojson:
         raise ValueError("Invalid GeoJSON: missing 'coordinates'")
 
-    projected = transform_coords(geom_geojson["coordinates"])
+    # One CRS for the whole project: derive it from the supplied centre and use
+    # that same transformer for every vertex. Deriving the zone per point made
+    # geometry that touches a UTM zone boundary (e.g. a vertex exactly at
+    # 36.0°E, which pyproj puts in zone 36 while the centre 36.0006°E lands in
+    # zone 37) come back 6° / ~500 km away when it was unprojected again.
+    utm_crs = get_utm_crs(lng, lat)
+    transformer = pyproj.Transformer.from_crs(wgs84, utm_crs, always_xy=True)
+    projected = transform_coords(geom_geojson["coordinates"], transformer)
     if not projected:
         raise ValueError("Projected coordinates are empty – check input geometry")
-
-    utm_crs = get_utm_crs(lng, lat)
 
     projected_geom = {
         "type": geom_geojson["type"],

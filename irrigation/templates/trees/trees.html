@@ -134,9 +134,9 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <form method="POST" id="deleteAllTreesForm" action="{{ url_for('trees.trees_remove', project_id=project.id) }}">
-                <div class="modal-header bg-danger text-white">
+                <div class="modal-header">
                     <h5 class="modal-title" id="deleteAllTreesTitle"><i class="bi bi-trash2-fill"></i> Delete All Trees / حذف جميع الأشجار</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <p class="mb-3">Are you sure you want to delete all trees? This action cannot be undone.</p>
@@ -156,9 +156,9 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <form method="POST" id="addTreeForm" action="{{ url_for('trees.tree_add', project_id=project.id) }}">
-                <div class="modal-header bg-success text-white">
+                <div class="modal-header">
                     <h5 class="modal-title" id="addTreeModalTitle"><i class="bi bi-plus-circle"></i> Add Tree / إضافة شجرة</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
@@ -229,9 +229,9 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <form method="POST" id="editTreeForm" action="{{ url_for('trees.tree_edit', project_id=project.id) }}">
-                <div class="modal-header bg-primary text-white">
+                <div class="modal-header">
                     <h5 class="modal-title" id="editTreeModalTitle"><i class="bi bi-pencil"></i> Edit Tree / تعديل الشجرة</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <input type="hidden" name="tree_id" id="editTreeId">
@@ -278,7 +278,7 @@
     <div class="modal-dialog modal-dialog-scrollable modal-xl">
         <div class="modal-content">
             <form id="treeSetupForm" method="POST" action="{{ url_for('trees.trees_generate', project_id=project.id) }}">
-                <div class="modal-header bg-success text-white">
+                <div class="modal-header">
                     <h2 class="wf-title-en">Tree Setup</h2>
                     <i class="bi bi-tree fs-1" aria-hidden="true"></i>
                     <h2 class="wf-title-ar" lang="ar">إعداد الأشجار</h2>
@@ -299,6 +299,11 @@
                                 <div class="col-md-3">
                                     <label class="form-label small mb-0">Drips/Tree / القطاعات لكل شجرة</label>
                                     <input type="number" name="drips_all" step="1" min="1" class="form-control form-control-sm" value="2">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small mb-0">Offset Tree Space (m) / إزاحة أول شجرة</label>
+                                    <input type="number" name="offset_all" step="0.5" min="0" class="form-control form-control-sm" value="0"
+                                           title="Distance from the start of each row to its first tree / المسافة من بداية الصف إلى أول شجرة">
                                 </div>
                             </div>
                             <div class="row g-2">

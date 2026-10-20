@@ -21,11 +21,12 @@ import numpy as np
 from irrigation.extensions import mongo
 from irrigation.models import get_next_id
 from irrigation.engineering.projection import (
-    projected_shape, unproject_shape, get_project_centroid, project_geometry, haversine_length_meters
+    projected_shape, unproject_shape, get_project_centroid, project_geometry,
+    haversine_length_meters, meridian_convergence
 )
 from irrigation.engineering.elevation import (
     get_or_build_elevation_model, elevation_metrics_for_polygon,
-    get_elevation_at_point, aspect_for_polygon,
+    get_elevation_at_point, aspect_for_polygon, compass_from_bearing,
     COMPASS_POINTS, ORIENTATION_ALIASES, ORIENTATION_DEGREES
 )
 
@@ -34,6 +35,18 @@ from irrigation.engineering.elevation import (
 
 # Angles to try for splitting (degrees)
 SPLIT_ANGLES = list(range(0, 180, 5))  # 0, 5, 10, ..., 175
+
+
+def split_angle_for_bearing(bearing_deg):
+    """Rotation angle that makes the equal-area strips run along ``bearing_deg``.
+
+    ``_split_polygon_equal_area`` slices perpendicular to x, so the strips are
+    long along y; rotating the polygon by θ and cutting leaves their long axis
+    at θ degrees clockwise from north. Hence the cut angle is the requested
+    bearing itself: 0° → north-south strips, 90° → east-west strips. A bearing
+    describes an undirected axis, so 270° gives the same cut as 90°.
+    """
+    return float(bearing_deg) % 180.0
 
 # Scoring weights (with elevation - total = 1.0)
 WEIGHT_AREA_BALANCE = 0.20
@@ -706,8 +719,10 @@ def regenerate_zones(project_id, sector_id=None, zones_per_sector=None, use_elev
     polygon.
 
     ``sector_orientations`` optionally maps ``sector_id`` to a compass point (or
-    ``'auto'``/``None``) so each sector can get its own orientation. A sector
-    listed there wins over the global ``orientation`` argument.
+    ``'auto'``/``None``) or an exact degree value (float). A sector listed there
+    wins over the global ``orientation`` argument. If a float is provided, the
+    exact degree is stored in ``orientation_deg`` and the nearest compass point
+    is stored in ``orientation``.
     """
     target_orientation = _target_orientation(orientation)
     sector_orientations = sector_orientations or {}
@@ -741,10 +756,16 @@ def regenerate_zones(project_id, sector_id=None, zones_per_sector=None, use_elev
     zone_names = [1, 2, 3, 4]
 
     for sector in sectors:
-        if sector['id'] in sector_orientations:
-            sector_target = _target_orientation(sector_orientations[sector['id']])
+        sector_orient_val = sector_orientations.get(sector['id'], target_orientation)
+        
+        # Determine if the value is an exact degree (float) or compass point
+        if isinstance(sector_orient_val, (int, float)):
+            sector_target = compass_from_bearing(sector_orient_val)
+            sector_target_deg = round(float(sector_orient_val) % 360, 1)
         else:
-            sector_target = target_orientation
+            sector_target = _target_orientation(sector_orient_val)
+            sector_target_deg = ORIENTATION_DEGREES.get(sector_target) if sector_target else None
+        
         polygon = sector.get('polygon')
         if not polygon or polygon.get('type') != 'Polygon':
             continue
@@ -763,30 +784,46 @@ def regenerate_zones(project_id, sector_id=None, zones_per_sector=None, use_elev
             'zone_id': {'$exists': True}
         })
 
-        # Try partitioning with elevation awareness
+        # Partition the sector.
+        #
+        # A user-chosen orientation is authoritative: the strips are cut at
+        # exactly that bearing, because the polygons are what the map draws.
+        # Previously the angle was only written onto the zones after an
+        # independent score search had picked the cut, so sectors that showed
+        # the same degrees in the table were drawn at different angles.
         best_result = None
         best_score = -1.0
 
-        for angle in SPLIT_ANGLES:
-            result = _try_partition(
-                sector_shapely, zones_per_sector, angle, None,
+        if sector_target_deg is not None:
+            best_result = _try_partition(
+                sector_shapely, zones_per_sector,
+                split_angle_for_bearing(
+                    sector_target_deg - meridian_convergence(lng, lat)
+                ), None,
                 elevation_model, water_source_elevation
             )
-            if result and result['score'] > best_score:
-                best_score = result['score']
-                best_result = result
+            if best_result:
+                best_score = best_result['score']
+        else:
+            for angle in SPLIT_ANGLES:
+                result = _try_partition(
+                    sector_shapely, zones_per_sector, angle, None,
+                    elevation_model, water_source_elevation
+                )
+                if result and result['score'] > best_score:
+                    best_score = result['score']
+                    best_result = result
 
-        # Terrain contour bands (respects the slope / fall line) when
-        # elevation data is available, so zone orientation follows the
-        # terrain instead of an arbitrary split angle.
-        if elevation_model:
-            elev_result = _try_elevation_partition(
-                sector_shapely, zones_per_sector, elevation_model,
-                None, water_source_elevation
-            )
-            if elev_result and elev_result['score'] > best_score:
-                best_score = elev_result['score']
-                best_result = elev_result
+            # Terrain contour bands (respects the slope / fall line) when
+            # elevation data is available and no orientation was requested.
+            if elevation_model:
+                elev_result = _try_elevation_partition(
+                    sector_shapely, zones_per_sector, elevation_model,
+                    None, water_source_elevation
+                )
+                if elev_result and elev_result['score'] > best_score:
+                    best_score = elev_result['score']
+                    best_result = elev_result
 
         if not best_result:
             best_result = _fallback_grid(sector_shapely, zones_per_sector, None,
@@ -809,17 +846,21 @@ def regenerate_zones(project_id, sector_id=None, zones_per_sector=None, use_elev
                 elev_metrics = elevation_metrics_for_polygon(elevation_model, part)
                 aspect = aspect_for_polygon(elevation_model, part)
 
-            # Orientation: user-chosen compass point, otherwise derived from
+            # Orientation: user-chosen exact degree, otherwise derived from
             # the terrain aspect (downhill direction) of the zone polygon.
-            if sector_target:
+            if sector_target_deg is not None:
                 zone_orientation = sector_target
-                zone_orientation_deg = ORIENTATION_DEGREES.get(sector_target)
+                zone_orientation_deg = sector_target_deg
             elif aspect:
                 zone_orientation = aspect['compass']
                 zone_orientation_deg = round(aspect['bearing_deg'], 1)
             else:
                 zone_orientation = None
                 zone_orientation_deg = None
+
+            # Ensure orientation_deg is always set when orientation is set
+            if zone_orientation and zone_orientation_deg is None:
+                zone_orientation_deg = ORIENTATION_DEGREES.get(zone_orientation)
 
             zone = {
                 'id': get_next_id('zones'),

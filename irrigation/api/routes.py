@@ -54,8 +54,13 @@ def get_geometry(project_id):
             })
 
     # Zones
+    from irrigation.engineering.elevation import ORIENTATION_DEGREES
     for zone in mongo.db.zones.find({'project_id': project_id}):
         if zone.get('polygon'):
+            orientation = zone.get('orientation')
+            orientation_deg = zone.get('orientation_deg')
+            if orientation_deg is None and orientation:
+                orientation_deg = ORIENTATION_DEGREES.get(orientation)
             features.append({
                 'type': 'Feature',
                 'properties': {
@@ -66,7 +71,9 @@ def get_geometry(project_id):
                     'color': '#ffc107',
                     'id': zone['id'],
                     'sector_id': zone.get('sector_id'),
-                    'validated': zone.get('validated', False)
+                    'validated': zone.get('validated', False),
+                    'orientation': orientation,
+                    'orientation_deg': orientation_deg
                 },
                 'geometry': zone['polygon']
             })

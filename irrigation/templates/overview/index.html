@@ -1,0 +1,617 @@
+{% extends "base.html" %}
+{% block title %}Map Overview / نظرة عامة على الخريطة{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* The overview is one edge-to-edge map: no page cards, no scrolling. */
+    body.map-overview-page {
+        overflow: hidden;
+    }
+
+    /* No page padding or spacing behind the map; modals keep working. */
+    body.map-overview-page .main-content {
+        margin: 0 !important;
+        padding: 0;
+        min-height: 0;
+    }
+
+    /* The fixed footer would sit on top of the map's bottom edge. */
+    body.map-overview-page footer {
+        display: none;
+    }
+
+    .map-overview-fill {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        top: 0;
+        z-index: 500;
+        visibility: hidden;
+    }
+
+    body.map-overview-ready .map-overview-fill {
+        visibility: visible;
+    }
+
+    .map-overview-fill #map {
+        width: 100%;
+        height: 100%;
+    }
+
+    /* Floating widgets drawn inside the map. */
+    .map-overview-panel {
+        background: rgba(255, 255, 255, 0.97);
+        border: 1px solid #cfd4d9;
+        border-radius: 0.5rem;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+        padding: 0.3rem;
+    }
+
+    .map-overview-panel .panel-title {
+        display: block;
+        padding: 0.1rem 0.25rem 0.25rem;
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #6c757d;
+        white-space: nowrap;
+    }
+
+    .map-overview-sectors {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        /* The filter widget sits above this panel in the same corner: keep the
+           list short enough that both stay inside the map. */
+        max-height: min(56vh, calc(100vh - 600px));
+        min-height: 3.5rem;
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    .map-overview-sector-btn {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        max-width: 13rem;
+        padding: 0.18rem 0.35rem;
+        border: 1px solid #cfd4d9;
+        border-radius: 0.35rem;
+        background: #fff;
+        color: #212529;
+        font-size: 0.78rem;
+        line-height: 1.15;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .map-overview-sector-btn:hover {
+        background: #eef5ea;
+    }
+
+    .map-overview-sector-btn.active {
+        background: #a9cf9b;
+        border-color: #6a9e5c;
+        font-weight: 600;
+    }
+
+    .map-overview-sector-btn .code {
+        flex: 0 0 auto;
+        padding: 0 0.28rem;
+        border-radius: 0.25rem;
+        background: #495057;
+        color: #fff;
+        font-size: 0.72rem;
+        font-weight: 700;
+    }
+
+    .map-overview-sector-btn .name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .map-overview-objects {
+        display: flex;
+        align-items: center;
+        gap: 0.22rem;
+    }
+
+    .map-overview-objects button {
+        display: grid;
+        place-items: center;
+        width: 2.05rem;
+        height: 2.05rem;
+        border: 1px solid #cfd4d9;
+        border-radius: 0.35rem;
+        background: #fff;
+        color: #212529;
+        cursor: pointer;
+    }
+
+    .map-overview-objects button:hover:not(:disabled) {
+        background: #eef5ea;
+    }
+
+    .map-overview-objects button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+
+    .map-overview-objects .count {
+        min-width: 1.6rem;
+        padding: 0 0.3rem;
+        border-radius: 999px;
+        background: #6c757d;
+        color: #fff;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-align: center;
+    }
+
+    .map-overview-objects .count.has-selection {
+        background: #2f6f3e;
+    }
+
+    @media (max-width: 575.98px) {
+        .map-overview-sector-btn {
+            max-width: 9rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- The map is the page; the widgets live inside it. -->
+<div class="map-overview-fill">
+    <div id="map"></div>
+</div>
+
+<!-- Rename modal -->
+<div class="modal fade" id="renameObjectModal" tabindex="-1" aria-labelledby="renameObjectTitle" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content modal-green">
+            <form method="POST" id="renameObjectForm"
+                  action="{{ url_for('overview.rename_object', project_id=project.id) }}">
+                <input type="hidden" name="element_type">
+                <input type="hidden" name="element_id">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="renameObjectTitle">
+                        <i class="bi bi-input-cursor-text"></i> Rename / إعادة تسمية
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small" data-role="object-label"></p>
+                    <div class="mb-3">
+                        <label class="form-label">Name (EN)</label>
+                        <input type="text" name="name_en" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Name (AR)</label>
+                        <input type="text" name="name_ar" class="form-control">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel / إلغاء</button>
+                    <button type="submit" class="btn btn-info">
+                        <i class="bi bi-check"></i> Rename / إعادة تسمية
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit modal -->
+<div class="modal fade" id="editObjectModal" tabindex="-1" aria-labelledby="editObjectTitle" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content modal-green">
+            <form method="POST" id="editObjectForm"
+                  action="{{ url_for('overview.edit_object', project_id=project.id) }}">
+                <input type="hidden" name="element_type">
+                <input type="hidden" name="element_id">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editObjectTitle">
+                        <i class="bi bi-pencil"></i> Edit / تعديل
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small" data-role="object-label"></p>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Name (EN)</label>
+                            <input type="text" name="name_en" class="form-control">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Name (AR)</label>
+                            <input type="text" name="name_ar" class="form-control">
+                        </div>
+                    </div>
+                    <div id="editObjectFields"></div>
+                    <p class="text-muted small mb-0" data-role="edit-hint"></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel / إلغاء</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check"></i> Save / حفظ
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete form (filled by the toolbar) -->
+<form method="POST" id="deleteObjectsForm" class="d-none"
+      action="{{ url_for('overview.delete_objects', project_id=project.id) }}"></form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const EDIT_SPECS = {{ edit_specs|tojson }};
+const SELECTABLE_TYPES = {{ selectable_types|tojson }};
+const SECTORS = {{ sectors|tojson }};
+// Filter categories offered by the map's funnel widget (see FILTER_CATEGORIES in map.js).
+const ELEMENT_FILTER_KEYS = [
+    'sector', 'zone', 'tree_row', 'tree', 'pipe',
+    'master_valve', 'sector_valve', 'zone_valve', 'check_valve',
+    'connector', 'reduction', 'air_release', 'pressure_reduction', 'terminator',
+    'boundary', 'water_source'
+];
+const OBJECT_URL = "{{ url_for('overview.object_values', project_id=project.id, element_type='__type__', element_id=0) }}";
+
+document.addEventListener('DOMContentLoaded', function () {
+    document.body.classList.add('map-overview-page');
+
+    // The map starts under the workflow tabs and fills the rest of the page.
+    placeFullPageMap();
+
+    const geojsonUrl = '{{ url_for("api.get_geometry", project_id=project.id) }}';
+    initMap('map', geojsonUrl, {
+        center: [34.0, -6.0], zoom: 13,
+        height: '100%',
+        selectable: { type: SELECTABLE_TYPES, toggleOnClick: true, onSelectionChange: onMapSelectionChange },
+        labelTypes: ['sector', 'zone', 'tree_row', 'tree'],
+        // Every element type the API can draw is filterable from the funnel widget.
+        mapFilters: ELEMENT_FILTER_KEYS,
+        // First visit shows the sector layout only; the rest is one click away.
+        mapFiltersOn: ['sector']
+    });
+
+    buildSectorControl();
+    buildObjectControl();
+    setupObjectToolbar();
+    document.body.classList.add('map-overview-ready');
+
+    // The map was created before the wrapper settled; sync its size again.
+    placeFullPageMap();
+});
+
+// Keep the fixed map under the project tabs, whatever height they take.
+function placeFullPageMap() {
+    const wrapper = document.querySelector('.map-overview-fill');
+    if (!wrapper) return;
+    const nav = document.querySelector('.project-workflow-nav');
+    const subnav = document.querySelector('.project-workflow-subnav');
+    let top = nav ? nav.getBoundingClientRect().bottom : 0;
+    if (subnav) top = Math.max(top, subnav.getBoundingClientRect().bottom);
+    wrapper.style.top = Math.max(0, Math.round(top)) + 'px';
+    syncMapSize();
+}
+
+// "map" is the Leaflet instance declared by map.js, not window.map.
+function syncMapSize() {
+    if (typeof map === 'undefined' || !map || typeof map.invalidateSize !== 'function') return;
+    map.invalidateSize({ pan: false });
+    // Once more after the browser has applied the new box, so tiles cover it.
+    requestAnimationFrame(function () {
+        if (map && map.invalidateSize) map.invalidateSize({ pan: false });
+    });
+}
+
+window.addEventListener('resize', placeFullPageMap);
+window.addEventListener('orientationchange', placeFullPageMap);
+
+// ---------- Widget inside the map: sector-by-sector zoom ----------
+let pendingSectorZoom = null;
+
+function sectorButtonLabel(sector) {
+    const name = sector.name_en || sector.name_ar || '';
+    return name ? sector.code + ' – ' + name : sector.code;
+}
+
+function buildSectorControl() {
+    const control = L.control({ position: 'topleft' });
+    control.onAdd = function () {
+        const panel = L.DomUtil.create('div', 'map-overview-panel');
+        L.DomEvent.disableClickPropagation(panel);
+        L.DomEvent.disableScrollPropagation(panel);
+
+        const title = L.DomUtil.create('span', 'panel-title', panel);
+        title.textContent = 'Sectors / القطاعات';
+
+        const list = L.DomUtil.create('div', 'map-overview-sectors', panel);
+
+        const allButton = L.DomUtil.create('button', 'map-overview-sector-btn active', list);
+        allButton.type = 'button';
+        allButton.title = 'Whole project / المشروع كامل';
+        allButton.innerHTML = '<i class="bi bi-arrows-fullscreen"></i>' +
+            '<span class="name">All / الكل</span>';
+        allButton.addEventListener('click', function () {
+            setActiveSectorButton(allButton);
+            fitAllFeatures();
+        });
+
+        SECTORS.forEach(function (sector) {
+            if (!sector.has_polygon) return;
+            const button = L.DomUtil.create('button', 'map-overview-sector-btn', list);
+            button.type = 'button';
+            button.title = sectorButtonLabel(sector);
+            button.dataset.sectorId = sector.id;
+            button.innerHTML = '<span class="code">' + escapeSectorText(sector.code) + '</span>' +
+                '<span class="name">' + escapeSectorText(sector.name_en || sector.name_ar || '') + '</span>';
+            button.addEventListener('click', function () {
+                setActiveSectorButton(button);
+                if (!zoomToFeature('sector', sector.id)) pendingSectorZoom = sector.id;
+            });
+        });
+
+        return panel;
+    };
+    control.addTo(map);
+
+    document.addEventListener('mapgeometryloaded', function () {
+        if (pendingSectorZoom !== null) {
+            zoomToFeature('sector', pendingSectorZoom);
+            pendingSectorZoom = null;
+        }
+    });
+}
+
+function setActiveSectorButton(active) {
+    document.querySelectorAll('.map-overview-sector-btn').forEach(function (button) {
+        button.classList.toggle('active', button === active);
+    });
+}
+
+function escapeSectorText(value) {
+    return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+// ---------- Widget inside the map: select an object, then Edit / Rename / Delete ----------
+const selectedObjects = new Map();
+
+function objectKey(properties) {
+    return properties.type + ':' + properties.id;
+}
+
+function typeLabel(type) {
+    const spec = EDIT_SPECS[type];
+    return spec ? spec.label_en + ' / ' + spec.label_ar : type;
+}
+
+function describeObject(properties) {
+    const code = properties.short_name || '';
+    const name = properties.name || '';
+    const nameAr = properties.name_ar || '';
+    let text = typeLabel(properties.type);
+    if (code) text += ' ' + code;
+    if (name) text += ' – ' + name;
+    if (nameAr && nameAr !== name) text += ' / ' + nameAr;
+    return text;
+}
+
+function buildObjectControl() {
+    const control = L.control({ position: 'topright' });
+    control.onAdd = function () {
+        const panel = L.DomUtil.create('div', 'map-overview-panel');
+        L.DomEvent.disableClickPropagation(panel);
+        L.DomEvent.disableScrollPropagation(panel);
+
+        const title = L.DomUtil.create('span', 'panel-title', panel);
+        title.textContent = 'Selected object / العنصر المحدد';
+
+        const row = L.DomUtil.create('div', 'map-overview-objects', panel);
+
+        const count = L.DomUtil.create('span', 'count', row);
+        count.id = 'objectSelectionCount';
+        count.title = 'Selected objects / العناصر المحددة';
+        count.textContent = '0';
+
+        const actions = [
+            { id: 'objectEditBtn', icon: 'bi-pencil', title: 'Edit / تعديل', onClick: openEditModal },
+            { id: 'objectRenameBtn', icon: 'bi-input-cursor-text', title: 'Rename / إعادة تسمية', onClick: openRenameModal },
+            { id: 'objectDeleteBtn', icon: 'bi-trash', title: 'Delete / حذف', onClick: deleteSelected },
+            { id: 'objectClearBtn', icon: 'bi-x-lg', title: 'Clear selection / إلغاء التحديد', onClick: clearSelection }
+        ];
+        actions.forEach(function (action) {
+            const button = L.DomUtil.create('button', '', row);
+            button.type = 'button';
+            button.id = action.id;
+            button.title = action.title;
+            button.setAttribute('aria-label', action.title);
+            button.innerHTML = '<i class="bi ' + action.icon + '"></i>';
+            button.addEventListener('click', action.onClick);
+        });
+
+        return panel;
+    };
+    control.addTo(map);
+}
+
+function onMapSelectionChange(layer, properties, selected) {
+    if (!properties || properties.id === undefined) return;
+    const key = objectKey(properties);
+    if (selected) selectedObjects.set(key, { layer: layer, properties: properties });
+    else selectedObjects.delete(key);
+    refreshObjectToolbar();
+}
+
+function selectedList() {
+    return Array.from(selectedObjects.values());
+}
+
+function refreshObjectToolbar() {
+    const count = selectedObjects.size;
+    const single = count === 1;
+    const countBadge = document.getElementById('objectSelectionCount');
+    if (countBadge) {
+        countBadge.textContent = count;
+        countBadge.classList.toggle('has-selection', count > 0);
+        countBadge.title = single
+            ? describeObject(selectedList()[0].properties)
+            : count + ' selected / عنصر محدد';
+    }
+    document.getElementById('objectEditBtn').disabled = !single;
+    document.getElementById('objectRenameBtn').disabled = !single;
+    document.getElementById('objectDeleteBtn').disabled = count === 0;
+    document.getElementById('objectClearBtn').disabled = count === 0;
+}
+
+function setupObjectToolbar() {
+    refreshObjectToolbar();
+}
+
+function clearSelection() {
+    if (typeof clearMapSelection === 'function') clearMapSelection();
+    selectedObjects.clear();
+    refreshObjectToolbar();
+}
+
+function objectJsonUrl(type, id) {
+    return OBJECT_URL.replace('/__type__/0', '/' + encodeURIComponent(type) + '/' + id);
+}
+
+function setModalLabel(modal, properties) {
+    const label = modal.querySelector('[data-role="object-label"]');
+    if (label) label.textContent = describeObject(properties);
+}
+
+async function openEditModal() {
+    const items = selectedList();
+    if (items.length !== 1) return;
+    const properties = items[0].properties;
+    const form = document.getElementById('editObjectForm');
+    const modalElement = document.getElementById('editObjectModal');
+    const spec = EDIT_SPECS[properties.type] || { fields: [] };
+
+    form.elements['element_type'].value = properties.type;
+    form.elements['element_id'].value = properties.id;
+    form.elements['name_en'].value = properties.name || '';
+    form.elements['name_ar'].value = properties.name_ar || '';
+    setModalLabel(modalElement, properties);
+
+    const container = document.getElementById('editObjectFields');
+    container.innerHTML = '';
+    const hint = modalElement.querySelector('[data-role="edit-hint"]');
+    if (hint) {
+        hint.textContent = spec.fields.length
+            ? 'Shape and geometry are edited on the section page / يُعدل الشكل الهندسي في صفحة القسم'
+            : 'This kind has no map-editable attributes, only its name / لا توجد خصائص قابلة للتعديل سوى الاسم';
+    }
+
+    let values = {};
+    try {
+        const response = await fetch(objectJsonUrl(properties.type, properties.id),
+                                     { headers: { 'Accept': 'application/json' } });
+        if (response.ok) {
+            const data = await response.json();
+            values = data.values || {};
+            if (data.name_en) form.elements['name_en'].value = data.name_en;
+            if (data.name_ar) form.elements['name_ar'].value = data.name_ar;
+        }
+    } catch (error) {
+        console.warn('Could not load the object values', error);
+    }
+
+    spec.fields.forEach(function (field) {
+        container.appendChild(buildField(field, values[field.name]));
+    });
+
+    bootstrap.Modal.getOrCreateInstance(modalElement).show();
+}
+
+function buildField(field, value) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'mb-3';
+    const label = document.createElement('label');
+    label.className = 'form-label';
+    label.textContent = field.label_en + ' / ' + field.label_ar;
+    wrapper.appendChild(label);
+
+    if (field.kind === 'select') {
+        const select = document.createElement('select');
+        select.className = 'form-select';
+        select.name = field.name;
+        (field.options || []).forEach(function (option) {
+            const item = document.createElement('option');
+            item.value = option.value;
+            item.textContent = option.en + ' / ' + option.ar;
+            if (value !== undefined && String(value) === option.value) item.selected = true;
+            select.appendChild(item);
+        });
+        wrapper.appendChild(select);
+        return wrapper;
+    }
+
+    const input = document.createElement('input');
+    input.type = field.kind === 'number' ? 'number' : 'text';
+    input.className = 'form-control';
+    input.name = field.name;
+    if (field.min !== undefined) input.min = field.min;
+    if (field.step !== undefined) input.step = field.step;
+    if (value !== undefined && value !== null) input.value = value;
+    wrapper.appendChild(input);
+    return wrapper;
+}
+
+function openRenameModal() {
+    const items = selectedList();
+    if (items.length !== 1) return;
+    const properties = items[0].properties;
+    const form = document.getElementById('renameObjectForm');
+    const modalElement = document.getElementById('renameObjectModal');
+    form.elements['element_type'].value = properties.type;
+    form.elements['element_id'].value = properties.id;
+    form.elements['name_en'].value = properties.name || '';
+    form.elements['name_ar'].value = properties.name_ar || '';
+    setModalLabel(modalElement, properties);
+    bootstrap.Modal.getOrCreateInstance(modalElement).show();
+}
+
+function deleteSelected() {
+    const items = selectedList();
+    if (!items.length) return;
+
+    const namesEn = items.map(item => item.properties.name || item.properties.short_name)
+        .filter(Boolean).join(', ') || 'object(s)';
+    const namesAr = items.map(item => item.properties.name_ar)
+        .filter(Boolean).join('، ') || 'عنصر';
+
+    const doSubmit = function () {
+        const form = document.getElementById('deleteObjectsForm');
+        form.querySelectorAll('input[name="elements"]').forEach(el => el.remove());
+        items.forEach(function (item) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'elements';
+            input.value = item.properties.type + ':' + item.properties.id;
+            form.appendChild(input);
+        });
+        form.requestSubmit();
+    };
+
+    if (window.confirmDelete) {
+        window.confirmDelete(namesEn, namesAr, doSubmit);
+    } else if (window.confirm('Delete ' + namesEn + ' ?')) {
+        doSubmit();
+    }
+}
+</script>
+{% endblock %}

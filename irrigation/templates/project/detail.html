@@ -456,16 +456,16 @@
     <div
         class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable"
         role="document">
-        <div class="modal-content">
+        <div class="modal-content modal-green">
             <form method="POST"
                 action="{{ url_for('project.settings', project_id=project.id) }}"
                 enctype="multipart/form-data">
-                <div class="modal-header bg-primary text-white">
+                <div class="modal-header">
                     <h5 class="modal-title w-100 mb-0">
                         <div class="row">
                             <div class="col text-start" style="width: 25%;">Project Settings</div>
                             <div class="col text-center" style="width: 50%;">
-                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="col text-end" style="width: 25%;">إعدادات</div>
                         </div>
@@ -792,10 +792,10 @@
 <!-- KML Elements Modal -->
 <div class="modal fade" id="kmlElementsModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header bg-info text-white">
+        <div class="modal-content modal-green">
+            <div class="modal-header">
                 <h5 class="modal-title"><i class="bi bi-file-earmark-code"></i> KML/KMZ Elements / عناصر الملف</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 {% set kml_features = project.kml_features or [] %}
@@ -944,14 +944,14 @@ document.addEventListener('DOMContentLoaded', function() {
 <div class="modal fade" id="deleteProjectModal" tabindex="-1" aria-labelledby="deleteProjectTitle"
     aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
+        <div class="modal-content modal-green">
             <form method="POST"
                 action="{{ url_for('project.delete', project_id=project.id) }}">
-                <div class="modal-header bg-danger text-white">
+                <div class="modal-header">
                     <h5 class="modal-title" id="deleteProjectTitle">
                         <i class="bi bi-trash"></i> Delete Project / حذف المشروع
                     </h5>
-                    <button type="button" class="btn-close btn-close-white"
+                    <button type="button" class="btn-close"
                         data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">

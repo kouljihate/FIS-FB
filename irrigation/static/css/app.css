@@ -224,6 +224,19 @@ footer {
     padding: 0.35em 0.65em;
 }
 
+/* Repository name sits next to the version badge in the footer. */
+.footer-badges {
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.repo-badge .bi {
+    margin-right: 0.25em;
+}
+
 .flash-toast-container {
     position: fixed;
     top: 70%;
@@ -965,10 +978,11 @@ body.map-fullscreen-lock {
     line-height: 1;
 }
 
-/* Map filter widget (one left-hand column: valve kinds, then geometry) */
+/* Map filter widget: a compact grid of circles so a page listing every element
+   type still fits in the corner (three per row, head and divider span the row). */
 .map-filter-widget {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(3, 30px);
     gap: 4px;
     padding: 4px;
     border-radius: 18px;
@@ -977,8 +991,8 @@ body.map-fullscreen-lock {
 
 .map-filter-head {
     display: grid;
+    grid-column: 1 / -1;
     place-items: center;
-    width: 30px;
     height: 24px;
     color: #495057;
     font-size: 13px;
@@ -986,6 +1000,7 @@ body.map-fullscreen-lock {
 }
 
 .map-filter-divider {
+    grid-column: 1 / -1;
     width: 22px;
     height: 1px;
     margin: 1px auto;
@@ -1110,29 +1125,206 @@ body.map-fullscreen-lock {
     border-radius: 0.5rem;
 }
 
-/* Modal styling */
+/* ── Modal styling: one pastel shell for every confirm / action form ─────────
+   Header: soft green · Body: cream · Footer: deeper cream.
+   Kept global (not per-class) so no template can drift back to a saturated
+   Bootstrap header; `.modal-green` below only adds button/form tuning.
+   ──────────────────────────────────────────────────────────────────────────── */
 .modal-content {
+    background-color: var(--pal-cream);
+    color: var(--pal-ink);
+    border: 1px solid var(--pal-border);
     border-radius: 0.75rem;
 }
 
 .modal-header {
+    background-color: var(--pal-green);
+    color: var(--pal-ink);
+    border-bottom: 1px solid var(--pal-border);
     border-radius: 0.75rem 0.75rem 0 0;
 }
 
-/* ── Delete confirmation modal ──────────────────────────────────────────── */
+.modal-header .modal-title {
+    color: var(--pal-ink);
+}
+
+/* Dark ink close glyph: white-on-pastel would vanish. */
+.modal-header .btn-close {
+    opacity: 0.65;
+    filter: invert(30%) sepia(20%) saturate(500%) hue-rotate(80deg);
+}
+
+.modal-header .btn-close:hover,
+.modal-header .btn-close:focus {
+    opacity: 1;
+}
+
+.modal-body {
+    background-color: var(--pal-cream);
+    color: var(--pal-ink);
+}
+
+.modal-footer {
+    background-color: var(--pal-cream-2);
+    border-top: 1px solid var(--pal-border);
+    border-radius: 0 0 0.75rem 0.75rem;
+}
+
+/* Bootswatch Journal hard-codes `color: #fff` on .btn-secondary/.btn-warning,
+   which leaves white text on the pastel footer buttons. Re-assert ink. */
+.modal-footer .btn-secondary,
+.modal-footer .btn-warning {
+    color: var(--pal-ink);
+}
+
+/* ── Green Action Confirmation Modal Theme ───────────────────────────────────
+   Consistent green palette for all action modals (add, edit, delete, etc.)
+   Header: --pal-green background with --pal-ink text
+   Body: --pal-cream background
+   Footer: --pal-green accent buttons
+   ──────────────────────────────────────────────────────────────────────────── */
+.modal-green .modal-header {
+    background-color: var(--pal-green);
+    color: var(--pal-ink);
+    border-bottom-color: var(--pal-border);
+}
+
+.modal-green .modal-header .modal-title {
+    color: var(--pal-ink);
+}
+
+.modal-green .modal-header .btn-close {
+    filter: invert(30%) sepia(20%) saturate(500%) hue-rotate(80deg);
+}
+
+.modal-green .modal-body {
+    background-color: var(--pal-cream);
+    color: var(--pal-ink);
+}
+
+.modal-green .modal-footer {
+    background-color: var(--pal-cream-2);
+    border-top-color: var(--pal-border);
+    border-radius: 0 0 0.75rem 0.75rem;
+}
+
+.modal-green .btn-primary,
+.modal-footer .btn-primary {
+    --bs-btn-bg: var(--pal-green);
+    --bs-btn-border-color: var(--pal-green);
+    --bs-btn-hover-bg: var(--pal-green-2);
+    --bs-btn-hover-border-color: var(--pal-green-2);
+    --bs-btn-active-bg: var(--pal-sage);
+    --bs-btn-active-border-color: var(--pal-sage);
+    --bs-btn-color: var(--pal-ink);
+    --bs-btn-hover-color: var(--pal-ink);
+}
+
+.modal-green .btn-secondary,
+.modal-footer .btn-secondary {
+    --bs-btn-bg: var(--pal-almond);
+    --bs-btn-border-color: var(--pal-almond);
+    --bs-btn-hover-bg: var(--pal-sand);
+    --bs-btn-hover-border-color: var(--pal-sand);
+    --bs-btn-active-bg: var(--pal-tan);
+    --bs-btn-active-border-color: var(--pal-tan);
+    --bs-btn-color: var(--pal-ink);
+    --bs-btn-hover-color: var(--pal-ink);
+}
+
+.modal-green .btn-success,
+.modal-footer .btn-success {
+    --bs-btn-bg: var(--pal-green-2);
+    --bs-btn-border-color: var(--pal-green-2);
+    --bs-btn-hover-bg: var(--pal-green);
+    --bs-btn-hover-border-color: var(--pal-green);
+    --bs-btn-active-bg: var(--pal-sage);
+    --bs-btn-active-border-color: var(--pal-sage);
+    --bs-btn-color: var(--pal-ink);
+    --bs-btn-hover-color: var(--pal-ink);
+}
+
+.modal-green .btn-danger,
+.modal-footer .btn-danger {
+    /* Deep terracotta: the pastel danger tone (#c98b7a) is too light for white
+       label text, and brown left the destructive action looking neutral. */
+    --bs-btn-bg: #a9583f;
+    --bs-btn-border-color: #a9583f;
+    --bs-btn-hover-bg: #944c36;
+    --bs-btn-hover-border-color: #8a4632;
+    --bs-btn-active-bg: #8a4632;
+    --bs-btn-active-border-color: #7d3f2c;
+    --bs-btn-color: #fff;
+    --bs-btn-hover-color: #fff;
+    --bs-btn-active-color: #fff;
+}
+
+.modal-green .btn-info,
+.modal-footer .btn-info {
+    --bs-btn-bg: var(--pal-sage);
+    --bs-btn-border-color: var(--pal-sage);
+    --bs-btn-hover-bg: var(--pal-olive);
+    --bs-btn-hover-border-color: var(--pal-olive);
+    --bs-btn-color: var(--pal-ink);
+    --bs-btn-hover-color: var(--pal-ink);
+}
+
+.modal-green .btn-warning,
+.modal-footer .btn-warning {
+    --bs-btn-bg: var(--pal-wheat);
+    --bs-btn-border-color: var(--pal-wheat);
+    --bs-btn-hover-bg: var(--pal-sand);
+    --bs-btn-hover-border-color: var(--pal-sand);
+    --bs-btn-color: var(--pal-ink);
+    --bs-btn-hover-color: var(--pal-ink);
+}
+
+.modal-green .form-control,
+.modal-green .form-select,
+.modal-green .form-control:focus,
+.modal-green .form-select:focus {
+    background-color: #fff;
+    border-color: var(--pal-border);
+    color: var(--pal-ink);
+}
+
+.modal-green .form-control:focus,
+.modal-green .form-select:focus {
+    box-shadow: 0 0 0 0.25rem rgba(159, 191, 141, 0.4);
+    border-color: var(--pal-green);
+}
+
+.modal-green .form-label {
+    color: var(--pal-ink);
+}
+
+.modal-green .text-muted {
+    color: var(--pal-ink-soft) !important;
+}
+
+.modal-green .badge {
+    background-color: var(--pal-green-2);
+    color: var(--pal-ink);
+}
+
+/* ── Delete confirmation modal ───────────────────────────────────────────────
+   Destructive action, but still pastel: rose header over the same cream body
+   and footer as every other confirm form. Danger is carried by the terracotta
+   icon and button instead of a saturated red bar.
+   ──────────────────────────────────────────────────────────────────────────── */
 .confirm-delete-header {
-    background-color: #dc3545;
-    color: #fff;
+    background-color: #e3c5b9;
+    color: var(--pal-ink);
 }
 
 .confirm-delete-header .modal-title {
-    color: #fff;
+    color: var(--pal-ink);
     font-weight: 700;
     margin-bottom: 0;
 }
 
 .confirm-delete-icon-col {
-    color: #fff;
+    color: #a9583f;
     font-size: 1.35rem;
 }
 
@@ -1142,8 +1334,8 @@ body.map-fullscreen-lock {
 }
 
 .confirm-delete-body {
-    background-color: #DD99BB;
-    color: #000;
+    background-color: var(--pal-cream);
+    color: var(--pal-ink);
 }
 
 .confirm-delete-body .confirm-delete-en {
@@ -1160,12 +1352,13 @@ body.map-fullscreen-lock {
 }
 
 .confirm-delete-footer {
-    border-top: 0;
+    background-color: var(--pal-cream-2);
+    border-top: 1px solid var(--pal-border);
 }
 
 .confirm-delete-btn {
-    background-color: #dc3545;
-    border-color: #dc3545;
+    background-color: #a9583f;
+    border-color: #a9583f;
     color: #fff;
     border-radius: 50px;
     padding-left: 1.5rem;
@@ -1175,8 +1368,8 @@ body.map-fullscreen-lock {
 .confirm-delete-btn:hover,
 .confirm-delete-btn:focus,
 .confirm-delete-btn:active {
-    background-color: #bb2d3b;
-    border-color: #b02a37;
+    background-color: #944c36;
+    border-color: #8a4632;
     color: #fff;
 }
 

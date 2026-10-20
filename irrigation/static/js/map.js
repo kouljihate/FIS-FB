@@ -10,6 +10,12 @@ let mapRulerActive = false;
 let sectorSelection = null;
 let labelLayers = null;
 let currentGeojsonUrl = null;
+let currentComponentFilters = [];// Feature types the page never draws (a components tab only shows the fitting it
+// owns).  They are dropped before the GeoJSON reaches the map, so no layer, popup
+// or label of that kind can appear.
+let hiddenFeatureTypes = [];
+// Page callback told whenever a feature is selected or deselected on the map.
+let mapSelectionListener = null;
 const TREE_LABEL_MIN_ZOOM = 17;
 
 // Label categories that can be toggled from the map widget.
@@ -152,16 +158,31 @@ function setupLabelToggleWidget(targetMap, labelTypes) {
 }
 
 // ---------- Optional geometry filter widget ----------
-// Pages that pass `mapFilters` get a funnel widget that hides whole geometry
-// categories (sectors, zones, rows, trees, pipes) without reloading the map.
+// Pages that pass `mapFilters` get a funnel widget that hides whole element
+// categories (geometry and fittings) without reloading the map. Every element
+// type the GeoJSON endpoint can emit has a category here, so a page that lists
+// them all can filter the whole project.
 const FILTER_CATEGORIES = [
     { key: 'sector', letter: 'S', label: 'Sectors / القطاعات', types: ['sector'] },
     { key: 'zone', letter: 'Z', label: 'Zones / المناطق', types: ['zone'] },
     { key: 'tree_row', letter: 'R', label: 'Rows / الصفوف', types: ['tree_row'] },
     { key: 'tree', letter: 'T', label: 'Trees / الأشجار', types: ['tree'] },
-    { key: 'pipe', letter: 'P', label: 'Pipes / الأنابيب', types: ['main_pipe', 'second_pipe', 'sub_pipe', 'dripline'] }
+    { key: 'pipe', letter: 'P', label: 'Pipes / الأنابيب', types: ['main_pipe', 'second_pipe', 'sub_pipe', 'dripline'] },
+    { key: 'master_valve', letter: 'VM', label: 'Main Valves / الصمامات الرئيسية', types: ['master_valve'] },
+    { key: 'sector_valve', letter: 'VS', label: 'Sector Valves / صمامات القطاعات', types: ['sector_valve'] },
+    { key: 'zone_valve', letter: 'VZ', label: 'Zone Valves / صمامات المناطق', types: ['zone_valve'] },
+    { key: 'check_valve', letter: 'VC', label: 'Check Valves / صمامات عدم الرجوع', types: ['check_valve'] },
+    { key: 'connector', letter: 'CN', label: 'Connectors / الوصلات', types: ['connector'] },
+    { key: 'reduction', letter: 'RD', label: 'Reductors / المخفضات', types: ['reduction'] },
+    { key: 'air_release', letter: 'AR', label: 'Air Removal / إزالة الهواء', types: ['air_release'] },
+    { key: 'pressure_reduction', letter: 'PR', label: 'Reduce Pressure / خفض الضغط', types: ['pressure_reduction'] },
+    { key: 'terminator', letter: 'TM', label: 'Terminators / النهايات', types: ['terminator'] },
+    { key: 'boundary', letter: 'B', label: 'Land Boundary / حدود الأرض', types: ['boundary'] },
+    { key: 'water_source', letter: 'W', label: 'Water Source / مصدر المياه', types: ['water_source'] }
 ];
-const filterState = { sector: true, zone: true, tree_row: true, tree: true, pipe: true };
+// Every category starts visible; a page may ask for a shorter starting set.
+const filterState = {};
+FILTER_CATEGORIES.forEach(function(category) { filterState[category.key] = true; });
 
 // Which filter category a feature belongs to (null = never filtered).
 function featureFilterKey(properties) {
@@ -238,9 +259,22 @@ function applyAllComponentFilters(categories) {
     });
 }
 
+// Drop the feature types this page asked to never see.
+function filterHiddenFeatures(data) {
+    if (!hiddenFeatureTypes.length || !data || !Array.isArray(data.features)) {
+        return data;
+    }
+    return Object.assign({}, data, {
+        features: data.features.filter(function(feature) {
+            const type = ((feature.properties || {}).type) || '';
+            return hiddenFeatureTypes.indexOf(type) === -1;
+        })
+    });
+}
+
 // One left-hand widget (under the zoom buttons): fitting kinds first, a divider,
 // then the geometry categories. Either group may be empty.
-function setupMapFilterWidget(targetMap, filterKeys, componentCategories, listener) {
+function setupMapFilterWidget(targetMap, filterKeys, componentCategories, listener, enabledKeys) {
     const geometryCategories = FILTER_CATEGORIES.filter(function(category) {
         return (filterKeys || []).indexOf(category.key) !== -1;
     });
@@ -251,6 +285,18 @@ function setupMapFilterWidget(targetMap, filterKeys, componentCategories, listen
     fittingCategories.forEach(function(category) {
         if (componentFilterState[category.key] === undefined) componentFilterState[category.key] = true;
     });
+
+    // A page may list the categories it wants switched on at load; the rest of the
+    // widget's categories start hidden until the user presses them.
+    const startingKeys = Array.isArray(enabledKeys) ? enabledKeys : null;
+    if (startingKeys) {
+        geometryCategories.forEach(function(category) {
+            filterState[category.key] = startingKeys.indexOf(category.key) !== -1;
+        });
+        fittingCategories.forEach(function(category) {
+            componentFilterState[category.key] = startingKeys.indexOf(category.key) !== -1;
+        });
+    }
 
     const control = L.control({ position: 'topleft' });
     control.onAdd = function() {
@@ -264,13 +310,14 @@ function setupMapFilterWidget(targetMap, filterKeys, componentCategories, listen
 
         fittingCategories.forEach(function(category) {
             const button = L.DomUtil.create('button', 'geometry-map-select-button map-filter-button', group);
+            const visible = componentFilterState[category.key] !== false;
             button.type = 'button';
             button.textContent = category.letter;
-            button.title = category.label;
+            button.title = (visible ? 'Hide ' : 'Show ') + category.label;
             button.setAttribute('aria-label', 'Toggle ' + category.label);
-            button.setAttribute('aria-pressed', 'true');
+            button.setAttribute('aria-pressed', String(visible));
             button.dataset.filterKey = category.key;
-            button.classList.add('active');
+            button.classList.toggle('active', visible);
             L.DomEvent.on(button, 'click', function(event) {
                 L.DomEvent.stop(event);
                 const visible = !componentFilterState[category.key];
@@ -288,13 +335,14 @@ function setupMapFilterWidget(targetMap, filterKeys, componentCategories, listen
 
         geometryCategories.forEach(function(category) {
             const button = L.DomUtil.create('button', 'geometry-map-select-button map-filter-button', group);
+            const visible = filterState[category.key] !== false;
             button.type = 'button';
             button.textContent = category.letter;
-            button.title = 'Hide ' + category.label;
+            button.title = (visible ? 'Hide ' : 'Show ') + category.label;
             button.setAttribute('aria-label', 'Toggle ' + category.label);
-            button.setAttribute('aria-pressed', 'true');
+            button.setAttribute('aria-pressed', String(visible));
             button.dataset.filterKey = category.key;
-            button.classList.add('active');
+            button.classList.toggle('active', visible);
             L.DomEvent.on(button, 'click', function(event) {
                 L.DomEvent.stop(event);
                 filterState[category.key] = !filterState[category.key];
@@ -320,6 +368,7 @@ window.reloadMapGeometry = function() {
     return fetch(currentGeojsonUrl)
         .then(function(response) { return response.json(); })
         .then(function(data) {
+            data = filterHiddenFeatures(data);
             if (labelLayers) {
                 Object.keys(labelLayers).forEach(function(type) {
                     labelLayers[type].clearLayers();
@@ -328,7 +377,7 @@ window.reloadMapGeometry = function() {
             featureLayer.clearLayers();
             featureLayer.addData(data);
             applyAllGeometryFilters();
-            applyAllComponentFilters(Array.isArray(options.componentFilters) ? options.componentFilters : []);
+            applyAllComponentFilters(currentComponentFilters);
             syncTreeLabels();
             return true;
         })
@@ -336,6 +385,60 @@ window.reloadMapGeometry = function() {
             console.error('Error reloading geometry:', err);
             return false;
         });
+};
+
+// ---------- Whole-map helpers (Map Overview tab) ----------
+// Find one loaded feature by its type and id.
+function mapFeatureLayer(type, id) {
+    let found = null;
+    if (!featureLayer) return null;
+    featureLayer.eachLayer(function(layer) {
+        if (found || !layer.feature) return;
+        const properties = layer.feature.properties || {};
+        if (properties.type === type && String(properties.id) === String(id)) found = layer;
+    });
+    return found;
+}
+
+// Zoom to one feature (a sector from the sector widget, ...).
+window.zoomToFeature = function(type, id) {
+    const layer = mapFeatureLayer(type, id);
+    if (!map || !layer) return false;
+    if (typeof layer.getBounds === 'function') {
+        const bounds = layer.getBounds();
+        if (bounds && bounds.isValid()) {
+            map.fitBounds(bounds, { padding: [40, 40], maxZoom: 19 });
+        }
+    } else if (typeof layer.getLatLng === 'function') {
+        map.setView(layer.getLatLng(), Math.max(map.getZoom(), 18));
+    }
+    if (layer.bringToFront) layer.bringToFront();
+    return true;
+};
+
+// Frame the whole project.
+window.fitAllFeatures = function() {
+    if (!map || !featureLayer) return false;
+    const bounds = featureLayer.getBounds();
+    if (!bounds || !bounds.isValid()) return false;
+    map.fitBounds(bounds, { padding: [30, 30] });
+    return true;
+};
+
+// Drop every selection made on the map (keeps the layers in place).
+window.clearMapSelection = function() {
+    if (!featureLayer) return;
+    featureLayer.eachLayer(function(layer) {
+        if (!layer._geometrySelected) return;
+        const properties = (layer.feature && layer.feature.properties) || {};
+        layer._geometrySelected = false;
+        if (layer.setStyle) {
+            layer.setStyle({ color: properties.color || '#3388ff', weight: 2, fillOpacity: 0.2 });
+        }
+        if (typeof mapSelectionListener === 'function') {
+            mapSelectionListener(layer, properties, false);
+        }
+    });
 };
 
 // Registry of Leaflet map instances keyed by their container element id.
@@ -466,10 +569,16 @@ function addNorthIndicator(targetMap) {
     targetMap.addControl(new NorthControl());
 }
 
+// options.mapFilters    -> filter categories shown in the funnel widget (keys of
+//                          FILTER_CATEGORIES, e.g. 'sector', 'zone', 'check_valve').
+// options.mapFiltersOn  -> optional subset that starts switched on; omit it to show
+//                          every listed category.
+// options.componentFilters -> fitting kinds driven by the page's own table.
 function initMap(elementId, geojsonUrl, options = {}) {
     const mapElement = document.getElementById(elementId);
     if (!mapElement) return null;
     currentGeojsonUrl = geojsonUrl || currentGeojsonUrl;
+    hiddenFeatureTypes = Array.isArray(options.hiddenTypes) ? options.hiddenTypes : [];
 
     const mapHeight = options.height || '500px';
     mapElement.style.height = mapHeight;
@@ -517,12 +626,19 @@ function initMap(elementId, geojsonUrl, options = {}) {
         }
     }
 
-    // Popups should not compete with the ruler while measuring
+    // Popups should not compete with the ruler while measuring, nor with
+    // sector picking: a popup opened by the first clicked sector covers its
+    // neighbours and would swallow the clicks meant to add them to the
+    // selection.
     map.on('popupopen', function() {
         if (mapRulerActive) map.closePopup();
+        else if (sectorSelection && sectorSelection.pickMode) map.closePopup();
     });
 
     mapSelectionMode = false;
+    mapSelectionListener = (options.selectable && typeof options.selectable.onSelectionChange === 'function')
+        ? options.selectable.onSelectionChange
+        : null;
     const selectableTypes = options.selectable
         ? (Array.isArray(options.selectable.type) ? options.selectable.type : [options.selectable.type])
         : [];
@@ -546,8 +662,10 @@ function initMap(elementId, geojsonUrl, options = {}) {
     // Optional left-hand filter widget (valve kinds and/or geometry categories).
     const geometryFilters = Array.isArray(options.mapFilters) ? options.mapFilters : [];
     const componentFilters = Array.isArray(options.componentFilters) ? options.componentFilters : [];
+    currentComponentFilters = componentFilters;
     if (geometryFilters.length || componentFilters.length) {
-        setupMapFilterWidget(map, geometryFilters, componentFilters, options.onComponentFilterChange);
+        setupMapFilterWidget(map, geometryFilters, componentFilters,
+                              options.onComponentFilterChange, options.mapFiltersOn);
     }
 
     // The label widget would repeat the geometry buttons, so a page that filters
@@ -660,6 +778,11 @@ function initMap(elementId, geojsonUrl, options = {}) {
                 if (validated !== undefined) {
                     popupContent += `<br><small>Status: ${validated ? '✓ Validated' : 'Pending'}</small>`;
                 }
+                if (type === 'zone' && properties.orientation_deg !== undefined) {
+                    const deg = properties.orientation_deg;
+                    const compass = properties.orientation || '';
+                    popupContent += `<br><small><b>Orientation / الاتجاه:</b> ${deg}° (${compass})</small>`;
+                }
                 if (options.showArea) {
                     const stats = geometryAreaStats(feature.geometry);
                     if (stats) {
@@ -680,6 +803,9 @@ function initMap(elementId, geojsonUrl, options = {}) {
                                 weight: selected ? 4 : 2,
                                 fillOpacity: selected ? 0.4 : 0.2
                             });
+                        }
+                        if (typeof mapSelectionListener === 'function') {
+                            mapSelectionListener(layer, properties, selected);
                         }
                     };
 
@@ -721,6 +847,7 @@ function initMap(elementId, geojsonUrl, options = {}) {
         fetch(geojsonUrl)
             .then(response => response.json())
             .then(data => {
+                data = filterHiddenFeatures(data);
                 featureLayer.addData(data);
                 if (data.features && data.features.length > 0) {
                     map.fitBounds(featureLayer.getBounds(), { padding: [50, 50] });
@@ -728,6 +855,8 @@ function initMap(elementId, geojsonUrl, options = {}) {
                 applyAllGeometryFilters();
                 applyAllComponentFilters(Array.isArray(options.componentFilters) ? options.componentFilters : []);
                 syncTreeLabels();
+                // Pages with a sector list wait for this before zooming.
+                document.dispatchEvent(new CustomEvent('mapgeometryloaded'));
             })
             .catch(err => console.error('Error loading geometry:', err));
     }
@@ -932,6 +1061,7 @@ function setupSectorSelection(targetMap, config) {
 
 function setSectorPickMode(targetMap, state, on) {
     state.pickMode = on;
+    if (on) targetMap.closePopup();
     if (state.pickButton) {
         state.pickButton.classList.toggle('active', on);
         state.pickButton.setAttribute('aria-pressed', String(on));

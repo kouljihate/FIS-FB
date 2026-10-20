@@ -140,11 +140,11 @@
 <!-- Edit Modal -->
                     <div class="modal fade" id="editModal{{ s.id }}" tabindex="-1">
                         <div class="modal-dialog">
-                            <div class="modal-content">
+                            <div class="modal-content modal-green">
                                 <form method="POST" action="{{ url_for('geometry.sector_edit', project_id=project.id, sector_id=s.id) }}">
-                                    <div class="modal-header bg-primary text-white">
+                                    <div class="modal-header">
                                         <h5 class="modal-title"><i class="bi bi-pencil"></i> Edit Sector / تعديل القطاع</h5>
-                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                     </div>
                                     <div class="modal-body">
                                         <div class="mb-3">
@@ -183,11 +183,11 @@
                     <!-- Rename Modal -->
                     <div class="modal fade" id="renameModal{{ s.id }}" tabindex="-1">
                         <div class="modal-dialog">
-                            <div class="modal-content">
+                            <div class="modal-content modal-green">
                                 <form method="POST" action="{{ url_for('geometry.sector_rename', project_id=project.id, sector_id=s.id) }}">
-                                    <div class="modal-header bg-info text-white">
+                                    <div class="modal-header">
                                         <h5 class="modal-title"><i class="bi bi-input-cursor-text"></i> Rename Sector / إعادة تسمية القطاع</h5>
-                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                     </div>
                                     <div class="modal-body">
                                         <div class="mb-3">
@@ -211,9 +211,9 @@
                     <!-- Split Modal -->
                     <div class="modal fade" id="splitModal{{ s.id }}" tabindex="-1">
                         <div class="modal-dialog">
-                            <div class="modal-content">
+                            <div class="modal-content modal-green">
                                 <form method="POST" action="{{ url_for('geometry.sector_split', project_id=project.id, sector_id=s.id) }}">
-                                    <div class="modal-header bg-warning text-dark">
+                                    <div class="modal-header">
                                         <h5 class="modal-title"><i class="bi bi-scissors"></i> Split Sector / تقسيم القطاع</h5>
                                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                     </div>
@@ -227,7 +227,7 @@
                                             </select>
                                         </div>
                                     </div>
-                                    <div class="modal-footer">
+<div class="modal-footer">
                                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close / إغلاق</button>
                                         <button type="submit" class="btn btn-warning"><i class="bi bi-scissors"></i> Split / تقسيم</button>
                                     </div>
@@ -249,11 +249,11 @@
 <!-- Add Sector Modal -->
 <div class="modal fade" id="addSectorModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
-        <div class="modal-content">
+        <div class="modal-content modal-green">
             <form method="POST" action="{{ url_for('geometry.sector_add', project_id=project.id) }}">
-                <div class="modal-header bg-success text-white">
+                <div class="modal-header">
                     <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Add New Sector / إضافة قطاع جديد</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="row">
@@ -288,7 +288,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close / إغلاق</button>
-                    <button type="submit" class="btn btn-success"><i class="bi bi-check"></i> Add / إضافة</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check"></i> Add / إضافة</button>
                 </div>
             </form>
         </div>
@@ -298,11 +298,11 @@
 <!-- Merge Modal -->
 <div class="modal fade" id="mergeModal" tabindex="-1">
     <div class="modal-dialog">
-        <div class="modal-content">
+        <div class="modal-content modal-green">
             <form method="POST" action="{{ url_for('geometry.sector_merge', project_id=project.id) }}" id="mergeForm">
-                <div class="modal-header bg-primary text-white">
+                <div class="modal-header">
                     <h5 class="modal-title"><i class="bi bi-union"></i> Merge Sectors / دمج القطاعات</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <p>Selected sectors will be merged into one / سيتم دمج القطاعات المحددة في قطاع واحد</p>
@@ -320,9 +320,9 @@
 <!-- Split Selected Modal -->
 <div class="modal fade" id="splitSelectedModal" tabindex="-1">
     <div class="modal-dialog">
-        <div class="modal-content">
+        <div class="modal-content modal-green">
             <form method="POST" action="{{ url_for('geometry.sector_split_selected', project_id=project.id) }}">
-                <div class="modal-header bg-warning text-dark">
+                <div class="modal-header">
                     <h5 class="modal-title"><i class="bi bi-scissors"></i> Split Selected Sectors / تقسيم القطاعات المحددة</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
@@ -350,11 +350,11 @@
 <!-- Swap Modal -->
 <div class="modal fade" id="swapModal" tabindex="-1">
     <div class="modal-dialog">
-        <div class="modal-content">
+        <div class="modal-content modal-green">
             <form method="POST" action="{{ url_for('geometry.sector_swap', project_id=project.id) }}">
-                <div class="modal-header bg-primary text-white">
+                <div class="modal-header">
                     <h5 class="modal-title"><i class="bi bi-arrow-left-right"></i> Swap Sectors / تبديل القطاعات</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
@@ -386,10 +386,10 @@
 <!-- Auto Generate Sectors Modal -->
 <div class="modal fade" id="aiGenerateModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content">
+        <div class="modal-content modal-green">
             <form method="POST" action="{{ url_for('geometry.sector_ai_regenerate', project_id=project.id) }}"
                 data-confirm="AI will rebuild all sectors, zones, network and trees using these parameters. Continue? / سيعيد الذكاء الاصطناعي بناء القطاعات والمناطق والشبكة والأشجار بناءً على هذه المعايير. متابعة؟">
-                <div class="modal-header bg-warning">
+                <div class="modal-header">
                     <h5 class="modal-title"><i class="bi bi-magic"></i> Auto Generate Sectors / إنشاء القطاعات بالذكاء الاصطناعي</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>

@@ -172,11 +172,11 @@
 <!-- Edit Valve Modal -->
 <div class="modal fade" id="editValveModal{{ v.id }}" tabindex="-1">
     <div class="modal-dialog">
-        <div class="modal-content">
+        <div class="modal-content modal-green">
             <form method="POST" action="{{ url_for('components.valve_edit', project_id=project.id, element_id=v.id) }}">
-                <div class="modal-header bg-primary text-white">
+                <div class="modal-header">
                     <h5 class="modal-title"><i class="bi bi-pencil"></i> Edit Valve / تعديل الصمام</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
@@ -244,11 +244,11 @@
 <!-- Rename Valve Modal -->
 <div class="modal fade" id="renameValveModal{{ v.id }}" tabindex="-1">
     <div class="modal-dialog">
-        <div class="modal-content">
+        <div class="modal-content modal-green">
             <form method="POST" action="{{ url_for('components.valve_rename', project_id=project.id, element_id=v.id) }}">
-                <div class="modal-header bg-info text-white">
+                <div class="modal-header">
                     <h5 class="modal-title"><i class="bi bi-input-cursor-text"></i> Rename Valve / إعادة تسمية الصمام</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
@@ -276,11 +276,11 @@
 <!-- Add Valve Modal -->
 <div class="modal fade" id="addValveModal" tabindex="-1" aria-labelledby="addValveTitle" aria-hidden="true">
     <div class="modal-dialog">
-        <div class="modal-content">
+        <div class="modal-content modal-green">
             <form method="POST" action="{{ url_for('components.valve_add', project_id=project.id) }}">
-                <div class="modal-header bg-success text-white">
+                <div class="modal-header">
                     <h5 class="modal-title" id="addValveTitle"><i class="bi bi-plus-circle"></i> Add Valve / إضافة صمام</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
@@ -325,7 +325,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel / إلغاء</button>
-                    <button type="submit" class="btn btn-success"><i class="bi bi-check"></i> Add Valve / إضافة صمام</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check"></i> Add Valve / إضافة صمام</button>
                 </div>
             </form>
         </div>
@@ -335,9 +335,9 @@
 <!-- Generate Valves Modal -->
 <div class="modal fade" id="generateValvesModal" tabindex="-1" aria-labelledby="generateValvesTitle" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
+        <div class="modal-content modal-green">
             <form method="POST" action="{{ url_for('components.valves_generate', project_id=project.id) }}">
-                <div class="modal-header bg-warning">
+                <div class="modal-header">
                     <h5 class="modal-title" id="generateValvesTitle"><i class="bi bi-magic"></i> Generate Valves / إنشاء الصمامات</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
@@ -399,8 +399,9 @@ document.addEventListener('DOMContentLoaded', function() {
     initMap('map', geojsonUrl, {
         center: [34.0, -6.0], zoom: 14,
         selectable: { type: ['master_valve', 'sector_valve', 'zone_valve'], checkboxSelector: '.valve-checkbox', toggleOnClick: true },
-        labelTypes: ['sector', 'zone', 'tree_row', 'tree'],
-        mapFilters: ['sector', 'zone', 'tree_row', 'tree', 'pipe'],
+        labelTypes: ['zone'],
+        mapFilters: ['zone', 'pipe'],
+        hiddenTypes: ['sector', 'tree_row', 'tree'],
         componentFilters: [
             { key: 'master_valve', letter: 'VM', label: 'Main Valve / الصمام الرئيسي', types: ['master_valve'] },
             { key: 'sector_valve', letter: 'VS', label: 'Sector Valve / صمام القطاع', types: ['sector_valve'] },

@@ -17,8 +17,8 @@
 
     <!-- App CSS -->
     <link href="{{ url_for('static', filename='css/app.css') }}" rel="stylesheet">
-    <link rel="preload" href="{{ url_for('static', filename='fonts/Comfortaa-Regular.ttf') }}" as="font" type="font/ttf" crossorigin
-    <link rel="preload" href="{{ url_for('static', filename='fonts/VIP-Rawy-Regular.ttf') }}" as="font" type="font/ttf" crossorigin
+    <link rel="preload" href="{{ url_for('static', filename='fonts/Comfortaa-Regular.ttf') }}" as="font" type="font/ttf" crossorigin>
+    <link rel="preload" href="{{ url_for('static', filename='fonts/VIP-Rawy-Regular.ttf') }}" as="font" type="font/ttf" crossorigin>
 
     {# Bootstrap's JS bundle is loaded once, at the end of <body>.  Loading a
        second copy here made every dropdown listen twice and toggle twice per
@@ -140,6 +140,15 @@
                     <span class="nav-link disabled" aria-disabled="true" title="Open a project first">
                     {% endif %}
                         <i class="bi bi-gear"></i> Components / المكونات
+                    {% if workflow_project_id %}</a>{% else %}</span>{% endif %}
+                </li>
+                <li class="nav-item">
+                    {% if workflow_project_id %}
+                    <a class="nav-link{% if workflow_endpoint == 'overview.index' %} active{% endif %}" href="{{ url_for('overview.index', project_id=workflow_project_id) }}">
+                    {% else %}
+                    <span class="nav-link disabled" aria-disabled="true" title="Open a project first">
+                    {% endif %}
+                        <i class="bi bi-map"></i> Map Overview / نظرة عامة
                     {% if workflow_project_id %}</a>{% else %}</span>{% endif %}
                 </li>
                 <li class="nav-item">
@@ -268,7 +277,10 @@
                     koul &copy;2026
                 </div>
                 <div class="col-4 text-end">
-                    <span class="badge version-badge">v{{ app_version }}</span>
+                    <span class="footer-badges">
+                        <span class="badge version-badge repo-badge"><i class="bi bi-git"></i> {{ app_repo }}</span>
+                        <span class="badge version-badge">v{{ app_version }}</span>
+                    </span>
                 </div>
             </div>
         </div>

@@ -822,14 +822,17 @@ def zone_ai_regenerate(project_id):
     use_elevation = request.form.get('use_elevation') == '1'
     orientation = request.form.get('orientation', '').strip()
 
-    # Per-sector orientation: every sector gets its own 'auto' / compass choice
-    # (fields named orientation_<sector_id>). Sectors without a field fall back
-    # to the legacy single orientation value.
+    # Per-sector orientation in degrees (fields named orientation_deg_<sector_id>).
+    # Empty = auto from slope. Exact degree value is stored.
     sector_orientations = {}
     for sector in mongo.db.sectors.find({'project_id': project_id}):
-        raw = request.form.get('orientation_%s' % sector['id'])
-        if raw is not None:
-            sector_orientations[sector['id']] = normalize_orientation(raw)
+        deg_raw = request.form.get('orientation_deg_%s' % sector['id'])
+        if deg_raw is not None and deg_raw.strip() != '':
+            try:
+                deg = float(deg_raw) % 360
+                sector_orientations[sector['id']] = round(deg, 1)
+            except ValueError:
+                pass
 
     mongo.db.zones.delete_many({'project_id': project_id})
     zones = regenerate_zones(project_id, zones_per_sector=zones_per_sector,
@@ -842,45 +845,93 @@ def zone_ai_regenerate(project_id):
 @geometry_bp.route('/<int:project_id>/zones/generate_for_sector', methods=['POST'])
 @login_required
 def zone_generate_for_sector(project_id):
-    """Split a single selected sector into N zones using terrain slope /
-    elevation and orientation (Auto Generate scoped to one sector)."""
+    """Split the selected sectors into N zones each using terrain slope /
+    elevation and a per-sector orientation (Auto Generate scoped to the map
+    selection, one or several sectors)."""
     project = get_project_or_redirect(project_id)
     if not project:
         return redirect(url_for('project.index'))
 
-    sector_id = request.form.get('sector_id', type=int)
-    if not sector_id:
+    # The map widget posts ``sector_ids`` (repeated); the old single-sector
+    # modal posted ``sector_id``. Accept both so existing links keep working.
+    raw_ids = request.form.getlist('sector_ids')
+    single_id = request.form.get('sector_id')
+    if single_id:
+        raw_ids.append(single_id)
+
+    sector_ids = []
+    for raw in raw_ids:
+        try:
+            sector_id = int(str(raw).strip())
+        except (TypeError, ValueError):
+            continue
+        if sector_id not in sector_ids:
+            sector_ids.append(sector_id)
+
+    if not sector_ids:
         flash('No sector selected / لم يتم تحديد قطاع', 'warning')
         return redirect(url_for('geometry.zones_view', project_id=project_id))
 
-    sector = mongo.db.sectors.find_one({'id': sector_id, 'project_id': project_id})
-    if not sector:
+    found = {s['id']: s for s in mongo.db.sectors.find(
+        {'project_id': project_id, 'id': {'$in': sector_ids}})}
+    sector_ids = [sid for sid in sector_ids if sid in found]
+    if not sector_ids:
         flash('Sector not found / القطاع غير موجود', 'danger')
         return redirect(url_for('geometry.zones_view', project_id=project_id))
 
     parts = request.form.get('parts', type=int) or 3
     parts = max(2, min(parts, 8))
     use_elevation = request.form.get('use_elevation') == '1'
-    orientation = normalize_orientation(request.form.get('orientation', ''))
+    # Legacy compass point shared by every sector without its own degrees.
+    shared_orientation = normalize_orientation(request.form.get('orientation', ''))
+    shared_deg_raw = request.form.get('orientation_deg')
 
-    # Remove only this sector's existing zones and their dependent data.
-    old_zone_ids = [z['id'] for z in mongo.db.zones.find(
-        {'project_id': project_id, 'sector_id': sector_id})]
-    if old_zone_ids:
-        mongo.db.tree_rows.delete_many({'project_id': project_id, 'zone_id': {'$in': old_zone_ids}})
-        mongo.db.trees.delete_many({'project_id': project_id, 'zone_id': {'$in': old_zone_ids}})
-        mongo.db.network_elements.delete_many({'project_id': project_id, 'zone_id': {'$in': old_zone_ids}})
-    mongo.db.zones.delete_many({'project_id': project_id, 'sector_id': sector_id})
+    total_zones = 0
+    failed = []
+    for sector_id in sector_ids:
+        # Orientation for this sector: exact degree value (new) or the legacy
+        # compass point / shared degree field.
+        sector_orientations = {}
+        orientation = shared_orientation
+        deg_raw = request.form.get('orientation_deg_%s' % sector_id)
+        if deg_raw is None:
+            deg_raw = shared_deg_raw
+        if deg_raw is not None and str(deg_raw).strip() != '':
+            try:
+                sector_orientations[sector_id] = round(float(deg_raw) % 360, 1)
+                orientation = None
+            except ValueError:
+                pass
 
-    zones = regenerate_zones(project_id, sector_id=sector_id,
-                             zones_per_sector=parts,
-                             use_elevation=use_elevation,
-                             orientation=orientation)
-    if zones:
-        flash(f'Sector split into {len(zones)} zones / تم تقسيم القطاع إلى {len(zones)} مناطق',
-              'success')
-    else:
-        flash('Could not split sector / تعذّر تقسيم القطاع', 'danger')
+        # Remove only this sector's existing zones and their dependent data.
+        old_zone_ids = [z['id'] for z in mongo.db.zones.find(
+            {'project_id': project_id, 'sector_id': sector_id})]
+        if old_zone_ids:
+            mongo.db.tree_rows.delete_many({'project_id': project_id, 'zone_id': {'$in': old_zone_ids}})
+            mongo.db.trees.delete_many({'project_id': project_id, 'zone_id': {'$in': old_zone_ids}})
+            mongo.db.network_elements.delete_many({'project_id': project_id, 'zone_id': {'$in': old_zone_ids}})
+        mongo.db.zones.delete_many({'project_id': project_id, 'sector_id': sector_id})
+
+        zones = regenerate_zones(project_id, sector_id=sector_id,
+                                 zones_per_sector=parts,
+                                 use_elevation=use_elevation,
+                                 orientation=orientation,
+                                 sector_orientations=sector_orientations)
+        if zones:
+            total_zones += len(zones)
+        else:
+            failed.append(sector_id)
+
+    if total_zones:
+        if len(sector_ids) == 1:
+            flash(f'Sector split into {total_zones} zones / تم تقسيم القطاع إلى {total_zones} مناطق',
+                  'success')
+        else:
+            flash(f'{len(sector_ids) - len(failed)} sectors split into {total_zones} zones / '
+                  f'تم تقسيم {len(sector_ids) - len(failed)} قطاعات إلى {total_zones} مناطق',
+                  'success')
+    if failed or not total_zones:
+        flash('Could not split every sector / تعذّر تقسيم كل القطاعات', 'danger')
     return redirect(url_for('geometry.zones_view', project_id=project_id))
 
 @geometry_bp.route('/<int:project_id>/zones/validate', methods=['POST'])

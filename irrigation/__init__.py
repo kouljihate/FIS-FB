@@ -3,7 +3,59 @@ from flask import Flask, render_template
 from irrigation.extensions import mongo, login_manager
 from irrigation.utils.logger import setup_logging
 
-__version__ = '0.4.5'
+__version__ = '0.4.6'
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _repo_name_from_url(url):
+    """``git@github.com:owner/repo.git`` / ``https://host/owner/repo`` -> ``repo``."""
+    if not url:
+        return None
+    tail = url.strip().rstrip('/').replace('\\', '/').rsplit('/', 1)[-1]
+    tail = tail.rsplit(':', 1)[-1]
+    if tail.endswith('.git'):
+        tail = tail[:-4]
+    return tail or None
+
+
+def _git_origin_url(root):
+    """Read ``remote.origin.url`` from .git/config (no subprocess, no network)."""
+    git_path = os.path.join(root, '.git')
+    if os.path.isfile(git_path):
+        # Worktrees and submodules keep a pointer file instead of a directory.
+        try:
+            with open(git_path, encoding='utf-8', errors='replace') as handle:
+                pointer = handle.readline().strip()
+        except OSError:
+            return None
+        if not pointer.startswith('gitdir:'):
+            return None
+        git_path = os.path.normpath(os.path.join(root, pointer.split(':', 1)[1].strip()))
+    try:
+        with open(os.path.join(git_path, 'config'), encoding='utf-8', errors='replace') as handle:
+            section = ''
+            for raw in handle:
+                line = raw.strip()
+                if not line or line.startswith(('#', ';')):
+                    continue
+                if line.startswith('[') and line.endswith(']'):
+                    section = line[1:-1].strip()
+                    continue
+                if section == 'remote "origin"' and line.lower().startswith('url'):
+                    return line.split('=', 1)[1].strip()
+    except OSError:
+        return None
+    return None
+
+
+def repo_name():
+    """Repository name for the footer badge: never a path, never the URL."""
+    override = os.environ.get('APP_REPO', '').strip()
+    if override:
+        return _repo_name_from_url(override) or override
+    detected = _repo_name_from_url(_git_origin_url(PROJECT_ROOT))
+    return detected or os.path.basename(PROJECT_ROOT) or 'FIS'
 
 
 def create_app():
@@ -48,6 +100,7 @@ def create_app():
     from irrigation.geometry.routes import geometry_bp
     from irrigation.hydrology.routes import hydrology_bp
     from irrigation.components.routes import components_bp
+    from irrigation.overview.routes import overview_bp
     from irrigation.trees.routes import trees_bp
     from irrigation.api.routes import api_bp
     from irrigation.engineering.routes import engineering_bp
@@ -59,6 +112,7 @@ def create_app():
     app.register_blueprint(geometry_bp)
     app.register_blueprint(hydrology_bp)
     app.register_blueprint(components_bp)
+    app.register_blueprint(overview_bp)
     app.register_blueprint(trees_bp)
     app.register_blueprint(api_bp)
     app.register_blueprint(engineering_bp, url_prefix='/engineering')
@@ -66,9 +120,11 @@ def create_app():
     app.register_blueprint(water_bp, url_prefix='/water')
 
     # Error handlers
+    repo = repo_name()
+
     @app.context_processor
     def inject_version():
-        return {'app_version': __version__}
+        return {'app_version': __version__, 'app_repo': repo}
 
     @app.errorhandler(404)
     def not_found(e):

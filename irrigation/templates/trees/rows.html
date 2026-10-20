@@ -16,8 +16,10 @@
 <div class="alert alert-info">
     <i class="bi bi-info-circle"></i>
     Each zone should have multiple rows traced at a specified distance between rows.
+    Rows always follow the orientation of their own zone.
     <br>
-    يجب أن يكون لكل منطقة صفوف متعددة مرسومة بمسافة تباعد محددة.
+    يجب أن يكون لكل منطقة صفوف متعددة مرسومة بمسافة تباعد محددة،
+    وتتبع الصفوف دائماً اتجاه منطقتها.
 </div>
 
 <!-- Rows Table -->
@@ -49,7 +51,9 @@
                                 <i class="bi bi-compass"></i>
                             </button>
                             <button class="btn btn-circle btn-warning" type="button" data-bs-toggle="modal"
-                                    data-bs-target="#generateRowsModal" title="Generate / إنشاء">
+                                    data-bs-target="#generateRowsModal" id="generateRowsBtn"
+                                    {% if zone_options %}title="Generate rows along the zone orientations / إنشاء الصفوف وفق اتجاهات المناطق"
+                                    {% else %}disabled title="Create zones first / أنشئ المناطق أولاً"{% endif %}>
                                 <i class="bi bi-magic"></i>
                             </button>
                             <form method="POST" action="{{ url_for('trees.rows_validate', project_id=project.id) }}" class="d-inline">
@@ -134,9 +138,9 @@
                         <div class="modal-dialog">
                             <div class="modal-content">
                                 <form method="POST" action="{{ url_for('trees.rows_edit', project_id=project.id, row_id=r.id) }}">
-                                    <div class="modal-header bg-primary text-white">
+                                    <div class="modal-header">
                                         <h5 class="modal-title"><i class="bi bi-pencil"></i> Edit Row / تعديل الصف</h5>
-                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                     </div>
                                     <div class="modal-body">
                                         <div class="mb-3">
@@ -154,7 +158,9 @@
                                             </div>
                                             <div class="col-md-6">
                                                 <label class="form-label">Orientation / الاتجاه</label>
-                                                <input type="number" step="1" name="orientation" class="form-control" value="{{ r.orientation }}">
+                                                <input type="number" class="form-control" readonly
+                                                       value="{{ r.zone_orientation_deg if r.zone_orientation_deg is not none else r.orientation }}">
+                                                <div class="form-text">Follows the zone / يتبع المنطقة</div>
                                             </div>
                                         </div>
                                     </div>
@@ -172,9 +178,9 @@
                         <div class="modal-dialog">
                             <div class="modal-content">
                                 <form method="POST" action="{{ url_for('trees.rows_rename', project_id=project.id, row_id=r.id) }}">
-                                    <div class="modal-header bg-info text-white">
+                                    <div class="modal-header">
                                         <h5 class="modal-title"><i class="bi bi-input-cursor-text"></i> Rename Row / إعادة تسمية الصف</h5>
-                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                     </div>
                                     <div class="modal-body">
                                         <div class="mb-3">
@@ -214,7 +220,7 @@
         <div class="modal-content">
             <form method="POST" action="{{ url_for('trees.rows_generate', project_id=project.id) }}"
                 data-confirm="This will trace rows inside all zones at the given distance between rows. Replace existing rows if selected. / سيرسم هذا الصفوف داخل جميع المناطق حسب المسافة المحددة بين الصفوف. سيستبدل الصفوف الموجودة إذا كان محدداً.">
-                <div class="modal-header bg-warning">
+                <div class="modal-header">
                     <h5 class="modal-title"><i class="bi bi-magic"></i> Generate Rows / إنشاء الصفوف</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
@@ -227,15 +233,47 @@
                         <input class="form-check-input" type="checkbox" name="replace" id="generateRowsReplace" value="1" checked>
                         <label class="form-check-label" for="generateRowsReplace">Replace existing rows / استبدال الصفوف الموجودة</label>
                     </div>
-                    <div class="alert alert-info py-2 small mb-0">
-                        Rows are traced inside every zone at the given spacing, along the dominant axis.
+                    <div class="alert alert-info py-2 small">
+                        Rows are traced inside every zone at the given spacing, along <b>that zone's orientation</b>.
+                        A zone without an orientation falls back to its dominant axis.
                         <br>
-                        تُرسم الصفوف داخل كل منطقة حسب المسافة المحددة، على طول المحور الرئيسي.
+                        تُرسم الصفوف داخل كل منطقة حسب المسافة المحددة <b>وفق اتجاه تلك المنطقة</b>.
+                        والمنطقة التي ليس لها اتجاه تُرسم على محورها الرئيسي.
+                    </div>
+                    <div class="table-responsive" style="max-height: 220px; overflow-y: auto;">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Zone / المنطقة</th>
+                                    <th class="text-center">Orientation / الاتجاه</th>
+                                    <th class="text-center">Rows / الصفوف</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for z in zone_options %}
+                                <tr>
+                                    <td><code>{{ z.code }}</code> <span class="text-muted small">{{ z.en }}</span></td>
+                                    <td class="text-center">
+                                        {% if z.orientation_deg is not none %}
+                                        {{ z.orientation_deg }}&deg;{% if z.orientation %} <span class="text-muted small">({{ z.orientation }})</span>{% endif %}
+                                        {% else %}
+                                        <span class="badge text-bg-secondary">Auto / تلقائي</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">{{ z.rows }}</td>
+                                </tr>
+                                {% else %}
+                                <tr><td colspan="3" class="text-center text-muted py-2">No zones yet / لا توجد مناطق</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel / إلغاء</button>
-                    <button type="submit" class="btn btn-warning"><i class="bi bi-magic"></i> Generate / إنشاء</button>
+                    <button type="submit" class="btn btn-warning" {% if not zone_options %}disabled{% endif %}>
+                        <i class="bi bi-magic"></i> Generate / إنشاء
+                    </button>
                 </div>
             </form>
         </div>
@@ -247,11 +285,11 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <form id="orientationForm" data-no-loader>
-                <div class="modal-header bg-secondary text-white">
+                <div class="modal-header">
                     <h5 class="modal-title" id="orientationModalTitle">
                         <i class="bi bi-compass"></i> Change Orientation / تغيير الاتجاه
                     </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <p class="text-muted small" id="orientationScopeText">
@@ -274,7 +312,7 @@
                                    id="orientationDegrees" name="orientation" value="0" required>
                             <span class="input-group-text">°</span>
                         </div>
-                        <div class="form-text">0° = East-West / الشرق-الغرب, 90° = North-South / الشمال-الجنوب</div>
+                        <div class="form-text">0° = North-South / الشمال-الجنوب, 90° = East-West / الشرق-الغرب. The zone orientation is updated to match. / يُحدَّث اتجاه المنطقة ليطابقه.</div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -485,7 +523,20 @@ function rowsRefreshTable() {
         .then(function (html) {
             const doc = new DOMParser().parseFromString(html, 'text/html');
             const fresh = doc.getElementById('rowsTable');
-            if (fresh) table.replaceWith(fresh);
+            if (fresh) {
+                // The per-row modals are hoisted out of the table by the HTML
+                // parser, so they are siblings of the table. Replace them too:
+                // otherwise the new rows point at modals that no longer exist
+                // and Edit/Rename stop opening after an AJAX refresh.
+                const modalSelector = '[id^="editRowModal"], [id^="renameRowModal"]';
+                document.querySelectorAll(modalSelector).forEach(function (node) { node.remove(); });
+                const holder = document.createDocumentFragment();
+                doc.querySelectorAll(modalSelector).forEach(function (node) {
+                    holder.appendChild(document.importNode(node, true));
+                });
+                table.replaceWith(fresh);
+                fresh.parentElement.insertBefore(holder, fresh);
+            }
             setupZoneSearch();
             const freshInput = document.getElementById('zoneSearch');
             if (freshInput && query.trim()) {
