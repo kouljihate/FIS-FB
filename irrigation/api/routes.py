@@ -61,13 +61,11 @@ def get_geometry(project_id):
             'geometry': project['boundary']
         })
 
-    # Water source
-    if sector_scope is None and project.get('water_source') and _accepted(wanted, 'water_source'):
-        features.append({
-            'type': 'Feature',
-            'properties': {'name': 'Water Source', 'name_ar': 'مصدر المياه', 'type': 'water_source', 'color': '#17a2b8'},
-            'geometry': project['water_source']
-        })
+    # Water sources: every well, basin and other source the project lists.
+    # ``water_source`` is the legacy single Point kept in sync for the rest of
+    # the app, so it is only drawn when the list has no positioned source.
+    if sector_scope is None and _accepted(wanted, 'water_source'):
+        features.extend(_water_source_features(project))
 
     # Sectors - a scoped view always keeps the boundaries for context.
     if sector_scope is not None or _accepted(wanted, 'sector'):
@@ -234,6 +232,61 @@ def _accepted(wanted, feature_type):
 
 def _has_network_types(wanted):
     return not wanted or any(feature_type in wanted for feature_type in NETWORK_TYPES)
+
+
+#: Marker colour and wording for each kind of water source.
+WATER_SOURCE_KINDS = {
+    'well': ('Well', 'بئر', '#17a2b8'),
+    'basin': ('Basin', 'حوض', '#0dcaf0'),
+    'reservoir': ('Reservoir', 'خزان', '#198754'),
+    'pump': ('Pump', 'مضخة', '#ffc107'),
+    'canal': ('Canal', 'قناة', '#6c757d'),
+}
+
+
+def _water_source_features(project):
+    """One point per positioned water source, with a kind-specific colour."""
+    sources = project.get('water') or (project.get('spec') or {}).get('water_sources') or []
+    features = []
+    for index, source in enumerate(sources):
+        try:
+            lat = float(source.get('lat'))
+            lng = float(source.get('lng'))
+        except (TypeError, ValueError):
+            continue
+        kind = str(source.get('type') or 'other').strip().lower()
+        label_en, label_ar, color = WATER_SOURCE_KINDS.get(
+            kind, ('Water Source', 'مصدر المياه', '#17a2b8'))
+        name = str(source.get('name') or '').strip() or label_en
+        features.append({
+            'type': 'Feature',
+            'properties': {
+                'name': name,
+                'name_ar': label_ar,
+                'type': 'water_source',
+                'source_type': kind,
+                'id': index,
+                'flow_lpm': source.get('flow_lpm'),
+                'color': color,
+            },
+            'geometry': {'type': 'Point', 'coordinates': [lng, lat]},
+        })
+    if features:
+        return features
+
+    # Older or hand-built projects only carry the single legacy Point.
+    legacy = project.get('water_source') or {}
+    if legacy.get('type') == 'Point' and legacy.get('coordinates'):
+        return [{
+            'type': 'Feature',
+            'properties': {
+                'name': 'Water Source', 'name_ar': 'مصدر المياه',
+                'type': 'water_source', 'source_type': 'well', 'id': 0,
+                'color': WATER_SOURCE_KINDS['well'][2],
+            },
+            'geometry': legacy,
+        }]
+    return []
 
 
 def _sector_scope(raw):

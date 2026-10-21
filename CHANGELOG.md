@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.10 - 2026-10-21
+
+### Changed
+- each source is coloured by kind (well, basin, reservoir, pump, canal) and its popup shows the kind and flow rate.
+
+### Fixed
+- wells, basins and other water sources are all drawn, while the geometry payload only ever emitted the single legacy point.
+
 ## 0.4.9 - 2026-10-21
 
 ### Added

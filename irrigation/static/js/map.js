@@ -996,7 +996,11 @@ function initMap(elementId, geojsonUrl, options = {}) {
                     let popupContent = `<b>${escapeLabelHtml(labelCode(properties) || name)}</b>`;
                     if (name && labelCode(properties)) popupContent += ` &ndash; ${escapeLabelHtml(name)}`;
                     if (nameAr) popupContent += ` / <span class="ar-text">${nameAr}</span>`;
-                    popupContent += `<br><small>Type: ${type}</small>`;
+                    // Water sources carry the kind of source (well, basin, ...).
+                    popupContent += `<br><small>Type: ${escapeLabelHtml(properties.source_type || type)}</small>`;
+                    if (properties.flow_lpm !== undefined && properties.flow_lpm !== null) {
+                        popupContent += `<br><small>Flow / التدفق: ${escapeLabelHtml(properties.flow_lpm)} L/min</small>`;
+                    }
                     if (validated !== undefined) {
                         popupContent += `<br><small>Status: ${validated ? '✓ Validated' : 'Pending'}</small>`;
                     }
