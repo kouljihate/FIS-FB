@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.9 - 2026-10-21
+
+### Added
+- geometry API sector scope, which keeps every sector outline but only the marks of the chosen sector.
+
+### Changed
+- clicking a sector in the Map Overview list now shows only that sector's zones, rows, trees and network, with the other sectors drawn as dashed boundaries.
+
+### Fixed
+- the displayed-marks counter updates when layers are removed and no longer waits for animation frames.
+
 ## 0.4.8 - 2026-10-21
 
 ### Added

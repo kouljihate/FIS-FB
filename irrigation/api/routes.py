@@ -16,6 +16,11 @@ def get_geometry(project_id):
     string ``all`` keeps everything).  Big orchards are tens of thousands of
     trees and driplines, so a map that opens on the sector layout must not
     download, parse and draw the whole project.
+
+    ``?sector=<id>`` keeps every sector outline (so the other boundaries stay
+    visible) but only the marks that belong to that sector: its zones, rows,
+    trees and network elements.  The land boundary, the water source and the
+    imported KML overlays are left out of that view.
     """
     from irrigation.access import find_project
 
@@ -24,6 +29,24 @@ def get_geometry(project_id):
         return jsonify({'error': 'Project not found'}), 404
 
     wanted = _wanted_types(request.args.get('types', ''))
+    sector_scope = _sector_scope(request.args.get('sector'))
+    scoped_sector = None
+    if sector_scope is not None:
+        scoped_sector = mongo.db.sectors.find_one({'project_id': project_id, 'id': sector_scope})
+        if not scoped_sector:
+            return jsonify({'error': 'Sector not found'}), 404
+    # Shape used to place hand-drawn elements that carry no sector/zone link.
+    sector_shape = _shape_of(scoped_sector.get('polygon')) if scoped_sector else None
+
+    # Membership of the scoped sector: its zones and the rows inside them.
+    zone_ids = []
+    row_ids = []
+    if sector_scope is not None:
+        zone_ids = [zone['id'] for zone in mongo.db.zones.find(
+            {'project_id': project_id, 'sector_id': sector_scope}, {'id': 1})]
+        row_ids = [row['id'] for row in mongo.db.tree_rows.find(
+            {'project_id': project_id, 'zone_id': {'$in': zone_ids}}, {'id': 1})]
+
     sector_levels = _short_name_levels(wanted)
     if sector_levels:
         assign_short_names(project_id, levels=sector_levels)
@@ -31,7 +54,7 @@ def get_geometry(project_id):
     features = []
 
     # Land boundary
-    if project.get('boundary') and _accepted(wanted, 'boundary'):
+    if sector_scope is None and project.get('boundary') and _accepted(wanted, 'boundary'):
         features.append({
             'type': 'Feature',
             'properties': {'name': 'Land Boundary', 'name_ar': 'حدود الأرض', 'type': 'boundary', 'color': '#28a745'},
@@ -39,15 +62,15 @@ def get_geometry(project_id):
         })
 
     # Water source
-    if project.get('water_source') and _accepted(wanted, 'water_source'):
+    if sector_scope is None and project.get('water_source') and _accepted(wanted, 'water_source'):
         features.append({
             'type': 'Feature',
             'properties': {'name': 'Water Source', 'name_ar': 'مصدر المياه', 'type': 'water_source', 'color': '#17a2b8'},
             'geometry': project['water_source']
         })
 
-    # Sectors
-    if _accepted(wanted, 'sector'):
+    # Sectors - a scoped view always keeps the boundaries for context.
+    if sector_scope is not None or _accepted(wanted, 'sector'):
         for sector in mongo.db.sectors.find({'project_id': project_id}):
             if sector.get('polygon'):
                 features.append({
@@ -67,7 +90,10 @@ def get_geometry(project_id):
     # Zones
     if _accepted(wanted, 'zone'):
         from irrigation.engineering.elevation import ORIENTATION_DEGREES
-        for zone in mongo.db.zones.find({'project_id': project_id}):
+        zone_query = {'project_id': project_id}
+        if sector_scope is not None:
+            zone_query['sector_id'] = sector_scope
+        for zone in mongo.db.zones.find(zone_query):
             if zone.get('polygon'):
                 orientation = zone.get('orientation')
                 orientation_deg = zone.get('orientation_deg')
@@ -96,6 +122,9 @@ def get_geometry(project_id):
             elem_type = elem.get('type', '')
             if not elem.get('geometry') or not _accepted(wanted, elem_type):
                 continue
+            if sector_scope is not None and not _element_in_sector(
+                    elem, sector_scope, zone_ids, sector_shape):
+                continue
             features.append({
                 'type': 'Feature',
                 'properties': {
@@ -111,7 +140,10 @@ def get_geometry(project_id):
 
     # Tree rows
     if _accepted(wanted, 'tree_row'):
-        for row in mongo.db.tree_rows.find({'project_id': project_id}):
+        row_query = {'project_id': project_id}
+        if sector_scope is not None:
+            row_query['zone_id'] = {'$in': zone_ids}
+        for row in mongo.db.tree_rows.find(row_query):
             if row.get('geometry'):
                 features.append({
                     'type': 'Feature',
@@ -130,7 +162,13 @@ def get_geometry(project_id):
 
     # Trees
     if _accepted(wanted, 'tree'):
-        for tree in mongo.db.trees.find({'project_id': project_id}):
+        tree_query = {'project_id': project_id}
+        if sector_scope is not None:
+            tree_query['$or'] = [
+                {'zone_id': {'$in': zone_ids}},
+                {'row_id': {'$in': row_ids}},
+            ]
+        for tree in mongo.db.trees.find(tree_query):
             if tree.get('geometry'):
                 features.append({
                     'type': 'Feature',
@@ -150,7 +188,7 @@ def get_geometry(project_id):
                 })
 
     # KML features that are not represented by the boundary or project collections.
-    if _accepted(wanted, 'kml_feature'):
+    if sector_scope is None and _accepted(wanted, 'kml_feature'):
         for imported in project.get('kml_features', []):
             if imported.get('category') != 'overlay' or not imported.get('geometry'):
                 continue
@@ -196,6 +234,55 @@ def _accepted(wanted, feature_type):
 
 def _has_network_types(wanted):
     return not wanted or any(feature_type in wanted for feature_type in NETWORK_TYPES)
+
+
+def _sector_scope(raw):
+    """Parse ``?sector=<id>``; anything else means "the whole project"."""
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    return int(text) if text.isdigit() else None
+
+
+def _shape_of(geometry):
+    """Shapely geometry for a GeoJSON dict, or None when it cannot be read."""
+    if not geometry:
+        return None
+    try:
+        from shapely.geometry import shape
+        return shape(geometry)
+    except Exception:
+        return None
+
+
+def _same_id(value, wanted):
+    return value is not None and wanted is not None and str(value) == str(wanted)
+
+
+def _element_in_sector(elem, sector_id, zone_ids, sector_shape):
+    """Whether a network element is one of the marks of the scoped sector.
+
+    Generated elements carry the sector or zone they serve; anything else (the
+    main pipe, the master valve, hand-drawn fittings) is placed by geometry: an
+    element that runs through the sector belongs to it, one that does not is
+    left out of the view.
+    """
+    properties = elem.get('properties') or {}
+    if _same_id(elem.get('sector_id'), sector_id) or _same_id(properties.get('sector_id'), sector_id):
+        return True
+    zone_ids = {str(zone_id) for zone_id in zone_ids}
+    for value in (elem.get('zone_id'), properties.get('zone_id')):
+        if value is not None and str(value) in zone_ids:
+            return True
+    if sector_shape is None:
+        return False
+    shape = _shape_of(elem.get('geometry'))
+    if shape is None:
+        return False
+    try:
+        return bool(shape.intersects(sector_shape))
+    except Exception:
+        return False
 
 
 def _short_name_levels(wanted):

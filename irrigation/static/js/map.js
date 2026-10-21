@@ -20,6 +20,11 @@ let hiddenFeatureTypes = [];
 let lazyGeometry = false;
 let lazyGeometryLoading = null;
 const loadedFeatureTypes = new Set();
+// Sector scope (Map Overview): one sector's marks on screen, every other
+// sector kept only as a dashed boundary.  null shows the whole project.
+let sectorScope = null;
+let sectorScopeFilterState = null;
+let initialFilterKeys = null;
 // Page callback told whenever a feature is selected or deselected on the map.
 let mapSelectionListener = null;
 const TREE_LABEL_MIN_ZOOM = 17;
@@ -212,9 +217,13 @@ function typesForFilterKeys(keys) {
 }
 
 function geometryUrlWithTypes(types) {
-    if (!currentGeojsonUrl || !types || !types.length) return currentGeojsonUrl;
+    if (!currentGeojsonUrl) return currentGeojsonUrl;
+    const params = [];
+    if (types && types.length) params.push('types=' + encodeURIComponent(types.join(',')));
+    if (sectorScope !== null) params.push('sector=' + encodeURIComponent(sectorScope));
+    if (!params.length) return currentGeojsonUrl;
     const separator = currentGeojsonUrl.indexOf('?') === -1 ? '?' : '&';
-    return currentGeojsonUrl + separator + 'types=' + encodeURIComponent(types.join(','));
+    return currentGeojsonUrl + separator + params.join('&');
 }
 
 // Add a fetched FeatureCollection to the visible map the same way the initial
@@ -228,6 +237,7 @@ function addGeometryFeatures(data) {
     });
     applyAllGeometryFilters();
     applyAllComponentFilters(currentComponentFilters);
+    styleSectorScope();
     syncTreeLabels();
 }
 
@@ -372,6 +382,7 @@ function setupMapFilterWidget(targetMap, filterKeys, componentCategories, listen
     // A page may list the categories it wants switched on at load; the rest of the
     // widget's categories start hidden until the user presses them.
     const startingKeys = Array.isArray(enabledKeys) ? enabledKeys : null;
+    initialFilterKeys = startingKeys ? startingKeys.slice() : null;
     if (startingKeys) {
         geometryCategories.forEach(function(category) {
             filterState[category.key] = startingKeys.indexOf(category.key) !== -1;
@@ -479,6 +490,115 @@ window.reloadMapGeometry = function() {
             console.error('Error reloading geometry:', err);
             return false;
         });
+};
+
+// ---------- Sector scope ----------
+// Selecting a sector keeps that sector's marks (zones, rows, trees, network)
+// and reduces every other sector to a dashed boundary, so a busy orchard does
+// not hide the one sector being looked at.
+function setFilterStateFromKeys(keys) {
+    const list = Array.isArray(keys) ? keys : null;
+    FILTER_CATEGORIES.forEach(function(category) {
+        filterState[category.key] = list ? list.indexOf(category.key) !== -1 : true;
+    });
+}
+
+// Repaint the funnel widget from the current state (scope changes move it).
+function syncFilterButtons() {
+    const buttons = document.querySelectorAll('.map-filter-button[data-filter-key]');
+    Array.prototype.forEach.call(buttons, function(button) {
+        const key = button.dataset.filterKey;
+        const state = filterState[key] !== undefined ? filterState[key] : componentFilterState[key];
+        const visible = state !== false;
+        button.classList.toggle('active', visible);
+        button.setAttribute('aria-pressed', String(visible));
+        const category = filterCategoryFor(key) ||
+            (currentComponentFilters || []).find(function(item) { return item.key === key; });
+        if (category) button.title = (visible ? 'Hide ' : 'Show ') + category.label;
+    });
+}
+
+// The scoped sector keeps its fill; the others are outlines only.
+function styleSectorScope() {
+    if (!featureLayer) return;
+    featureLayer.eachLayer(function(layer) {
+        const properties = (layer.feature && layer.feature.properties) || {};
+        if (properties.type !== 'sector' || !layer.setStyle) return;
+        if (layer._geometrySelected) return;   // the selection colour wins
+        if (sectorScope === null) {
+            layer.setStyle({ color: properties.color || '#3388ff', weight: 2,
+                             fill: true, fillOpacity: 0.2, dashArray: null });
+        } else if (String(properties.id) === String(sectorScope)) {
+            layer.setStyle({ color: '#0d6efd', weight: 3,
+                             fill: true, fillOpacity: 0.12, dashArray: null });
+        } else {
+            layer.setStyle({ color: '#868e96', weight: 1.5,
+                             fill: false, dashArray: '5 4' });
+        }
+    });
+}
+
+// Types to ask for: everything in a scoped view, the page's own starting set
+// when the whole project is shown again.
+function typesForCurrentState() {
+    if (sectorScope !== null) return [];
+    if (lazyGeometry) return typesForFilterKeys(initialFilterKeys);
+    return [];
+}
+
+function refetchScopedGeometry() {
+    if (!currentGeojsonUrl || !featureLayer) return Promise.resolve(false);
+    const previous = lazyGeometryLoading || Promise.resolve();
+    const task = previous.catch(function() {}).then(function() {
+        return fetch(geometryUrlWithTypes(typesForCurrentState()))
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+                if (labelLayers) {
+                    Object.keys(labelLayers).forEach(function(type) {
+                        labelLayers[type].clearLayers();
+                    });
+                }
+                featureLayer.clearLayers();
+                loadedFeatureTypes.clear();
+                addGeometryFeatures(data);
+                styleSectorScope();
+                if (sectorScope !== null) zoomToFeature('sector', sectorScope);
+                else fitAllFeatures();
+                document.dispatchEvent(new CustomEvent('mapgeometryloaded'));
+                return true;
+            });
+    }).catch(function(error) {
+        console.error('Error loading sector geometry:', error);
+        return false;
+    });
+    lazyGeometryLoading = task;
+    task.then(function() {
+        if (lazyGeometryLoading === task) lazyGeometryLoading = null;
+    });
+    return task;
+}
+
+// Zoom the map to one sector and show only its marks; null goes back to the
+// whole project with the page's starting categories.
+window.setSectorScope = function(sectorId) {
+    const next = (sectorId === null || sectorId === undefined || sectorId === '')
+        ? null : String(sectorId);
+    if (next === sectorScope) return Promise.resolve(false);
+    if (next !== null && sectorScopeFilterState === null) {
+        // Remember the buttons the page was showing, to restore them on "All".
+        sectorScopeFilterState = FILTER_CATEGORIES
+            .filter(function(category) { return filterState[category.key]; })
+            .map(function(category) { return category.key; });
+    }
+    sectorScope = next;
+    if (next === null) {
+        setFilterStateFromKeys(sectorScopeFilterState || initialFilterKeys);
+        sectorScopeFilterState = null;
+    } else {
+        setFilterStateFromKeys(null);      // every kind of mark inside the sector
+    }
+    syncFilterButtons();
+    return refetchScopedGeometry();
 };
 
 // ---------- Whole-map helpers (Map Overview tab) ----------

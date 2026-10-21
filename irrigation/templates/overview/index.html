@@ -369,7 +369,13 @@ function buildSectorControl() {
             '<span class="name">All / الكل</span>';
         allButton.addEventListener('click', function () {
             setActiveSectorButton(allButton);
-            fitAllFeatures();
+            // Back to the whole project: only the sector outlines, as on arrival.
+            clearSelection();
+            if (typeof setSectorScope === 'function') {
+                setSectorScope(null);
+            } else {
+                fitAllFeatures();
+            }
         });
 
         SECTORS.forEach(function (sector) {
@@ -382,7 +388,14 @@ function buildSectorControl() {
                 '<span class="name">' + escapeSectorText(sector.name_en || sector.name_ar || '') + '</span>';
             button.addEventListener('click', function () {
                 setActiveSectorButton(button);
-                if (!zoomToFeature('sector', sector.id)) pendingSectorZoom = sector.id;
+                // One sector at a time: its marks stay, the other sectors become
+                // dashed boundaries, everything else leaves the map.
+                clearSelection();
+                if (typeof setSectorScope === 'function') {
+                    setSectorScope(sector.id);
+                } else if (!zoomToFeature('sector', sector.id)) {
+                    pendingSectorZoom = sector.id;
+                }
             });
         });
 
@@ -474,7 +487,7 @@ function buildObjectControl() {
 // ---------- Widget inside the map: how many marks are displayed ----------
 // Counts the geometry layers the map is showing at this moment, so hiding a
 // category with the funnel (or loading one on demand) updates the total.
-let marksRefreshFrame = null;
+let marksRefreshTimer = null;
 
 function countDisplayedMarks() {
     if (typeof featureLayer === 'undefined' || !featureLayer) return 0;
@@ -512,19 +525,21 @@ function buildStatisticsControl() {
 
     // Every feature add/remove changes the total; recount once per frame so a
     // whole category (thousands of markers) costs one recount, not one each.
+    // Geometry layers carry `.feature`; labels and tiles do not.
     map.on('layeradd layerremove', function (event) {
-        if (typeof featureLayer === 'undefined' || !featureLayer) return;
-        if (!featureLayer.hasLayer(event.layer)) return;
+        if (!event.layer || !event.layer.feature) return;
         scheduleMarksRefresh();
     });
 }
 
+// A timer, not requestAnimationFrame: a hidden or throttled tab never runs
+// frames, and the counter would then stay on its old value.
 function scheduleMarksRefresh() {
-    if (marksRefreshFrame) return;
-    marksRefreshFrame = requestAnimationFrame(function () {
-        marksRefreshFrame = null;
+    if (marksRefreshTimer) return;
+    marksRefreshTimer = setTimeout(function () {
+        marksRefreshTimer = null;
         refreshDisplayedMarks();
-    });
+    }, 60);
 }
 
 function refreshDisplayedMarks() {
