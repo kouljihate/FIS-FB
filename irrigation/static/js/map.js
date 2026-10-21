@@ -14,6 +14,12 @@ let currentComponentFilters = [];// Feature types the page never draws (a compon
 // owns).  They are dropped before the GeoJSON reaches the map, so no layer, popup
 // or label of that kind can appear.
 let hiddenFeatureTypes = [];
+// On-demand geometry: only the categories shown at load are fetched, the rest
+// are requested the first time the user switches them on.  Drawing every tree
+// and dripline of a large orchard up front froze the browser.
+let lazyGeometry = false;
+let lazyGeometryLoading = null;
+const loadedFeatureTypes = new Set();
 // Page callback told whenever a feature is selected or deselected on the map.
 let mapSelectionListener = null;
 const TREE_LABEL_MIN_ZOOM = 17;
@@ -184,6 +190,83 @@ const FILTER_CATEGORIES = [
 const filterState = {};
 FILTER_CATEGORIES.forEach(function(category) { filterState[category.key] = true; });
 
+// ---------- On-demand geometry loading ----------
+// A page can pass `lazyFilters: true`: the first request asks only for the
+// categories listed in `mapFiltersOn`, and each category is fetched the first
+// time its filter button is switched on.  A 20k-tree orchard then opens on the
+// sector outlines instead of building twenty thousand Leaflet markers.
+function filterCategoryFor(key) {
+    return FILTER_CATEGORIES.find(function(item) { return item.key === key; }) || null;
+}
+
+function typesForFilterKeys(keys) {
+    const types = [];
+    (keys || []).forEach(function(key) {
+        const category = filterCategoryFor(key);
+        if (!category) return;
+        category.types.forEach(function(type) {
+            if (types.indexOf(type) === -1) types.push(type);
+        });
+    });
+    return types;
+}
+
+function geometryUrlWithTypes(types) {
+    if (!currentGeojsonUrl || !types || !types.length) return currentGeojsonUrl;
+    const separator = currentGeojsonUrl.indexOf('?') === -1 ? '?' : '&';
+    return currentGeojsonUrl + separator + 'types=' + encodeURIComponent(types.join(','));
+}
+
+// Add a fetched FeatureCollection to the visible map the same way the initial
+// load does (labels, filters, popups are all wired by `featureLayer`).
+function addGeometryFeatures(data) {
+    if (!data) return;
+    data = filterHiddenFeatures(data);
+    featureLayer.addData(data);
+    (data.features || []).forEach(function(feature) {
+        loadedFeatureTypes.add((feature.properties || {}).type || '');
+    });
+    applyAllGeometryFilters();
+    applyAllComponentFilters(currentComponentFilters);
+    syncTreeLabels();
+}
+
+function categoryIsLoaded(category) {
+    if (!category) return true;
+    return category.types.every(function(type) { return loadedFeatureTypes.has(type); });
+}
+
+// Fetch the missing feature types of one filter category.  Requests are queued
+// instead of dropped, so two quick clicks on different buttons both load.
+function loadFilterCategory(category, button) {
+    if (!category || categoryIsLoaded(category)) return Promise.resolve();
+    const previous = lazyGeometryLoading || Promise.resolve();
+    if (button) {
+        button.classList.add('map-filter-loading');
+        button.setAttribute('aria-busy', 'true');
+    }
+    const task = previous.catch(function() {}).then(function() {
+        if (categoryIsLoaded(category)) return null;
+        const missing = category.types.filter(function(type) {
+            return !loadedFeatureTypes.has(type);
+        });
+        return fetch(geometryUrlWithTypes(missing))
+            .then(function(response) { return response.json(); })
+            .then(function(data) { addGeometryFeatures(data); })
+            .catch(function(error) {
+                console.error('Error loading geometry for', category.key, error);
+            });
+    }).then(function() {
+        if (button) {
+            button.classList.remove('map-filter-loading');
+            button.removeAttribute('aria-busy');
+        }
+        if (lazyGeometryLoading === task) lazyGeometryLoading = null;
+    });
+    lazyGeometryLoading = task;
+    return task;
+}
+
 // Which filter category a feature belongs to (null = never filtered).
 function featureFilterKey(properties) {
     const type = (properties && properties.type) || '';
@@ -325,7 +408,13 @@ function setupMapFilterWidget(targetMap, filterKeys, componentCategories, listen
                 button.classList.toggle('active', visible);
                 button.setAttribute('aria-pressed', String(visible));
                 button.title = (visible ? 'Hide ' : 'Show ') + category.label;
-                applyComponentFilter(category, visible);
+                if (visible && lazyGeometry) {
+                    loadFilterCategory(category, button).then(function() {
+                        applyComponentFilter(category, true);
+                    });
+                } else {
+                    applyComponentFilter(category, visible);
+                }
             });
         });
 
@@ -350,7 +439,13 @@ function setupMapFilterWidget(targetMap, filterKeys, componentCategories, listen
                 button.classList.toggle('active', visible);
                 button.setAttribute('aria-pressed', String(visible));
                 button.title = (visible ? 'Hide ' : 'Show ') + category.label;
-                applyGeometryFilter(category.key, visible);
+                if (visible && lazyGeometry) {
+                    loadFilterCategory(category, button).then(function() {
+                        applyGeometryFilter(category.key, true);
+                    });
+                } else {
+                    applyGeometryFilter(category.key, visible);
+                }
             });
         });
 
@@ -365,20 +460,19 @@ function setupMapFilterWidget(targetMap, filterKeys, componentCategories, listen
 // Reload the current geometry without a page navigation (rows/orientation edits).
 window.reloadMapGeometry = function() {
     if (!currentGeojsonUrl || !featureLayer) return Promise.resolve(false);
-    return fetch(currentGeojsonUrl)
+    // Keep the on-demand contract: refresh only the categories already loaded.
+    const types = lazyGeometry ? Array.from(loadedFeatureTypes) : [];
+    return fetch(geometryUrlWithTypes(types))
         .then(function(response) { return response.json(); })
         .then(function(data) {
-            data = filterHiddenFeatures(data);
             if (labelLayers) {
                 Object.keys(labelLayers).forEach(function(type) {
                     labelLayers[type].clearLayers();
                 });
             }
             featureLayer.clearLayers();
-            featureLayer.addData(data);
-            applyAllGeometryFilters();
-            applyAllComponentFilters(currentComponentFilters);
-            syncTreeLabels();
+            loadedFeatureTypes.clear();
+            addGeometryFeatures(data);
             return true;
         })
         .catch(function(err) {
@@ -579,6 +673,10 @@ function initMap(elementId, geojsonUrl, options = {}) {
     if (!mapElement) return null;
     currentGeojsonUrl = geojsonUrl || currentGeojsonUrl;
     hiddenFeatureTypes = Array.isArray(options.hiddenTypes) ? options.hiddenTypes : [];
+    // Pages that open on a subset (Map Overview: sectors only) fetch the other
+    // categories later, when the matching filter button is switched on.
+    lazyGeometry = !!(options.lazyFilters && Array.isArray(options.mapFiltersOn));
+    loadedFeatureTypes.clear();
 
     const mapHeight = options.height || '500px';
     mapElement.style.height = mapHeight;
@@ -771,30 +869,41 @@ function initMap(elementId, geojsonUrl, options = {}) {
                 const nameAr = feature.properties.name_ar || '';
                 const type = feature.properties.type || '';
                 const validated = feature.properties.validated;
-                let popupContent = `<b>${escapeLabelHtml(labelCode(properties) || name)}</b>`;
-                if (name && labelCode(properties)) popupContent += ` &ndash; ${escapeLabelHtml(name)}`;
-                if (nameAr) popupContent += ` / <span class="ar-text">${nameAr}</span>`;
-                popupContent += `<br><small>Type: ${type}</small>`;
-                if (validated !== undefined) {
-                    popupContent += `<br><small>Status: ${validated ? '✓ Validated' : 'Pending'}</small>`;
-                }
-                if (type === 'zone' && properties.orientation_deg !== undefined) {
-                    const deg = properties.orientation_deg;
-                    const compass = properties.orientation || '';
-                    popupContent += `<br><small><b>Orientation / الاتجاه:</b> ${deg}° (${compass})</small>`;
-                }
-                if (options.showArea) {
-                    const stats = geometryAreaStats(feature.geometry);
-                    if (stats) {
-                        popupContent += `<br><small><b>Area / المساحة:</b> ${formatAreaM2(stats.area)}</small>`;
-                        popupContent += `<br><small><b>Perimeter / المحيط:</b> ${formatDistanceM(stats.perimeter)}</small>`;
+                // The popup HTML is built on click instead of for every feature:
+                // a large orchard has tens of thousands of them and the strings
+                // (plus the area maths) are only ever read one at a time.
+                layer.bindPopup(function() {
+                    let popupContent = `<b>${escapeLabelHtml(labelCode(properties) || name)}</b>`;
+                    if (name && labelCode(properties)) popupContent += ` &ndash; ${escapeLabelHtml(name)}`;
+                    if (nameAr) popupContent += ` / <span class="ar-text">${nameAr}</span>`;
+                    popupContent += `<br><small>Type: ${type}</small>`;
+                    if (validated !== undefined) {
+                        popupContent += `<br><small>Status: ${validated ? '✓ Validated' : 'Pending'}</small>`;
                     }
-                }
-                layer.bindPopup(popupContent);
+                    if (type === 'zone' && properties.orientation_deg !== undefined) {
+                        const deg = properties.orientation_deg;
+                        const compass = properties.orientation || '';
+                        popupContent += `<br><small><b>Orientation / الاتجاه:</b> ${deg}° (${compass})</small>`;
+                    }
+                    if (options.showArea) {
+                        const stats = geometryAreaStats(feature.geometry);
+                        if (stats) {
+                            popupContent += `<br><small><b>Area / المساحة:</b> ${formatAreaM2(stats.area)}</small>`;
+                            popupContent += `<br><small><b>Perimeter / المحيط:</b> ${formatDistanceM(stats.perimeter)}</small>`;
+                        }
+                    }
+                    return popupContent;
+                });
 
                 if (options.selectable && selectableTypes.indexOf(type) !== -1 && properties.id !== undefined) {
-                    const checkbox = Array.from(document.querySelectorAll(options.selectable.checkboxSelector))
-                        .find((input) => input.value === String(properties.id));
+                    // Only pages wired to a checkbox table have a selector; without
+                    // one this lookup would run (and find nothing) per feature,
+                    // which is costly on a large orchard.
+                    const checkboxSelector = options.selectable.checkboxSelector;
+                    const checkbox = checkboxSelector
+                        ? Array.from(document.querySelectorAll(checkboxSelector))
+                            .find((input) => input.value === String(properties.id))
+                        : null;
                     const setSelectedStyle = (selected) => {
                         layer._geometrySelected = selected;
                         if (layer.setStyle) {
@@ -842,19 +951,17 @@ function initMap(elementId, geojsonUrl, options = {}) {
         }
     }).addTo(map);
 
-    // Load GeoJSON data if URL provided
+    // Load GeoJSON data if URL provided.  With lazy geometry only the categories
+    // shown at load are requested; the rest arrive when their filter is enabled.
     if (geojsonUrl) {
-        fetch(geojsonUrl)
+        const initialTypes = lazyGeometry ? typesForFilterKeys(options.mapFiltersOn) : [];
+        fetch(geometryUrlWithTypes(initialTypes))
             .then(response => response.json())
             .then(data => {
-                data = filterHiddenFeatures(data);
-                featureLayer.addData(data);
+                addGeometryFeatures(data);
                 if (data.features && data.features.length > 0) {
                     map.fitBounds(featureLayer.getBounds(), { padding: [50, 50] });
                 }
-                applyAllGeometryFilters();
-                applyAllComponentFilters(Array.isArray(options.componentFilters) ? options.componentFilters : []);
-                syncTreeLabels();
                 // Pages with a sector list wait for this before zooming.
                 document.dispatchEvent(new CustomEvent('mapgeometryloaded'));
             })

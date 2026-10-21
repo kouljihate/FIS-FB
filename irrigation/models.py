@@ -57,13 +57,29 @@ def _sector_short_code(sector, ordinal):
     return 'S{}'.format(ordinal)
 
 
-def assign_short_names(project_id):
+#: Short-name levels, outermost first.  A level implies the ones above it.
+SHORT_NAME_LEVELS = ('sector', 'zone', 'row', 'tree')
+
+
+def assign_short_names(project_id, levels=None):
     """Compute and persist hierarchical short names for a project.
 
     Sector -> ``S1`` (number parsed from the name, else its ordinal),
     Zone -> ``S1Z1`` (numbered per sector), Row -> ``S1Z1R1`` (per zone),
     Tree -> ``S1Z1R1T1`` (per row). Numbering follows ascending ``id``.
+
+    ``levels`` limits the work to the codes a page actually shows: a map that
+    only draws sectors must not walk every tree in the project.  The default
+    refreshes every level.
     """
+    wanted = set(SHORT_NAME_LEVELS if levels is None else levels)
+    # A level needs the codes of its parents, so widen the request downwards.
+    if 'tree' in wanted:
+        wanted.update(('row', 'zone'))
+    if 'row' in wanted:
+        wanted.add('zone')
+    wanted.add('sector')
+
     def _sorted(collection):
         return sorted(
             list(mongo.db[collection].find({'project_id': project_id})),
@@ -79,6 +95,9 @@ def assign_short_names(project_id):
     for ordinal, sector in enumerate(_sorted('sectors'), start=1):
         sector_codes[sector['id']] = _save('sectors', sector, _sector_short_code(sector, ordinal))
 
+    if 'zone' not in wanted:
+        return
+
     zone_codes = {}
     zone_counters = {}
     for zone in _sorted('zones'):
@@ -89,6 +108,9 @@ def assign_short_names(project_id):
             'zones', zone, '{}Z{}'.format(base, zone_counters[sector_id])
         )
 
+    if 'row' not in wanted:
+        return
+
     row_codes = {}
     row_counters = {}
     for row in _sorted('tree_rows'):
@@ -98,6 +120,9 @@ def assign_short_names(project_id):
         row_codes[row['id']] = _save(
             'tree_rows', row, '{}R{}'.format(base, row_counters[zone_id])
         )
+
+    if 'tree' not in wanted:
+        return
 
     tree_counters = {}
     for tree in _sorted('trees'):

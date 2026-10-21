@@ -222,8 +222,10 @@ def index(project_id):
     if not project:
         return redirect(url_for("project.index"))
 
-    # Short names drive the sector buttons (S1, S2, ...).
-    assign_short_names(project_id)
+    # Short names drive the sector buttons (S1, S2, ...).  Only the sector level
+    # is needed here: walking every tree of a large orchard just to label four
+    # buttons kept this page loading for seconds.
+    assign_short_names(project_id, levels=('sector',))
     sectors = []
     for sector in mongo.db.sectors.find({"project_id": project_id}).sort("id", 1):
         sectors.append({

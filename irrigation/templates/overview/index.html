@@ -278,8 +278,11 @@ document.addEventListener('DOMContentLoaded', function () {
         labelTypes: ['sector', 'zone', 'tree_row', 'tree'],
         // Every element type the API can draw is filterable from the funnel widget.
         mapFilters: ELEMENT_FILTER_KEYS,
-        // First visit shows the sector layout only; the rest is one click away.
-        mapFiltersOn: ['sector']
+        // First visit draws the sector outlines only.  The other categories are
+        // fetched the first time their filter button is switched on: drawing a
+        // whole orchard (thousands of trees and driplines) froze the browser.
+        mapFiltersOn: ['sector'],
+        lazyFilters: true
     });
 
     buildSectorControl();

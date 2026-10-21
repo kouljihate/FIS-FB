@@ -1024,6 +1024,18 @@ body.map-fullscreen-lock {
     color: #adb5bd;
 }
 
+/* A category fetched on demand: keep the button readable while its geometry
+   is on the way instead of looking unresponsive. */
+.map-filter-button.map-filter-loading {
+    animation: map-filter-pulse 1s ease-in-out infinite;
+    cursor: progress;
+}
+
+@keyframes map-filter-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+}
+
 .geometry-map-select-mode .leaflet-interactive {
     cursor: pointer;
 }
