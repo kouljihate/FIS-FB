@@ -421,7 +421,8 @@ function setupMapFilterWidget(targetMap, filterKeys, componentCategories, listen
                 button.title = (visible ? 'Hide ' : 'Show ') + category.label;
                 if (visible && lazyGeometry) {
                     loadFilterCategory(category, button).then(function() {
-                        applyComponentFilter(category, true);
+                        // The user may have switched it off again while loading.
+                        applyComponentFilter(category, componentFilterState[category.key] !== false);
                     });
                 } else {
                     applyComponentFilter(category, visible);
@@ -452,7 +453,8 @@ function setupMapFilterWidget(targetMap, filterKeys, componentCategories, listen
                 button.title = (visible ? 'Hide ' : 'Show ') + category.label;
                 if (visible && lazyGeometry) {
                     loadFilterCategory(category, button).then(function() {
-                        applyGeometryFilter(category.key, true);
+                        // The user may have switched it off again while loading.
+                        applyGeometryFilter(category.key, filterState[category.key] !== false);
                     });
                 } else {
                     applyGeometryFilter(category.key, visible);
@@ -473,16 +475,13 @@ window.reloadMapGeometry = function() {
     if (!currentGeojsonUrl || !featureLayer) return Promise.resolve(false);
     // Keep the on-demand contract: refresh only the categories already loaded.
     const types = lazyGeometry ? Array.from(loadedFeatureTypes) : [];
+    // Nothing is loaded yet: refetching with an empty list would draw the whole
+    // project and defeat the on-demand contract.
+    if (lazyGeometry && !types.length) return Promise.resolve(true);
     return fetch(geometryUrlWithTypes(types))
         .then(function(response) { return response.json(); })
         .then(function(data) {
-            if (labelLayers) {
-                Object.keys(labelLayers).forEach(function(type) {
-                    labelLayers[type].clearLayers();
-                });
-            }
-            featureLayer.clearLayers();
-            loadedFeatureTypes.clear();
+            clearGeometryLayers();
             addGeometryFeatures(data);
             return true;
         })
@@ -493,9 +492,12 @@ window.reloadMapGeometry = function() {
 };
 
 // ---------- Sector scope ----------
-// Selecting a sector keeps that sector's marks (zones, rows, trees, network)
-// and reduces every other sector to a dashed boundary, so a busy orchard does
-// not hide the one sector being looked at.
+// Selecting a sector is a layout view, not a "show me everything" view: only
+// the sector and zone filters come on (blueprint of the chosen sector plus the
+// zones inside it), and the other sectors become dashed boundaries for
+// context.  Every other category stays off until the user asks for it.
+const SECTOR_SCOPE_FILTER_KEYS = ['sector', 'zone'];
+
 function setFilterStateFromKeys(keys) {
     const list = Array.isArray(keys) ? keys : null;
     FILTER_CATEGORIES.forEach(function(category) {
@@ -508,7 +510,11 @@ function syncFilterButtons() {
     const buttons = document.querySelectorAll('.map-filter-button[data-filter-key]');
     Array.prototype.forEach.call(buttons, function(button) {
         const key = button.dataset.filterKey;
-        const state = filterState[key] !== undefined ? filterState[key] : componentFilterState[key];
+        // Fitting kinds own their buttons even when a geometry category shares
+        // the key (connector, reduction, air_release, ...).
+        const ownedByFitting = (currentComponentFilters || [])
+            .some(function(item) { return item.key === key; });
+        const state = ownedByFitting ? componentFilterState[key] : filterState[key];
         const visible = state !== false;
         button.classList.toggle('active', visible);
         button.setAttribute('aria-pressed', String(visible));
@@ -538,28 +544,46 @@ function styleSectorScope() {
     });
 }
 
-// Types to ask for: everything in a scoped view, the page's own starting set
-// when the whole project is shown again.
+// Types to ask for: the categories currently switched on.  Reading the live
+// filter state (not `initialFilterKeys`) matters twice: a scoped sector only
+// asks for its layout (sectors + zones), and leaving a sector has to bring back
+// the categories the page was showing before the scope.
 function typesForCurrentState() {
-    if (sectorScope !== null) return [];
-    if (lazyGeometry) return typesForFilterKeys(initialFilterKeys);
-    return [];
+    // Pages without on-demand loading (the card maps) ask for everything.
+    if (!lazyGeometry) return [];
+    const keys = FILTER_CATEGORIES
+        .filter(function(category) { return filterState[category.key]; })
+        .map(function(category) { return category.key; });
+    return typesForFilterKeys(keys);
+}
+
+// Drop every drawn feature and its labels, keeping the GeoJSON layer itself.
+function clearGeometryLayers() {
+    if (labelLayers) {
+        Object.keys(labelLayers).forEach(function(type) {
+            labelLayers[type].clearLayers();
+        });
+    }
+    if (featureLayer) featureLayer.clearLayers();
+    loadedFeatureTypes.clear();
 }
 
 function refetchScopedGeometry() {
     if (!currentGeojsonUrl || !featureLayer) return Promise.resolve(false);
     const previous = lazyGeometryLoading || Promise.resolve();
     const task = previous.catch(function() {}).then(function() {
-        return fetch(geometryUrlWithTypes(typesForCurrentState()))
+        const types = typesForCurrentState();
+        // On a lazy page every category may be switched off: an empty `types`
+        // list would fetch the whole project, so draw nothing instead.
+        if (lazyGeometry && !types.length) {
+            clearGeometryLayers();
+            document.dispatchEvent(new CustomEvent('mapgeometryloaded'));
+            return true;
+        }
+        return fetch(geometryUrlWithTypes(types))
             .then(function(response) { return response.json(); })
             .then(function(data) {
-                if (labelLayers) {
-                    Object.keys(labelLayers).forEach(function(type) {
-                        labelLayers[type].clearLayers();
-                    });
-                }
-                featureLayer.clearLayers();
-                loadedFeatureTypes.clear();
+                clearGeometryLayers();
                 addGeometryFeatures(data);
                 styleSectorScope();
                 if (sectorScope !== null) zoomToFeature('sector', sectorScope);
@@ -578,8 +602,8 @@ function refetchScopedGeometry() {
     return task;
 }
 
-// Zoom the map to one sector and show only its marks; null goes back to the
-// whole project with the page's starting categories.
+// Zoom the map to one sector and show its layout (sector + zones); null goes
+// back to the whole project with the page's starting categories.
 window.setSectorScope = function(sectorId) {
     const next = (sectorId === null || sectorId === undefined || sectorId === '')
         ? null : String(sectorId);
@@ -595,7 +619,8 @@ window.setSectorScope = function(sectorId) {
         setFilterStateFromKeys(sectorScopeFilterState || initialFilterKeys);
         sectorScopeFilterState = null;
     } else {
-        setFilterStateFromKeys(null);      // every kind of mark inside the sector
+        // Only the sector layout and its zones, never the whole orchard.
+        setFilterStateFromKeys(SECTOR_SCOPE_FILTER_KEYS);
     }
     syncFilterButtons();
     return refetchScopedGeometry();

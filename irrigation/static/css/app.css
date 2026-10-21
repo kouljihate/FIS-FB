@@ -767,15 +767,21 @@ textarea {
     }
 }
 
-/* Map container */
+/* Map container. Leaflet ships its own Helvetica/Arial stack on the map, so
+   every map - the card maps and the full-page Map Overview - is pulled back
+   to the two app fonts. */
+.leaflet-container,
+.leaflet-container .leaflet-control,
+.leaflet-container .leaflet-popup-content,
+.leaflet-container .leaflet-tooltip,
+.leaflet-container .leaflet-control-attribution,
 .geometry-map-card .card-header h5,
-.geometry-map-card .leaflet-container,
-.geometry-map-card .leaflet-control,
-.geometry-map-card .leaflet-popup-content,
 .geometry-map-card .map-legend {
     font-family: var(--font-en) !important;
 }
 
+.leaflet-container .ar-text,
+.leaflet-container .leaflet-popup-content .ar-text,
 .geometry-map-card .ar-text {
     font-family: var(--font-ar) !important;
 }

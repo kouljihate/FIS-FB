@@ -388,8 +388,9 @@ function buildSectorControl() {
                 '<span class="name">' + escapeSectorText(sector.name_en || sector.name_ar || '') + '</span>';
             button.addEventListener('click', function () {
                 setActiveSectorButton(button);
-                // One sector at a time: its marks stay, the other sectors become
-                // dashed boundaries, everything else leaves the map.
+                // One sector at a time: the funnel switches to Sector + Zones
+                // only, so the map shows this sector's layout and the other
+                // sectors as dashed boundaries.
                 clearSelection();
                 if (typeof setSectorScope === 'function') {
                     setSectorScope(sector.id);

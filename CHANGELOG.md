@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.11 - 2026-10-21
+
+### Changed
+- every map now uses the app fonts (Comfortaa / VIP-Rawy), including zoom controls, popups, tooltips and attribution.
+- selecting a sector in Map Overview switches the funnel to Sector + Zones only, so the map opens on that sector's layout.
+
+### Fixed
+- leaving a sector restored the filter buttons but not the geometry behind them.
+- switching an on-demand category off before its fetch finished brought it back on the map.
+- an empty filter selection fetched and drew the whole project instead of nothing.
+- fitting buttons (connector, reductor, air removal, ...) read the geometry state for a shared key.
+
 ## 0.4.10 - 2026-10-21
 
 ### Changed
