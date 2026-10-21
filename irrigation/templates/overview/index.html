@@ -155,6 +155,28 @@
         background: #2f6f3e;
     }
 
+    /* Statistics panel: how many marks the map is showing right now. */
+    .map-overview-stats {
+        display: flex;
+        align-items: baseline;
+        gap: 0.3rem;
+        padding: 0 0.25rem 0.15rem;
+    }
+
+    .map-overview-stats .stats-value {
+        font-size: 1.15rem;
+        font-weight: 700;
+        line-height: 1;
+        color: #212529;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .map-overview-stats .stats-label {
+        font-size: 0.72rem;
+        color: #6c757d;
+        white-space: nowrap;
+    }
+
     @media (max-width: 575.98px) {
         .map-overview-sector-btn {
             max-width: 9rem;
@@ -287,6 +309,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     buildSectorControl();
     buildObjectControl();
+    buildStatisticsControl();
     setupObjectToolbar();
     document.body.classList.add('map-overview-ready');
 
@@ -446,6 +469,70 @@ function buildObjectControl() {
         return panel;
     };
     control.addTo(map);
+}
+
+// ---------- Widget inside the map: how many marks are displayed ----------
+// Counts the geometry layers the map is showing at this moment, so hiding a
+// category with the funnel (or loading one on demand) updates the total.
+let marksRefreshFrame = null;
+
+function countDisplayedMarks() {
+    if (typeof featureLayer === 'undefined' || !featureLayer) return 0;
+    let total = 0;
+    featureLayer.eachLayer(function (layer) {
+        if (map.hasLayer(layer)) total++;
+    });
+    return total;
+}
+
+window.countDisplayedMarks = countDisplayedMarks;
+
+function buildStatisticsControl() {
+    const control = L.control({ position: 'topright' });
+    control.onAdd = function () {
+        const panel = L.DomUtil.create('div', 'map-overview-panel');
+        L.DomEvent.disableClickPropagation(panel);
+        L.DomEvent.disableScrollPropagation(panel);
+
+        const title = L.DomUtil.create('span', 'panel-title', panel);
+        title.textContent = 'Displayed marks / العلامات المعروضة';
+
+        const row = L.DomUtil.create('div', 'map-overview-stats', panel);
+        const value = L.DomUtil.create('span', 'stats-value', row);
+        value.id = 'displayedMarksCount';
+        value.textContent = '0';
+        const label = L.DomUtil.create('span', 'stats-label', row);
+        label.textContent = 'marks / علامة';
+
+        return panel;
+    };
+    control.addTo(map);
+
+    refreshDisplayedMarks();
+
+    // Every feature add/remove changes the total; recount once per frame so a
+    // whole category (thousands of markers) costs one recount, not one each.
+    map.on('layeradd layerremove', function (event) {
+        if (typeof featureLayer === 'undefined' || !featureLayer) return;
+        if (!featureLayer.hasLayer(event.layer)) return;
+        scheduleMarksRefresh();
+    });
+}
+
+function scheduleMarksRefresh() {
+    if (marksRefreshFrame) return;
+    marksRefreshFrame = requestAnimationFrame(function () {
+        marksRefreshFrame = null;
+        refreshDisplayedMarks();
+    });
+}
+
+function refreshDisplayedMarks() {
+    const value = document.getElementById('displayedMarksCount');
+    if (!value) return;
+    const total = countDisplayedMarks();
+    value.textContent = total.toLocaleString('en-US');
+    value.title = total + ' marks displayed / علامة معروضة';
 }
 
 function onMapSelectionChange(layer, properties, selected) {

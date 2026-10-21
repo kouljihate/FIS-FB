@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.8 - 2026-10-21
+
+### Added
+- statistics widget under Selected object showing how many marks the map is currently displaying.
+
+### Changed
+- the count follows the map filters, so hiding or loading a category updates it immediately.
+
 ## 0.4.7 - 2026-10-21
 
 ### Added
