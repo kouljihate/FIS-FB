@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.7 - 2026-10-21
+
+### Added
+- geometry API `?types=` filter, so a map can request only the element categories it draws.
+
+### Changed
+- Map Overview opens on sectors only and fetches every other category the first time its filter is switched on, instead of drawing the whole project up front.
+- overview assigns short names to sectors only, instead of naming every zone, row and tree on page load.
+
+### Fixed
+- popups on lazily loaded layers (zones, rows, trees, pipes, components) resolve their element before opening.
+
 ## 0.4.6 - 2026-10-20
 
 ### Added
