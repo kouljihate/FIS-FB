@@ -155,12 +155,20 @@
         background: #2f6f3e;
     }
 
-    /* Statistics panel: how many marks the map is showing right now. */
+    /* Statistics panel: how many marks the map is showing right now, with a
+       per-type breakdown under the grand total. */
     .map-overview-stats {
+        display: flex;
+        flex-direction: column;
+        gap: 0.22rem;
+        width: 11rem;
+        padding: 0 0.25rem 0.15rem;
+    }
+
+    .map-overview-stats .stats-total {
         display: flex;
         align-items: baseline;
         gap: 0.3rem;
-        padding: 0 0.25rem 0.15rem;
     }
 
     .map-overview-stats .stats-value {
@@ -177,9 +185,72 @@
         white-space: nowrap;
     }
 
+    /* One row per mark type: badge, name, sum.  The list scrolls so the panel
+       keeps its corner however many types the map draws. */
+    .map-overview-stats .stats-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.05rem;
+        max-height: min(24vh, 12rem);
+        overflow-y: auto;
+        overflow-x: hidden;
+        /* Reserve the scrollbar lane so the sums are never drawn under it. */
+        scrollbar-gutter: stable;
+        padding-right: 0.15rem;
+    }
+
+    .map-overview-stats .stats-row {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.05rem 0.1rem;
+        border-radius: 0.25rem;
+        font-size: 0.72rem;
+        line-height: 1.25;
+        color: #212529;
+    }
+
+    .map-overview-stats .stats-row.is-empty {
+        color: #adb5bd;
+    }
+
+    .map-overview-stats .stats-row .stats-badge {
+        flex: 0 0 auto;
+        min-width: 1.5rem;
+        padding: 0 0.18rem;
+        border-radius: 0.25rem;
+        background: #e9ecef;
+        color: #495057;
+        font-size: 0.64rem;
+        font-weight: 700;
+        text-align: center;
+    }
+
+    .map-overview-stats .stats-row.has-marks .stats-badge {
+        background: #2f6f3e;
+        color: #fff;
+    }
+
+    .map-overview-stats .stats-row .stats-name {
+        flex: 1 1 auto;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .map-overview-stats .stats-row .stats-count {
+        flex: 0 0 auto;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+    }
+
     @media (max-width: 575.98px) {
         .map-overview-sector-btn {
             max-width: 9rem;
+        }
+
+        .map-overview-stats {
+            width: 9.5rem;
         }
     }
 </style>
@@ -487,19 +558,86 @@ function buildObjectControl() {
 
 // ---------- Widget inside the map: how many marks are displayed ----------
 // Counts the geometry layers the map is showing at this moment, so hiding a
-// category with the funnel (or loading one on demand) updates the total.
+// category with the funnel (or loading one on demand) updates the total.  The
+// panel also breaks the total down per mark type, one row per type.
 let marksRefreshTimer = null;
 
-function countDisplayedMarks() {
-    if (typeof featureLayer === 'undefined' || !featureLayer) return 0;
-    let total = 0;
+// One entry per mark type the GeoJSON endpoint can emit.  A type the map draws
+// but this catalogue does not know about still gets a row: refreshDisplayedMarks
+// appends it the first time it appears.
+const MARK_TYPE_SPECS = [
+    { type: 'sector', letter: 'S', name: 'Sectors', nameAr: 'القطاعات' },
+    { type: 'zone', letter: 'Z', name: 'Zones', nameAr: 'المناطق' },
+    { type: 'tree_row', letter: 'R', name: 'Tree Rows', nameAr: 'الصفوف' },
+    { type: 'tree', letter: 'T', name: 'Trees', nameAr: 'الأشجار' },
+    { type: 'main_pipe', letter: 'MP', name: 'Main Pipes', nameAr: 'الأنابيب الرئيسية' },
+    { type: 'second_pipe', letter: 'SP', name: 'Second Pipes', nameAr: 'الأنابيب الثانوية' },
+    { type: 'sub_pipe', letter: 'SB', name: 'Sub Pipes', nameAr: 'الأنابيب الفرعية' },
+    { type: 'dripline', letter: 'DL', name: 'Driplines', nameAr: 'خطوط التنقيط' },
+    { type: 'master_valve', letter: 'VM', name: 'Main Valves', nameAr: 'الصمامات الرئيسية' },
+    { type: 'sector_valve', letter: 'VS', name: 'Sector Valves', nameAr: 'صمامات القطاعات' },
+    { type: 'zone_valve', letter: 'VZ', name: 'Zone Valves', nameAr: 'صمامات المناطق' },
+    { type: 'check_valve', letter: 'VC', name: 'Check Valves', nameAr: 'صمامات عدم الرجوع' },
+    { type: 'connector', letter: 'CN', name: 'Connectors', nameAr: 'الوصلات' },
+    { type: 'reduction', letter: 'RD', name: 'Reductors', nameAr: 'المخفضات' },
+    { type: 'air_release', letter: 'AR', name: 'Air Removal', nameAr: 'إزالة الهواء' },
+    { type: 'pressure_reduction', letter: 'PR', name: 'Pressure Reduction', nameAr: 'خفض الضغط' },
+    { type: 'terminator', letter: 'TM', name: 'Terminators', nameAr: 'النهايات' },
+    { type: 'boundary', letter: 'B', name: 'Land Boundary', nameAr: 'حدود الأرض' },
+    { type: 'water_source', letter: 'W', name: 'Water Sources', nameAr: 'مصادر المياه' },
+    { type: 'kml_feature', letter: 'KML', name: 'KML Overlays', nameAr: 'طبقات KML' }
+];
+
+// type -> { row, count } for the rows already in the panel.
+const marksTypeRows = new Map();
+
+function markTypeSpec(type) {
+    return MARK_TYPE_SPECS.find(function (spec) { return spec.type === type; }) || null;
+}
+
+function countDisplayedMarksByType() {
+    const counts = {};
+    if (typeof featureLayer === 'undefined' || !featureLayer) return counts;
     featureLayer.eachLayer(function (layer) {
-        if (map.hasLayer(layer)) total++;
+        if (!map.hasLayer(layer)) return;
+        const properties = layer.feature ? layer.feature.properties : null;
+        const type = (properties && properties.type) || 'other';
+        counts[type] = (counts[type] || 0) + 1;
     });
-    return total;
+    return counts;
+}
+
+function countDisplayedMarks() {
+    const counts = countDisplayedMarksByType();
+    return Object.keys(counts).reduce(function (sum, type) { return sum + counts[type]; }, 0);
 }
 
 window.countDisplayedMarks = countDisplayedMarks;
+
+function buildMarkTypeRow(spec) {
+    const row = document.createElement('div');
+    row.className = 'stats-row is-empty';
+    row.dataset.markType = spec.type;
+    row.title = spec.name + ' / ' + spec.nameAr;
+
+    const badge = document.createElement('span');
+    badge.className = 'stats-badge';
+    badge.textContent = spec.letter;
+    row.appendChild(badge);
+
+    const name = document.createElement('span');
+    name.className = 'stats-name';
+    name.textContent = spec.name;
+    row.appendChild(name);
+
+    const count = document.createElement('span');
+    count.className = 'stats-count';
+    count.textContent = '0';
+    row.appendChild(count);
+
+    marksTypeRows.set(spec.type, { row: row, count: count });
+    return row;
+}
 
 function buildStatisticsControl() {
     const control = L.control({ position: 'topright' });
@@ -511,12 +649,25 @@ function buildStatisticsControl() {
         const title = L.DomUtil.create('span', 'panel-title', panel);
         title.textContent = 'Displayed marks / العلامات المعروضة';
 
-        const row = L.DomUtil.create('div', 'map-overview-stats', panel);
-        const value = L.DomUtil.create('span', 'stats-value', row);
+        const stats = L.DomUtil.create('div', 'map-overview-stats', panel);
+
+        const totalRow = L.DomUtil.create('div', 'stats-total', stats);
+        const value = L.DomUtil.create('span', 'stats-value', totalRow);
         value.id = 'displayedMarksCount';
         value.textContent = '0';
-        const label = L.DomUtil.create('span', 'stats-label', row);
+        const label = L.DomUtil.create('span', 'stats-label', totalRow);
         label.textContent = 'marks / علامة';
+
+        // Every type keeps its row, zeros included, so the list never
+        // re-orders itself while the map loads category after category.
+        const list = L.DomUtil.create('div', 'stats-list', stats);
+        list.id = 'displayedMarksByType';
+        MARK_TYPE_SPECS.forEach(function (spec) {
+            list.appendChild(buildMarkTypeRow(spec));
+        });
+
+        // Scrolling the list must not pan or zoom the map underneath.
+        L.DomEvent.on(list, 'mousedown wheel', L.DomEvent.stopPropagation);
 
         return panel;
     };
@@ -546,7 +697,28 @@ function scheduleMarksRefresh() {
 function refreshDisplayedMarks() {
     const value = document.getElementById('displayedMarksCount');
     if (!value) return;
-    const total = countDisplayedMarks();
+    const counts = countDisplayedMarksByType();
+    const list = document.getElementById('displayedMarksByType');
+
+    // A type the map draws but the catalogue does not list still gets a row.
+    if (list) {
+        Object.keys(counts).sort().forEach(function (type) {
+            if (marksTypeRows.has(type)) return;
+            const spec = markTypeSpec(type) || { type: type, letter: '?', name: type, nameAr: type };
+            list.appendChild(buildMarkTypeRow(spec));
+        });
+    }
+
+    let total = 0;
+    Object.keys(counts).forEach(function (type) { total += counts[type]; });
+
+    marksTypeRows.forEach(function (entry, type) {
+        const shown = counts[type] || 0;
+        entry.count.textContent = shown.toLocaleString('en-US');
+        entry.row.classList.toggle('is-empty', shown === 0);
+        entry.row.classList.toggle('has-marks', shown > 0);
+    });
+
     value.textContent = total.toLocaleString('en-US');
     value.title = total + ' marks displayed / علامة معروضة';
 }

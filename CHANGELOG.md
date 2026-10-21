@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.12 - 2026-10-21
+
+### Added
+- the Displayed marks panel gives every mark type its own row with its sum, under the grand total
+
+### Changed
+- rows keep the funnel order and dim when a type is hidden or not loaded, so the list never re-orders
+
+### Fixed
+- the sums stay clear of the scrollbar and the panel fits above the map's bottom edge
+
 ## 0.4.11 - 2026-10-21
 
 ### Changed
