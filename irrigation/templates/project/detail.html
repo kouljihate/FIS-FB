@@ -858,22 +858,28 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const geojsonUrl = '{{ url_for("api.get_geometry", project_id=project.id) }}';
-    initMap('projectMap', geojsonUrl, {
+    // The Project tab shows the drawing itself: sector outlines, water sources
+    // and the terrain.  Zones, rows, trees, pipes and fittings have their own
+    // tabs; drawing them all here buried the layout under the network.
+    const projectMap = initMap('projectMap', geojsonUrl, {
         center: [34.0, -6.0],
-        zoom: 14
+        zoom: 14,
+        labelTypes: ['sector'],
+        mapFilters: ['sector', 'water_source'],
+        mapFiltersOn: ['sector', 'water_source'],
+        lazyFilters: true
     });
 
-    // Add legend
+    // Terrain surface from the cached elevation model (Engineering → Fetch
+    // Elevation fills it; until then the toggle stays inert).
+    addElevationHeatmap(projectMap, '{{ url_for("engineering.elevation_heatmap", project_id=project.id) }}');
+
+    // Elevation has its own gradient legend (bottom right), so this one only
+    // names the two drawn layers.
     addLegend([
-        {color: '#28a745', label: 'Boundary / الحدود'},
         {color: '#007bff', label: 'Sectors / القطاعات'},
-        {color: '#ffc107', label: 'Zones / المناطق'},
-        {color: '#dc3545', label: 'Main Pipe / الأنبوب الرئيسي'},
-        {color: '#fd7e14', label: 'Sub Pipe / أنبوب فرعي'},
-        {color: '#6c757d', label: 'Tree Rows / صفوف الأشجار'},
-        {color: '#28a745', label: 'Trees / الأشجار'},
-        {color: '#6610f2', label: 'Valves / الصمامات'}
-    ]);
+        {color: '#17a2b8', label: 'Water Sources / مصادر المياه'}
+    ], {position: 'bottomleft'});
 
     // Add a new tree plan row
     document.getElementById('addTreePlanRow').addEventListener('click', function() {

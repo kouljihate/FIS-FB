@@ -78,7 +78,8 @@ project
 │   └── validations    [ validation result ]
 ├── elevation_models   [ terrain model ]
 └── spec               project settings (owner, config, rules, tree plan,
-                       estimation, land_documents, water_sources)
+                       estimation (prices, items, discount, tax, roi),
+                       land_documents, water_sources)
 ```
 
 Child documents keep the fields the existing UI uses (`id`, `project_id`,

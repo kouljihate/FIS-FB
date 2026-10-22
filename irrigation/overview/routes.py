@@ -222,6 +222,12 @@ def index(project_id):
     if not project:
         return redirect(url_for("project.index"))
 
+    # Basins drawn as KML polygons were left out of the water source list by
+    # older imports; list them before the map asks for the sources.
+    from irrigation.project.routes import _ensure_kml_water_sources
+
+    _ensure_kml_water_sources(project)
+
     # Short names drive the sector buttons (S1, S2, ...).  Only the sector level
     # is needed here: walking every tree of a large orchard just to label four
     # buttons kept this page loading for seconds.

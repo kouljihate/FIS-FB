@@ -19,8 +19,9 @@ def get_geometry(project_id):
 
     ``?sector=<id>`` keeps every sector outline (so the other boundaries stay
     visible) but only the marks that belong to that sector: its zones, rows,
-    trees and network elements.  The land boundary, the water source and the
-    imported KML overlays are left out of that view.
+    trees and network elements.  The land boundary and the imported KML
+    overlays are left out of that view; the water sources stay, because they
+    are the project's water supply and not part of any one sector.
     """
     from irrigation.access import find_project
 
@@ -64,7 +65,9 @@ def get_geometry(project_id):
     # Water sources: every well, basin and other source the project lists.
     # ``water_source`` is the legacy single Point kept in sync for the rest of
     # the app, so it is only drawn when the list has no positioned source.
-    if sector_scope is None and _accepted(wanted, 'water_source'):
+    # A scoped sector view keeps them too: the basin or well feeds the whole
+    # project, and hiding it made the basin look missing on the Map Overview.
+    if _accepted(wanted, 'water_source'):
         features.extend(_water_source_features(project))
 
     # Sectors - a scoped view always keeps the boundaries for context.

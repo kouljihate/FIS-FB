@@ -4,8 +4,8 @@
 Irrigation Planning System - A Flask-based web application for irrigation planning and management.
 
 ## Current Version
-- **Version**: 0.4.12
-- **Last Updated**: 2026-10-21
+- **Version**: 0.4.13
+- **Last Updated**: 2026-10-22
 
 ## Architecture Overview
 
@@ -20,7 +20,7 @@ Project - Water Resource - Geometry - Pipes - Trees - Components - Estimation - 
 #### 1. Project
 - **New**: Create a new project
 - **Load**: Load an existing project
-- **Link**: Open the project workspace (land documents, water sources, KML link/upload)
+- **Link**: Open the project workspace (land documents, water sources, KML link/upload) and its map: sector outlines, water sources and the elevation heatmap only
 
 #### 2. Water Resource
 - **Well**: Well management (Coming Soon placeholder)
@@ -50,6 +50,7 @@ Project - Water Resource - Geometry - Pipes - Trees - Components - Estimation - 
 
 #### 7. Estimation
 - **Pricing**: Estimation pricing configuration (prices, items, notes, discount, tax)
+- **ROI**: Return on investment after 5 years of exploitation (investment from the priced quote, yearly revenue and costs, yearly cash flow, ROI %, payback; assumptions saved per project)
 - **Result**: Estimation results and calculations (Coming Soon placeholder)
 
 #### 8. Report
@@ -87,7 +88,7 @@ Project - Water Resource - Geometry - Pipes - Trees - Components - Estimation - 
 - KML/KMZ import/export
 - AI-powered sector/zones generation
 - Hydraulic calculations and validation
-- Estimation and cost calculation
+- Estimation, cost calculation and 5-year ROI
 - Report generation (charts, bilan hydrique, technical reports)
 
 ## Rebuild Instructions
@@ -140,7 +141,7 @@ With sub-tabs:
 - **Pipes**: Main Pipe (MP) - Second Pipe (SP) - Zone Pipe (ZP)
 - **Trees**: Rows - Trees
 - **Components**: Valves - Connectors - Reductors - Air Removal - Reduce Pressure - Terminators
-- **Estimation**: Pricing - Result (Coming Soon)
+- **Estimation**: Pricing - ROI - Result (Coming Soon)
 - **Report**: Charts (Coming Soon) - Standard - Technical (DPA)
 
 ### API Endpoints
@@ -164,7 +165,7 @@ Key API endpoints for rebuild:
 
 ### Version Control
 - Git branches: `project-settings-v1`
-- Version: 0.4.12
+- Version: 0.4.13
 - Changelog: CHANGELOG.md
 - **ALWAYS bump the version on every change (never forget).** Increment `__version__` in
   `irrigation/__init__.py` (patch `+1`, e.g. `0.3.44` -> `0.3.45`), add a dated `## <version> - YYYY-MM-DD`

@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.4.13 - 2026-10-22
+
+### Added
+- Project tab map draws only the sector layout, the water sources and an elevation heatmap, each with its own toggle.
+- elevation heatmap from the cached terrain model, with a gradient legend showing the real min/max and sample count.
+- ROI subtab with the 5-year return, payback and yearly cash flow, and assumptions saved per project.
+- KML water bodies drawn as polygons (Basin, Bassin, حوض, ...) are imported as water sources at their centroid.
+- Map Overview lists water sources per kind (Wells, Basins, Reservoirs, Pumps, Canals) in the Displayed marks panel.
+
+### Changed
+- Map Overview opens with the water sources next to the sectors, so a basin is visible without switching its filter on.
+- water sources stay on the map in a scoped sector view.
+- tree labels are drawn only at a readable zoom and for the trees in view, keeping large orchards responsive.
+- water-source markers carry their kind's initial (W, B, R, P, C) instead of a generic dot.
+
+### Fixed
+- a KML basin imported as a polygon never reached the Water Sources table; projects imported earlier repair themselves when the Project or Map Overview page is opened.
+- a selected feature keeps its label and highlight even when its category's labels are off.
+
 ## 0.4.12 - 2026-10-21
 
 ### Added

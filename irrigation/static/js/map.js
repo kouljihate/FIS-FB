@@ -27,7 +27,12 @@ let sectorScopeFilterState = null;
 let initialFilterKeys = null;
 // Page callback told whenever a feature is selected or deselected on the map.
 let mapSelectionListener = null;
+// Tree labels are drawn only when the map is close enough for them to be read,
+// and only for the trees in view: an orchard of thousands would otherwise build
+// one label per tree and lock the browser while the user waits for them.
+// (A selected tree always shows its label, whatever the zoom.)
 const TREE_LABEL_MIN_ZOOM = 17;
+const TREE_LABEL_MAX_VISIBLE = 1200;
 
 // Label categories that can be toggled from the map widget.
 const LABEL_CATEGORIES = [
@@ -83,37 +88,158 @@ function layerCenterLatLng(layer) {
     return null;
 }
 
-function addFeatureLabel(layer, properties, group) {
-    if (!group) return;
+// One label marker for a feature, or null when the feature has no code/name.
+// The label card centres itself with CSS (translate -50%), so adding hundreds of
+// labels costs no layout measurement per label.
+function buildFeatureLabel(layer, properties) {
     const html = featureLabelHtml(properties);
-    if (!html) return;
+    if (!html) return null;
     const center = layerCenterLatLng(layer);
-    if (!center) return;
-    const marker = L.marker(center, {
+    if (!center) return null;
+    return L.marker(center, {
         interactive: false,
         keyboard: false,
-        icon: L.divIcon({ className: 'map-feature-label', html: html, iconSize: null })
+        icon: L.divIcon({
+            className: 'map-feature-label-anchor',
+            html: '<div class="map-feature-label">' + html + '</div>',
+            iconSize: [0, 0]
+        })
     });
-    marker.on('add', function() {
-        const el = marker.getElement();
-        if (el) {
-            el.style.marginLeft = -(el.offsetWidth / 2) + 'px';
-            el.style.marginTop = -(el.offsetHeight / 2) + 'px';
-        }
-    });
-    marker.addTo(group);
 }
 
-// Tree labels are only rendered at high zoom levels to keep dense orchard maps usable.
+// Every drawn label, by "type:id", so a selection can highlight its own label.
+const featureLabelMarkers = new Map();
+// Labels drawn only because their feature is selected (a tree below the label
+// zoom, or a label the current filter hides).
+const selectionLabels = new Map();
+
+function featureKeyOf(properties) {
+    if (!properties || properties.id === undefined) return null;
+    return properties.type + ':' + properties.id;
+}
+
+function addFeatureLabel(layer, properties, group) {
+    if (!group) return null;
+    const marker = buildFeatureLabel(layer, properties);
+    if (marker) {
+        marker.addTo(group);
+        const key = featureKeyOf(properties);
+        if (key) featureLabelMarkers.set(key, marker);
+    }
+    return marker;
+}
+
+// A selected tree/row/zone shows its code even when labels are off at this zoom,
+// and the label is highlighted so the picked mark is obvious on the map.
+function applySelectionFeedback(layer, properties, selected) {
+    if (!map) return;
+    const key = featureKeyOf(properties);
+    if (!key) return;
+    const marker = featureLabelMarkers.get(key);
+    let labelElement = marker && marker.getElement ? marker.getElement() : null;
+    let card = labelElement && labelElement.querySelector
+        ? labelElement.querySelector('.map-feature-label')
+        : null;
+
+    if (selected) {
+        if (!card) {
+            const extra = buildFeatureLabel(layer, properties);
+            if (extra) {
+                extra.addTo(map);
+                extra.setZIndexOffset(2000);
+                selectionLabels.set(key, extra);
+                labelElement = extra.getElement();
+                card = labelElement && labelElement.querySelector
+                    ? labelElement.querySelector('.map-feature-label')
+                    : null;
+            }
+        } else {
+            marker.setZIndexOffset(2000);
+        }
+        if (card) card.classList.add('is-selected');
+        const icon = layer.getElement ? layer.getElement() : null;
+        if (icon) icon.classList.add('is-selected');
+        return;
+    }
+
+    const extra = selectionLabels.get(key);
+    if (extra) {
+        if (map.hasLayer(extra)) map.removeLayer(extra);
+        selectionLabels.delete(key);
+    }
+    if (card) card.classList.remove('is-selected');
+    if (marker) marker.setZIndexOffset(0);
+    const icon = layer.getElement ? layer.getElement() : null;
+    if (icon) icon.classList.remove('is-selected');
+}
+
+// Trees are labelled on demand: only the trees inside the current view get a
+// label, and the labels are dropped again when the view or the zoom moves away.
+// ``treeLabelSources`` holds every loaded tree that can be labelled;
+// ``treeLabelMarkers`` holds the labels currently drawn.
+const treeLabelSources = new Map();
+const treeLabelMarkers = new Map();
+
+function treeLabelsVisible() {
+    return !!(labelState.tree
+        && filterState.tree !== false
+        && map && map.getZoom() >= TREE_LABEL_MIN_ZOOM);
+}
+
 function syncTreeLabels() {
     if (!map || !labelLayers || !labelLayers.tree) return;
     const group = labelLayers.tree;
-    const show = labelState.tree && map.getZoom() >= TREE_LABEL_MIN_ZOOM;
-    if (show) {
-        if (!map.hasLayer(group)) group.addTo(map);
-    } else if (map.hasLayer(group)) {
-        map.removeLayer(group);
+
+    if (!treeLabelsVisible()) {
+        if (map.hasLayer(group)) map.removeLayer(group);
+        if (treeLabelMarkers.size) {
+            treeLabelMarkers.forEach(function(marker, key) {
+                if (featureLabelMarkers.get(key) === marker) featureLabelMarkers.delete(key);
+            });
+            group.clearLayers();
+            treeLabelMarkers.clear();
+        }
+        return;
     }
+    if (!map.hasLayer(group)) group.addTo(map);
+
+    // Forget the labels that scrolled out of view.
+    const bounds = map.getBounds().pad(0.05);
+    Array.from(treeLabelMarkers.keys()).forEach(function(key) {
+        const marker = treeLabelMarkers.get(key);
+        if (marker && bounds.contains(marker.getLatLng())) return;
+        if (marker) group.removeLayer(marker);
+        if (featureLabelMarkers.get(key) === marker) featureLabelMarkers.delete(key);
+        treeLabelMarkers.delete(key);
+    });
+
+    // Label the trees that just came into view, up to a readable density.
+    if (treeLabelMarkers.size >= TREE_LABEL_MAX_VISIBLE) return;
+    treeLabelSources.forEach(function(entry, key) {
+        if (treeLabelMarkers.size >= TREE_LABEL_MAX_VISIBLE) return;
+        if (treeLabelMarkers.has(key)) return;
+        const layer = entry.layer;
+        if (!map.hasLayer(layer) || typeof layer.getLatLng !== 'function') return;
+        if (!bounds.contains(layer.getLatLng())) return;
+        const marker = buildFeatureLabel(layer, entry.properties);
+        if (!marker) return;
+        // The regular label replaces a label drawn only for the selection.
+        const extra = selectionLabels.get(key);
+        if (extra) {
+            if (map.hasLayer(extra)) map.removeLayer(extra);
+            selectionLabels.delete(key);
+        }
+        group.addLayer(marker);
+        treeLabelMarkers.set(key, marker);
+        featureLabelMarkers.set(key, marker);
+        if (layer._geometrySelected) {
+            const element = marker.getElement();
+            const card = element && element.querySelector
+                ? element.querySelector('.map-feature-label')
+                : null;
+            if (card) card.classList.add('is-selected');
+        }
+    });
 }
 
 // Show/hide one category's labels (trees additionally require the zoom threshold).
@@ -496,7 +622,14 @@ window.reloadMapGeometry = function() {
 // the sector and zone filters come on (blueprint of the chosen sector plus the
 // zones inside it), and the other sectors become dashed boundaries for
 // context.  Every other category stays off until the user asks for it.
-const SECTOR_SCOPE_FILTER_KEYS = ['sector', 'zone'];
+// The water sources stay on in a scoped view: the well or basin feeds every
+// sector, so it is context for the layout rather than part of it.
+const SECTOR_SCOPE_FILTER_KEYS = ['sector', 'zone', 'water_source'];
+
+// Initial shown inside a water source marker, one per kind the API emits.
+const WATER_SOURCE_LETTERS = {
+    well: 'W', basin: 'B', reservoir: 'R', pump: 'P', canal: 'C', other: 'S'
+};
 
 function setFilterStateFromKeys(keys) {
     const list = Array.isArray(keys) ? keys : null;
@@ -564,6 +697,15 @@ function clearGeometryLayers() {
             labelLayers[type].clearLayers();
         });
     }
+    treeLabelSources.clear();
+    treeLabelMarkers.clear();
+    featureLabelMarkers.clear();
+    if (map) {
+        selectionLabels.forEach(function(marker) {
+            if (map.hasLayer(marker)) map.removeLayer(marker);
+        });
+    }
+    selectionLabels.clear();
     if (featureLayer) featureLayer.clearLayers();
     loadedFeatureTypes.clear();
 }
@@ -674,6 +816,7 @@ window.clearMapSelection = function() {
         if (layer.setStyle) {
             layer.setStyle({ color: properties.color || '#3388ff', weight: 2, fillOpacity: 0.2 });
         }
+        applySelectionFeedback(layer, properties, false);
         if (typeof mapSelectionListener === 'function') {
             mapSelectionListener(layer, properties, false);
         }
@@ -899,8 +1042,9 @@ function initMap(elementId, geojsonUrl, options = {}) {
         }
     });
 
-    // Tree labels only appear from a high zoom level to keep orchard maps readable.
-    map.on('zoomend', syncTreeLabels);
+    // Tree labels follow the zoom and the view, so only readable, on-screen
+    // trees carry one.
+    map.on('zoomend moveend', syncTreeLabels);
 
     // Optional left-hand filter widget (valve kinds and/or geometry categories).
     const geometryFilters = Array.isArray(options.mapFilters) ? options.mapFilters : [];
@@ -992,6 +1136,18 @@ function initMap(elementId, geojsonUrl, options = {}) {
                     html: `<div style="background:${color};width:8px;height:8px;border-radius:50%;border:1px solid white"></div>`,
                     iconSize: [10, 10]
                 });
+            } else if (type === 'water_source') {
+                // Wells, basins and the other sources are project landmarks, so
+                // each one carries its kind's initial instead of a generic dot:
+                // an unlabelled cyan dot read as "the basin is not on the map".
+                const kind = String(feature.properties?.source_type || '').toLowerCase();
+                const letter = WATER_SOURCE_LETTERS[kind] || 'S';
+                icon = L.divIcon({
+                    className: 'water-source-marker',
+                    html: `<div style="background:${color};width:22px;height:22px;border-radius:6px;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4);color:#fff;font:700 12px/18px system-ui,sans-serif;text-align:center;text-shadow:0 1px 2px rgba(0,0,0,.45)">${letter}</div>`,
+                    iconSize: [26, 26],
+                    iconAnchor: [13, 13]
+                });
             } else if (type.includes('valve') || type.includes('pipe') || type === 'dripline' || type.includes('air') || type.includes('pressure') || type === 'reduction' || type === 'other') {
                 icon = L.divIcon({
                     className: 'network-marker',
@@ -1062,6 +1218,7 @@ function initMap(elementId, geojsonUrl, options = {}) {
                                 fillOpacity: selected ? 0.4 : 0.2
                             });
                         }
+                        applySelectionFeedback(layer, properties, selected);
                         if (typeof mapSelectionListener === 'function') {
                             mapSelectionListener(layer, properties, selected);
                         }
@@ -1094,7 +1251,14 @@ function initMap(elementId, geojsonUrl, options = {}) {
                 }
 
                 if (labelTypes.indexOf(type) !== -1 && labelLayers && labelLayers[type]) {
-                    addFeatureLabel(layer, properties, labelLayers[type]);
+                    if (type === 'tree') {
+                        // Trees are labelled lazily, per view, by syncTreeLabels.
+                        treeLabelSources.set(properties.id !== undefined
+                            ? type + ':' + properties.id
+                            : 'tree:' + treeLabelSources.size, { layer: layer, properties: properties });
+                    } else {
+                        addFeatureLabel(layer, properties, labelLayers[type]);
+                    }
                 }
             }
         }
@@ -1562,9 +1726,9 @@ function clearDrawn() {
     }
 }
 
-function addLegend(legendItems) {
+function addLegend(legendItems, options) {
     if (!map) return;
-    const legend = L.control({ position: 'bottomright' });
+    const legend = L.control({ position: (options && options.position) || 'bottomright' });
     legend.onAdd = function() {
         const div = L.DomUtil.create('div', 'map-legend');
         let html = '<h6>Legend / مفتاح الخريطة</h6>';
@@ -1575,6 +1739,251 @@ function addLegend(legendItems) {
         return div;
     };
     legend.addTo(map);
+}
+
+// ---------- Elevation heatmap ----------
+// The elevation model is a grid of samples about 30 m apart.  Drawn as circles
+// that meet at that spacing the samples join into a continuous terrain surface
+// instead of a field of dots, and a radius in metres keeps the same ground
+// covered at every zoom level.  The layer lives under the feature layer (own
+// pane) and is not interactive, so sector popups and clicks still work.
+const ELEVATION_GRADIENT = 'linear-gradient(90deg, #2f9e44 0%, #fcc419 50%, #e03131 100%)';
+
+function haversineMeters(a, b) {
+    const radius = 6371000;
+    const toRad = Math.PI / 180;
+    const lat1 = a[1] * toRad;
+    const lat2 = b[1] * toRad;
+    const dLat = (b[1] - a[1]) * toRad;
+    const dLng = (b[0] - a[0]) * toRad;
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+    return 2 * radius * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+// Median nearest-neighbour distance of the sample grid, measured on a bounded
+// subset so a very dense model does not cost a quadratic pass.
+function elevationSampleSpacingM(features) {
+    const coords = features
+        .map(function(feature) { return feature.geometry && feature.geometry.coordinates; })
+        .filter(Boolean);
+    if (coords.length < 2) return 0;
+    const step = Math.max(1, Math.ceil(coords.length / 240));
+    const picked = coords.filter(function(_, index) { return index % step === 0; });
+    const distances = [];
+    picked.forEach(function(point) {
+        let nearest = Infinity;
+        coords.forEach(function(other) {
+            if (other === point) return;
+            const distance = haversineMeters(point, other);
+            if (distance > 0 && distance < nearest) nearest = distance;
+        });
+        if (isFinite(nearest)) distances.push(nearest);
+    });
+    if (!distances.length) return 0;
+    distances.sort(function(a, b) { return a - b; });
+    return distances[Math.floor(distances.length / 2)];
+}
+
+function formatElevation(value) {
+    return (Math.round(value * 10) / 10).toLocaleString('en-US') + ' m';
+}
+
+function colorWithAlpha(color, alpha) {
+    const match = /^#?([0-9a-f]{6})$/i.exec(String(color || '').trim());
+    if (!match) return 'rgba(252, 196, 25, ' + alpha + ')';
+    const value = parseInt(match[1], 16);
+    return 'rgba(' + ((value >> 16) & 255) + ', ' + ((value >> 8) & 255) + ', ' +
+        (value & 255) + ', ' + alpha + ')';
+}
+
+// Paint the samples into a canvas as soft colour blobs and lay it over their
+// bounds.  A field of vector circles turned into bubbles as soon as the user
+// zoomed in; a raster surface keeps the same soft gradients at every zoom, and
+// the blobs blend into one terrain map instead of a grid of dots.
+function buildElevationHeatOverlay(features, spacingM, paneName) {
+    const located = features.filter(function(feature) {
+        const coords = feature.geometry && feature.geometry.coordinates;
+        return coords && isFinite(Number((feature.properties || {}).elevation_m));
+    });
+    if (!located.length) return null;
+
+    const lats = located.map(function(f) { return f.geometry.coordinates[1]; });
+    const lngs = located.map(function(f) { return f.geometry.coordinates[0]; });
+    const minLat = Math.min.apply(null, lats);
+    const maxLat = Math.max.apply(null, lats);
+    const minLng = Math.min.apply(null, lngs);
+    const maxLng = Math.max.apply(null, lngs);
+    const spacing = spacingM > 0 ? spacingM : 30;
+
+    // Half a sample of padding so the surface reaches past its outermost
+    // points instead of ending on a hard rectangle.
+    const latPad = spacing / 111320;
+    const midLat = (minLat + maxLat) / 2;
+    const lngPad = spacing / (111320 * Math.max(0.2, Math.cos(midLat * Math.PI / 180)));
+    const south = minLat - latPad;
+    const north = maxLat + latPad;
+    const west = minLng - lngPad;
+    const east = maxLng + lngPad;
+
+    const width = 1024;
+    const height = Math.max(256, Math.min(1024, Math.round(width * (north - south) / (east - west))));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    const xOf = function(lng) { return ((lng - west) / (east - west)) * width; };
+    const yOf = function(lat) { return ((north - lat) / (north - south)) * height; };
+    // lngPad is the sample spacing expressed in degrees at this latitude, so the
+    // blobs stay one sample wide whatever the canvas resolution is.
+    const radius = Math.max(2, (lngPad / (east - west)) * width * 0.95);
+
+    located.forEach(function(feature) {
+        const coords = feature.geometry.coordinates;
+        const color = (feature.properties || {}).color || '#fcc419';
+        const x = xOf(coords[0]);
+        const y = yOf(coords[1]);
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+        gradient.addColorStop(0, colorWithAlpha(color, 0.85));
+        gradient.addColorStop(0.55, colorWithAlpha(color, 0.5));
+        gradient.addColorStop(1, colorWithAlpha(color, 0));
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    return L.imageOverlay(canvas.toDataURL('image/png'),
+        [[south, west], [north, east]], {
+            pane: paneName,
+            opacity: 0.8,
+            interactive: false,
+            className: 'elevation-heat-overlay'
+        });
+}
+
+// Draw the cached elevation model as a coloured surface with its own toggle and
+// legend.  options.spacingM skips the spacing measurement, options.onStats is
+// called with {min, max, range, count} once the model arrives (or null when the
+// project has no elevation data yet).
+function addElevationHeatmap(targetMap, url, options) {
+    options = options || {};
+    if (!targetMap || !url) return null;
+
+    const paneName = 'elevationHeatPane';
+    if (!targetMap.getPane(paneName)) {
+        const pane = targetMap.createPane(paneName);
+        // Above the tile layer (200), below the vector overlay pane (400).
+        pane.style.zIndex = 350;
+    }
+
+    const state = { layer: L.layerGroup(), visible: options.visible !== false, stats: null };
+    let button = null;
+    let lowLabel = null;
+    let highLabel = null;
+    let rangeLabel = null;
+
+    function paint() {
+        if (!button) return;
+        button.classList.toggle('active', state.visible);
+        button.setAttribute('aria-pressed', String(state.visible));
+        button.title = (state.visible ? 'Hide' : 'Show') + ' elevation heatmap / خريطة الارتفاع';
+        if (state.visible) {
+            if (!targetMap.hasLayer(state.layer)) state.layer.addTo(targetMap);
+        } else if (targetMap.hasLayer(state.layer)) {
+            targetMap.removeLayer(state.layer);
+        }
+    }
+
+    const control = L.control({ position: 'topleft' });
+    control.onAdd = function() {
+        const group = L.DomUtil.create('div', 'leaflet-bar map-elevation-widget');
+        L.DomEvent.disableClickPropagation(group);
+        L.DomEvent.disableScrollPropagation(group);
+        button = L.DomUtil.create('button', 'map-elevation-button', group);
+        button.type = 'button';
+        button.innerHTML = '<i class="bi bi-thermometer-half"></i>';
+        button.setAttribute('aria-label', 'Toggle elevation heatmap');
+        L.DomEvent.on(button, 'click', function(event) {
+            L.DomEvent.stop(event);
+            if (button.disabled) return;
+            state.visible = !state.visible;
+            paint();
+        });
+        return group;
+    };
+    control.addTo(targetMap);
+
+    const legend = L.control({ position: 'bottomright' });
+    legend.onAdd = function() {
+        const div = L.DomUtil.create('div', 'map-legend map-elevation-legend');
+        div.innerHTML =
+            '<h6>Elevation / الارتفاع</h6>' +
+            '<div class="elevation-gradient" style="background:' + ELEVATION_GRADIENT + '"></div>' +
+            '<div class="elevation-scale">' +
+            '  <span data-role="low">Low / منخفض</span>' +
+            '  <span data-role="high">High / عالي</span>' +
+            '</div>' +
+            '<div class="elevation-range" data-role="range"></div>';
+        lowLabel = div.querySelector('[data-role="low"]');
+        highLabel = div.querySelector('[data-role="high"]');
+        rangeLabel = div.querySelector('[data-role="range"]');
+        return div;
+    };
+    legend.addTo(targetMap);
+
+    paint();
+
+    fetch(url)
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            const features = ((data && data.features) || []).filter(function(feature) {
+                return feature.geometry && feature.geometry.coordinates;
+            });
+            const elevations = features
+                .map(function(feature) { return Number((feature.properties || {}).elevation_m); })
+                .filter(function(value) { return isFinite(value); });
+
+            if (!features.length || !elevations.length) {
+                // No terrain data yet: leave the toggle visible but inert so the
+                // page still shows that elevation is part of this map.
+                if (button) {
+                    button.disabled = true;
+                    button.title = 'No elevation data yet / لا توجد بيانات ارتفاع بعد';
+                }
+                if (rangeLabel) rangeLabel.textContent = 'No elevation data / لا توجد بيانات';
+                if (typeof options.onStats === 'function') options.onStats(null);
+                return;
+            }
+
+            const min = Math.min.apply(null, elevations);
+            const max = Math.max.apply(null, elevations);
+            const spacing = Number(options.spacingM) || elevationSampleSpacingM(features);
+            const overlay = buildElevationHeatOverlay(features, spacing, paneName);
+            if (overlay) state.layer.addLayer(overlay);
+            state.stats = { min: min, max: max, range: max - min, count: features.length };
+
+            if (lowLabel) lowLabel.textContent = formatElevation(min);
+            if (highLabel) highLabel.textContent = formatElevation(max);
+            if (rangeLabel) {
+                rangeLabel.textContent = 'Range / المدى: ' + formatElevation(max - min) +
+                    ' · ' + features.length + ' samples';
+            }
+            if (typeof options.onStats === 'function') options.onStats(state.stats);
+        })
+        .catch(function(error) {
+            console.error('Elevation heatmap error:', error);
+            if (button) button.disabled = true;
+            if (rangeLabel) rangeLabel.textContent = 'Elevation unavailable / الارتفاع غير متاح';
+            if (typeof options.onStats === 'function') options.onStats(null);
+        });
+
+    return {
+        layer: state.layer,
+        stats: function() { return state.stats; },
+        setVisible: function(visible) { state.visible = !!visible; paint(); }
+    };
 }
 
 // ---------- Fullscreen map ----------

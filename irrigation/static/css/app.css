@@ -925,7 +925,20 @@ body.map-fullscreen-lock {
     opacity: 0.85;
 }
 
+/* The marker icon is a zero-size anchor; the label card centres itself on it,
+   so a label needs no measurement when it is added to the map. */
+.map-feature-label-anchor {
+    width: 0 !important;
+    height: 0 !important;
+    background: none;
+    border: 0;
+}
+
 .map-feature-label {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform: translate(-50%, -50%);
     pointer-events: none;
     background: rgba(255, 255, 255, 0.9);
     border: 1px solid rgba(0, 0, 0, 0.2);
@@ -945,6 +958,22 @@ body.map-fullscreen-lock {
     font-size: 10px;
     font-weight: 500;
     color: #495057;
+}
+
+/* A selected feature keeps its code on screen and stands out in the map. */
+.map-feature-label.is-selected {
+    background: #f08c00;
+    color: #fff;
+    border-color: #b35e00;
+    box-shadow: 0 0 0 2px rgba(240, 140, 0, 0.35);
+}
+
+.map-feature-label.is-selected .map-label-ar {
+    color: #fff3e0;
+}
+
+.leaflet-marker-icon.is-selected > div {
+    box-shadow: 0 0 0 3px #f08c00, 0 0 0 5px rgba(240, 140, 0, 0.3);
 }
 
 .geometry-map-actions {
@@ -1040,6 +1069,70 @@ body.map-fullscreen-lock {
 @keyframes map-filter-pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.45; }
+}
+
+/* Elevation heatmap toggle: one round button under the zoom / filter controls. */
+.map-elevation-widget {
+    padding: 4px;
+    border-radius: 18px;
+}
+
+.map-elevation-button {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    border-radius: 50%;
+    background: #fff;
+    color: #495057;
+    font-size: 14px;
+    line-height: 1;
+}
+
+.map-elevation-button:not(.active) {
+    background: #f8f9fa;
+    color: #adb5bd;
+}
+
+.map-elevation-button.active {
+    background: var(--pal-green);
+    color: var(--pal-ink);
+}
+
+.map-elevation-button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.map-elevation-legend .elevation-gradient {
+    width: 100%;
+    height: 10px;
+    margin: 4px 0 2px;
+    border-radius: 5px;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.map-elevation-legend .elevation-scale {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 0.75rem;
+    color: #495057;
+}
+
+.map-elevation-legend .elevation-range {
+    margin-top: 2px;
+    font-size: 0.72rem;
+    color: #6c757d;
+}
+
+/* Raster elevation surface: let the browser smooth it when zoomed in, and
+   never let it swallow clicks meant for the sectors underneath. */
+.elevation-heat-overlay {
+    image-rendering: auto;
+    pointer-events: none;
 }
 
 .geometry-map-select-mode .leaflet-interactive {

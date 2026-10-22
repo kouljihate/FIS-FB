@@ -153,7 +153,7 @@
                 </li>
                 <li class="nav-item">
                     {% if workflow_project_id %}
-                    <a class="nav-link{% if workflow_endpoint in ['estimation.quote_view', 'estimation.quote_save'] %} active{% endif %}" href="{{ url_for('estimation.quote_view', project_id=workflow_project_id) }}">
+                    <a class="nav-link{% if workflow_endpoint in ['estimation.quote_view', 'estimation.quote_save', 'estimation.roi_view', 'estimation.roi_save'] %} active{% endif %}" href="{{ url_for('estimation.quote_view', project_id=workflow_project_id) }}">
                     {% else %}
                     <span class="nav-link disabled" aria-disabled="true" title="Open a project first">
                     {% endif %}
@@ -196,9 +196,10 @@
                 ('trees.rows_view', url_for('trees.rows_view', project_id=workflow_project_id), 'Rows / الصفوف', 'bi-list-ol', False),
                 ('trees.trees_view', url_for('trees.trees_view', project_id=workflow_project_id), 'Trees / الأشجار', 'bi-tree', False)
             ] %}
-        {% elif workflow_endpoint in ['estimation.quote_view', 'estimation.quote_save'] %}
+        {% elif workflow_endpoint in ['estimation.quote_view', 'estimation.quote_save', 'estimation.roi_view', 'estimation.roi_save'] %}
             {% set workflow_subnav = [
                 ('estimation.quote_view', url_for('estimation.quote_view', project_id=workflow_project_id), 'Pricing / التسعير', 'bi-calculator', False),
+                ('estimation.roi_view', url_for('estimation.roi_view', project_id=workflow_project_id), 'ROI / العائد', 'bi-graph-up-arrow', False),
                 (None, None, 'Result / النتيجة', 'bi-file-earmark-bar-graph', True)
             ] %}
         {% elif workflow_endpoint in ['components.valves', 'components.connectors', 'components.reductors', 'components.air_removal', 'components.pressure_reduction', 'components.terminators'] %}

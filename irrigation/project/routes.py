@@ -364,6 +364,7 @@ def detail(project_id):
     if not project:
         return redirect(url_for('project.index'))
 
+    _ensure_kml_water_sources(project)
     project['_id'] = str(project['_id'])
     spec = _get_spec(project)
 
@@ -464,38 +465,151 @@ def download_land_document(project_id, doc_index):
 
 
 def _classify_kml_water_source(name):
-    """Classify a KML point feature name into a water source type."""
+    """Classify a KML feature name into a water source type, else ``None``.
+
+    English, French and Arabic names are understood: a basin can be a KML
+    *polygon* called "Basin" or "Bassin", not only a Point.
+    """
     n = (name or '').strip().lower()
-    if re.search(r'\b(well|bore|boring|puit)\b|بئر', n):
+    if not n:
+        return None
+    if re.search(r'\b(wells?|bores?|borings?|puits?)\b|بئر|آبار|ابار', n):
         return 'well'
-    if re.search(r'\bbasin\b|حوض|أحواض', n):
+    if re.search(r'\b(basins?|bassins?)\b|حوض|أحواض|احواض', n):
         return 'basin'
-    if re.search(r'\b(reservoir|tank)\b|خزان', n):
+    if re.search(r'\b(reservoirs?|tanks?|retenues?|r[ée]servoirs?|b[âa]ches?)\b|خزان|خزانات', n):
         return 'reservoir'
-    if re.search(r'\bpump|مضخة|مضخه|مضحات', n):
+    if re.search(r'\b(pumps?|pompes?)\b|مضخة|مضخه|مضخات', n):
         return 'pump'
-    if re.search(r'\bcanal|قناة|ترعة|قنال|قنوات', n):
+    if re.search(r'\b(canals?|channels?)\b|قناة|ترعة|قنال|قنوات', n):
         return 'canal'
-    if re.search(r'water|source|مياه|مصدر|عين|لاين|طريق|رواد|نهر|بركة', n):
+    if re.search(r'water|source|spring|fountain|مياه|مصدر|عين|لاين|طريق|رواد|نهر|بركة', n):
         return 'other'
-    return 'other'
+    return None
 
 
-def _kml_point_latlng(feature):
-    """Return ``(lat, lng)`` of a KML Point / MultiPoint feature."""
-    geom_type = feature['geometry'].get('type')
+def _kml_water_latlng(feature):
+    """Representative ``(lat, lng)`` of a KML water feature.
+
+    Points use their own position; basins, reservoirs and other water bodies
+    arrive as polygons, so their centroid is the point the app stores.
+    """
+    geometry = feature.get('geometry') or {}
+    geom_type = geometry.get('type')
     try:
         if geom_type == 'Point':
-            lng, lat = feature['geometry']['coordinates'][:2]
+            lng, lat = geometry['coordinates'][:2]
             return float(lat), float(lng)
         if geom_type == 'MultiPoint':
-            for pt in feature['geometry'].get('coordinates') or []:
+            for pt in geometry.get('coordinates') or []:
                 if pt:
                     lng, lat = pt[:2]
                     return float(lat), float(lng)
-    except (TypeError, ValueError, IndexError):
+        if geom_type in ('Polygon', 'MultiPolygon'):
+            from shapely.geometry import shape as shp_shape
+
+            centroid = shp_shape(geometry).centroid
+            return float(centroid.y), float(centroid.x)
+    except (TypeError, ValueError, IndexError, AttributeError):
         pass
     return None, None
+
+
+def _kml_water_entry(feature, filename):
+    """Water source entry for a KML point or named water polygon."""
+    lat, lng = _kml_water_latlng(feature)
+    if lat is None:
+        return None
+    geometry = feature.get('geometry') or {}
+    kind = _classify_kml_water_source(feature.get('name')) or 'other'
+    notes = f'Imported from {filename}'
+    if geometry.get('type') in ('Polygon', 'MultiPolygon'):
+        notes += ' (water body outline)'
+    return {
+        'type': kind,
+        'name': feature.get('name') or '',
+        'lat': lat,
+        'lng': lng,
+        'flow_lpm': None,
+        'notes': notes,
+    }
+
+
+def _water_source_key(source):
+    return (
+        str(source.get('name') or '').strip().lower(),
+        round(float(source.get('lat') or 0), 6),
+        round(float(source.get('lng') or 0), 6),
+    )
+
+
+def _kml_water_entries(project):
+    """Water sources implied by the KML features stored on a project."""
+    filename = project.get('kml_file') or 'KML'
+    entries = []
+    for feature in project.get('kml_features') or []:
+        geometry = feature.get('geometry') or {}
+        geom_type = geometry.get('type')
+        if geom_type not in ('Point', 'MultiPoint', 'Polygon', 'MultiPolygon'):
+            continue
+        if feature.get('category') in ('boundary', 'sector'):
+            continue
+        if (geom_type in ('Polygon', 'MultiPolygon')
+                and not _classify_kml_water_source(feature.get('name'))):
+            continue
+        entry = _kml_water_entry(feature, filename)
+        if entry:
+            entries.append(entry)
+    return entries
+
+
+def _ensure_kml_water_sources(project):
+    """List every KML water body in the project's water source list.
+
+    Older imports only turned KML Points into sources, so a basin drawn as a
+    polygon stayed an anonymous overlay and never reached the Water Sources
+    table (or the map's source markers).  This adds the missing entries once and
+    is idempotent, so old projects repair themselves when their page is opened.
+    Returns True when the project document changed.
+    """
+    project_id = project.get('id')
+    if project_id is None or not project.get('kml_features'):
+        return False
+
+    spec = _get_spec(project)
+    existing = list(spec.get('water_sources') or [])
+    seen = {_water_source_key(source) for source in existing}
+    added = []
+    for entry in _kml_water_entries(project):
+        key = _water_source_key(entry)
+        if key in seen:
+            continue
+        existing.append(entry)
+        seen.add(key)
+        added.append(entry)
+    if not added:
+        return False
+
+    spec['water_sources'] = existing
+    update = {
+        'spec': spec,
+        'water': existing,
+        'land': _land({**project, 'spec': spec}),
+    }
+    if not project.get('water_source'):
+        first = added[0]
+        update['water_source'] = {
+            'type': 'Point',
+            'coordinates': [first['lng'], first['lat']]
+        }
+    mongo.db.projects.update_one({'id': project_id}, {'$set': update})
+
+    # Keep the document the page is rendered from in step with the write.
+    project['spec'] = spec
+    project['water'] = existing
+    project.update({key: value for key, value in update.items()
+                    if key not in ('spec', 'water')})
+    return True
 
 
 def _store_kml_features(project_id, project, filename, features):
@@ -509,14 +623,22 @@ def _store_kml_features(project_id, project, filename, features):
         feature for feature in features
         if feature['geometry'].get('type') in ('Point', 'MultiPoint')
     ]
+    # A basin, reservoir or tank is often drawn as a polygon in the KML.  It is
+    # still a water source, so it must not be mistaken for the land boundary and
+    # it has to reach the project's water source list (not only the overlays).
+    water_polygons = [
+        feature for feature in polygon_features
+        if _classify_kml_water_source(feature.get('name'))
+    ]
     boundary_feature = max(
-        polygon_features,
+        [feature for feature in polygon_features if feature not in water_polygons],
         key=lambda feature: shp_shape(feature['geometry']).area,
         default=None
     )
     sector_features = [
         feature for feature in polygon_features
         if feature is not boundary_feature
+        and feature not in water_polygons
         and re.match(r'^(?:s\s*\d+|sector\s*\d*)$', feature['name'].strip(), re.IGNORECASE)
     ]
 
@@ -542,35 +664,21 @@ def _store_kml_features(project_id, project, filename, features):
             'source': 'kml'
         })
 
-    # Every point feature becomes a water source entry in the project spec.
+    # Every point, plus every named water polygon, becomes a water source in the
+    # project spec (polygons are stored at their centroid).
     water_entries = []
-    for feature in point_features:
-        lat, lng = _kml_point_latlng(feature)
-        if lat is None:
-            continue
-        water_entries.append({
-            'type': _classify_kml_water_source(feature['name']),
-            'name': feature['name'] or '',
-            'lat': lat,
-            'lng': lng,
-            'flow_lpm': None,
-            'notes': f'Imported from {filename}',
-        })
+    for feature in point_features + water_polygons:
+        entry = _kml_water_entry(feature, filename)
+        if entry:
+            water_entries.append(entry)
 
     # Merge KML water sources into the spec, deduped by name + position.
     spec = _get_spec(project)
     existing = list(spec.get('water_sources') or [])
 
-    def _ws_key(w):
-        return (
-            str(w.get('name') or '').strip().lower(),
-            round(float(w.get('lat') or 0), 6),
-            round(float(w.get('lng') or 0), 6),
-        )
-
-    seen = {_ws_key(w) for w in existing}
+    seen = {_water_source_key(w) for w in existing}
     for entry in water_entries:
-        key = _ws_key(entry)
+        key = _water_source_key(entry)
         if key in seen:
             continue
         existing.append(entry)

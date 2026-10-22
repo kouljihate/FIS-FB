@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+{% block title %}ROI / العائد على الاستثمار{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">
+        <i class="bi bi-graph-up-arrow"></i> ROI / العائد على الاستثمار
+        <span class="text-muted fs-6">— {{ project.name }}</span>
+    </h4>
+    <a href="{{ url_for('estimation.quote_view', project_id=project.id) }}"
+        class="btn btn-outline-secondary">
+        <i class="bi bi-calculator"></i> Pricing / التسعير
+    </a>
+</div>
+
+<p class="text-muted mb-4">
+    Return on investment after {{ roi.horizon }} years of exploitation — the
+    investment is the priced quote, the return is what the orchard earns per
+    year once it is running. /
+    العائد على الاستثمار بعد {{ roi.horizon }} سنوات من الاستغلال: الاستثمار هو
+    مجموع بنود التسعير، والعائد هو ما ينتجه المشروع سنويا بعد تشغيله.
+</p>
+
+{% if roi.investment <= 0 %}
+<div class="alert alert-warning d-flex align-items-center gap-2">
+    <i class="bi bi-exclamation-triangle"></i>
+    <div>
+        The quote has no priced lines yet, so there is no investment to return.
+        Fill in the unit prices on the Pricing subtab. /
+        لا توجد بنود مسعّرة بعد، لذلك لا يوجد استثمار لحساب عائده. أدخل أسعار
+        الوحدات في تبويب التسعير.
+    </div>
+</div>
+{% endif %}
+
+{% if roi.trees_count <= 0 %}
+<div class="alert alert-info d-flex align-items-center gap-2">
+    <i class="bi bi-info-circle"></i>
+    <div>
+        The project has no trees yet, so the yearly revenue is zero. /
+        لا توجد أشجار في المشروع بعد، لذلك المدخول السنوي صفر.
+    </div>
+</div>
+{% endif %}
+
+<!-- ROI headline -->
+<div class="row mb-4 g-3">
+    <div class="col-lg-3 col-md-6">
+        <div class="card shadow-sm text-center h-100">
+            <div class="card-body">
+                <div class="text-muted small">Investment / الاستثمار</div>
+                <div class="fs-4 fw-bold">{{ '{:,.2f}'.format(roi.investment) }}</div>
+                <div class="text-muted small">{{ roi.currency }} — priced quote / التسعير</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="card shadow-sm text-center h-100">
+            <div class="card-body">
+                <div class="text-muted small">
+                    Net profit after {{ roi.horizon }} years / الربح الصافي
+                </div>
+                <div class="fs-4 fw-bold {{ 'text-success' if roi.profit_5y > 0 else 'text-danger' }}">
+                    {{ '{:,.2f}'.format(roi.profit_5y) }}
+                </div>
+                <div class="text-muted small">{{ roi.currency }} — net cash minus investment</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="card shadow-sm text-center h-100 {{ 'border-success' if roi.roi_pct is not none and roi.roi_pct > 0 else '' }}">
+            <div class="card-body">
+                <div class="text-muted small">
+                    ROI after {{ roi.horizon }} years / العائد على الاستثمار
+                </div>
+                <div class="fs-4 fw-bold {{ 'text-success' if roi.roi_pct is not none and roi.roi_pct > 0 else 'text-danger' }}">
+                    {% if roi.roi_pct is not none %}
+                    {{ '%.1f'|format(roi.roi_pct) }} %
+                    {% else %}
+                    —
+                    {% endif %}
+                </div>
+                <div class="text-muted small">
+                    {% if roi.annualized_roi_pct is not none %}
+                    {{ '%.1f'|format(roi.annualized_roi_pct) }} % per year / سنويا
+                    {% else %}
+                    needs a priced quote / يحتاج تسعير
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="card shadow-sm text-center h-100">
+            <div class="card-body">
+                <div class="text-muted small">Payback / فترة الاسترداد</div>
+                <div class="fs-4 fw-bold">
+                    {% if roi.payback_years is not none %}
+                    {{ '%.1f'|format(roi.payback_years) }} yrs
+                    {% else %}
+                    —
+                    {% endif %}
+                </div>
+                <div class="text-muted small">
+                    {% if roi.payback_years is not none and roi.payback_years > roi.horizon %}
+                    beyond the {{ roi.horizon }}-year horizon / بعد الأفق
+                    {% elif roi.payback_years is not none %}
+                    within {{ roi.horizon }} years / داخل الأفق
+                    {% else %}
+                    no positive yearly cash flow / لا تدفق نقدي موجب
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <!-- Yearly cash flow -->
+    <div class="col-lg-7">
+        <div class="card shadow-sm h-100">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="bi bi-table"></i>
+                    Yearly cash flow / التدفق النقدي السنوي
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0" id="roiCashflowTable">
+                        <thead>
+                            <tr>
+                                <th>Year / السنة</th>
+                                <th class="text-end">Revenue / المدخول</th>
+                                <th class="text-end">Costs / التكاليف</th>
+                                <th class="text-end">Net / الصافي</th>
+                                <th class="text-end">Cumulative / التراكمي</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="table-light">
+                                <td>0 — investment / الاستثمار</td>
+                                <td class="text-end">0.00</td>
+                                <td class="text-end">0.00</td>
+                                <td class="text-end">{{ '{:,.2f}'.format(-roi.investment) }}</td>
+                                <td class="text-end {{ 'text-danger' if roi.investment > 0 else '' }}">
+                                    {{ '{:,.2f}'.format(-roi.investment) }}
+                                </td>
+                            </tr>
+                            {% for year in roi.years %}
+                            <tr>
+                                <td>{{ year.year }}</td>
+                                <td class="text-end">{{ '{:,.2f}'.format(year.revenue) }}</td>
+                                <td class="text-end">{{ '{:,.2f}'.format(year.cost) }}</td>
+                                <td class="text-end {{ 'text-success' if year.net > 0 else 'text-danger' }}">
+                                    {{ '{:,.2f}'.format(year.net) }}
+                                </td>
+                                <td class="text-end fw-semibold {{ 'text-danger' if year.cumulative < 0 else 'text-success' }}">
+                                    {{ '{:,.2f}'.format(year.cumulative) }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="table-light">
+                            <tr>
+                                <th>{{ roi.horizon }}-year total / مجموع {{ roi.horizon }} سنوات</th>
+                                <th class="text-end">{{ '{:,.2f}'.format(roi.annual_revenue * roi.horizon) }}</th>
+                                <th class="text-end">{{ '{:,.2f}'.format(roi.annual_cost * roi.horizon) }}</th>
+                                <th class="text-end">{{ '{:,.2f}'.format(roi.net_cash_5y) }}</th>
+                                <th class="text-end">{{ '{:,.2f}'.format(roi.net_cash_5y - roi.investment) }}</th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                <p class="text-muted small mb-0 mt-2">
+                    All amounts in {{ roi.currency }}. The cumulative column starts at
+                    minus the investment and turns positive the year the project pays
+                    itself back. /
+                    كل المبالغ بعملة {{ roi.currency }}. يبدأ العمود التراكمي بخصم
+                    الاستثمار ويصبح موجبا في سنة استرداد رأس المال.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Assumptions -->
+    <div class="col-lg-5">
+        <div class="card shadow-sm h-100">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="bi bi-sliders"></i>
+                    Exploitation assumptions / افتراضات الاستغلال
+                </h6>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('estimation.roi_save', project_id=project.id) }}"
+                    id="roiAssumptionsForm">
+                    <div class="mb-3">
+                        <label class="form-label" for="roiYield">
+                            Yield per tree (kg/year) / محصول الشجرة (كغ/سنة)
+                        </label>
+                        <input type="number" step="0.1" min="0" class="form-control"
+                            id="roiYield" name="yield_kg_per_tree"
+                            value="{{ assumptions.yield_kg_per_tree }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="roiPrice">
+                            Sale price per kg ({{ roi.currency }}) / سعر الكيلو
+                        </label>
+                        <input type="number" step="0.01" min="0" class="form-control"
+                            id="roiPrice" name="price_per_kg"
+                            value="{{ assumptions.price_per_kg }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="roiCostTree">
+                            Operating cost per tree ({{ roi.currency }}/year) /
+                            تكلفة تشغيل الشجرة سنويا
+                        </label>
+                        <input type="number" step="0.01" min="0" class="form-control"
+                            id="roiCostTree" name="cost_per_tree_year"
+                            value="{{ assumptions.cost_per_tree_year }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="roiMaintenance">
+                            Maintenance (% of investment per year) / الصيانة (٪ من
+                            الاستثمار سنويا)
+                        </label>
+                        <input type="number" step="0.1" min="0" max="100" class="form-control"
+                            id="roiMaintenance" name="maintenance_pct"
+                            value="{{ assumptions.maintenance_pct }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="roiOther">
+                            Other annual costs ({{ roi.currency }}) / تكاليف سنوية أخرى
+                        </label>
+                        <input type="number" step="0.01" min="0" class="form-control"
+                            id="roiOther" name="other_annual_cost"
+                            value="{{ assumptions.other_annual_cost }}">
+                    </div>
+
+                    <dl class="row small text-muted mb-3">
+                        <dt class="col-7">Trees / الأشجار</dt>
+                        <dd class="col-5 text-end mb-1">{{ '{:,.0f}'.format(roi.trees_count) }}</dd>
+                        <dt class="col-7">Yearly revenue / المدخول السنوي</dt>
+                        <dd class="col-5 text-end mb-1">{{ '{:,.2f}'.format(roi.annual_revenue) }}</dd>
+                        <dt class="col-7">Yearly costs / التكاليف السنوية</dt>
+                        <dd class="col-5 text-end mb-1">{{ '{:,.2f}'.format(roi.annual_cost) }}</dd>
+                        <dt class="col-7">of which maintenance / منها الصيانة</dt>
+                        <dd class="col-5 text-end mb-1">{{ '{:,.2f}'.format(roi.maintenance_cost) }}</dd>
+                        <dt class="col-7">Yearly net / الصافي السنوي</dt>
+                        <dd class="col-5 text-end mb-1 fw-semibold">
+                            {{ '{:,.2f}'.format(roi.annual_net) }}
+                        </dd>
+                        {% if roi.margin_pct is not none %}
+                        <dt class="col-7">Margin / الهامش</dt>
+                        <dd class="col-5 text-end mb-1">{{ '%.1f'|format(roi.margin_pct) }} %</dd>
+                        {% endif %}
+                    </dl>
+
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-check"></i> Save assumptions / حفظ الافتراضات
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body small text-muted">
+        <strong>How the figure is computed / كيف يُحسب الرقم</strong>
+        <ul class="mb-0 mt-2">
+            <li>
+                Investment = priced quote (subtotal {{ '{:,.2f}'.format(roi.subtotal) }},
+                discount {{ '{:,.2f}'.format(roi.discount_amount) }},
+                tax {{ '{:,.2f}'.format(roi.tax_amount) }}).
+            </li>
+            <li>
+                Yearly net = (trees × yield × price) − (trees × operating cost +
+                maintenance + other costs).
+            </li>
+            <li>
+                ROI = ({{ roi.horizon }} × yearly net − investment) ÷ investment × 100.
+            </li>
+            <li>
+                Payback = investment ÷ yearly net; it is open ended and may fall after
+                the {{ roi.horizon }}-year horizon shown here.
+            </li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Keep the assumptions form honest: no negative numbers, maintenance within 0-100.
+document.getElementById('roiAssumptionsForm').addEventListener('submit', function (event) {
+    let valid = true;
+    this.querySelectorAll('input[type="number"]').forEach(function (input) {
+        const value = parseFloat(input.value);
+        if (Number.isNaN(value) || value < 0) {
+            input.classList.add('is-invalid');
+            valid = false;
+        } else {
+            input.classList.remove('is-invalid');
+        }
+    });
+    if (!valid) event.preventDefault();
+});
+</script>
+{% endblock %}

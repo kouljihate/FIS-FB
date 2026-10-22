@@ -371,10 +371,12 @@ document.addEventListener('DOMContentLoaded', function () {
         labelTypes: ['sector', 'zone', 'tree_row', 'tree'],
         // Every element type the API can draw is filterable from the funnel widget.
         mapFilters: ELEMENT_FILTER_KEYS,
-        // First visit draws the sector outlines only.  The other categories are
-        // fetched the first time their filter button is switched on: drawing a
-        // whole orchard (thousands of trees and driplines) froze the browser.
-        mapFiltersOn: ['sector'],
+        // First visit draws the sector outlines plus the water sources (well,
+        // basin, ...), which are context for the whole project.  The other
+        // categories are fetched the first time their filter button is switched
+        // on: drawing a whole orchard (thousands of trees and driplines) froze
+        // the browser, and a basin had to be asked for to be seen at all.
+        mapFiltersOn: ['sector', 'water_source'],
         lazyFilters: true
     });
 
@@ -584,7 +586,15 @@ const MARK_TYPE_SPECS = [
     { type: 'pressure_reduction', letter: 'PR', name: 'Pressure Reduction', nameAr: 'خفض الضغط' },
     { type: 'terminator', letter: 'TM', name: 'Terminators', nameAr: 'النهايات' },
     { type: 'boundary', letter: 'B', name: 'Land Boundary', nameAr: 'حدود الأرض' },
-    { type: 'water_source', letter: 'W', name: 'Water Sources', nameAr: 'مصادر المياه' },
+    // Water sources are one GeoJSON type but several kinds; each kind gets its
+    // own row so a basin is listed (and summed) even when the project also has
+    // a well, as on the map, where each marker carries its kind.
+    { type: 'water_source:well', letter: 'W', name: 'Wells', nameAr: 'الآبار' },
+    { type: 'water_source:basin', letter: 'B', name: 'Basins', nameAr: 'الأحواض' },
+    { type: 'water_source:reservoir', letter: 'R', name: 'Reservoirs', nameAr: 'الخزانات' },
+    { type: 'water_source:pump', letter: 'P', name: 'Pumps', nameAr: 'المضخات' },
+    { type: 'water_source:canal', letter: 'C', name: 'Canals', nameAr: 'القنوات' },
+    { type: 'water_source:other', letter: 'WS', name: 'Other Sources', nameAr: 'مصادر أخرى' },
     { type: 'kml_feature', letter: 'KML', name: 'KML Overlays', nameAr: 'طبقات KML' }
 ];
 
@@ -592,7 +602,17 @@ const MARK_TYPE_SPECS = [
 const marksTypeRows = new Map();
 
 function markTypeSpec(type) {
-    return MARK_TYPE_SPECS.find(function (spec) { return spec.type === type; }) || null;
+    const known = MARK_TYPE_SPECS.find(function (spec) { return spec.type === type; });
+    if (known) return known;
+    // A source kind the catalogue does not list (new API value) still reads as
+    // a proper row instead of the raw "water_source:xyz" key.
+    if (type.indexOf('water_source:') === 0) {
+        const kind = type.slice('water_source:'.length) || 'other';
+        const label = kind.charAt(0).toUpperCase() + kind.slice(1) + 's';
+        return { type: type, letter: kind.charAt(0).toUpperCase() || 'S',
+                 name: label, nameAr: 'مصادر المياه' };
+    }
+    return null;
 }
 
 function countDisplayedMarksByType() {
@@ -602,6 +622,14 @@ function countDisplayedMarksByType() {
         if (!map.hasLayer(layer)) return;
         const properties = layer.feature ? layer.feature.properties : null;
         const type = (properties && properties.type) || 'other';
+        // One row per water source kind (well, basin, ...), matching the marker
+        // each feature is drawn with.
+        if (type === 'water_source') {
+            const kind = String((properties && properties.source_type) || 'other').toLowerCase();
+            const key = 'water_source:' + kind;
+            counts[key] = (counts[key] || 0) + 1;
+            return;
+        }
         counts[type] = (counts[type] || 0) + 1;
     });
     return counts;

@@ -140,6 +140,121 @@ def _get_saved_estimation(project):
         'notes': est.get('notes', ''),
         'discount_pct': est.get('discount_pct', 0),
         'tax_pct': est.get('tax_pct', 0),
+        'roi': est.get('roi') or {},
+    }
+
+
+def _as_float(value, default=0.0):
+    try:
+        return float(str(value).strip() or default)
+    except (TypeError, ValueError):
+        return default
+
+
+def quote_totals(lines, estimation):
+    """Priced totals of the quote: the project's investment."""
+    subtotal = 0.0
+    for line in lines:
+        price = _as_float((estimation.get('prices') or {}).get(line['key']), 0)
+        subtotal += price * _as_float(line.get('quantity'), 0)
+    for item in estimation.get('items') or []:
+        subtotal += _as_float(item.get('quantity'), 0) * _as_float(item.get('unit_price'), 0)
+
+    discount_pct = _as_float(estimation.get('discount_pct'), 0)
+    tax_pct = _as_float(estimation.get('tax_pct'), 0)
+    discount_amount = subtotal * discount_pct / 100.0
+    after_discount = subtotal - discount_amount
+    tax_amount = after_discount * tax_pct / 100.0
+    return {
+        'subtotal': subtotal,
+        'discount_amount': discount_amount,
+        'tax_amount': tax_amount,
+        'total': after_discount + tax_amount,
+    }
+
+
+#: Years of exploitation the ROI subtab reports on.
+ROI_HORIZON_YEARS = 5
+
+#: Per-tree / per-year assumptions used until the user saves their own.
+ROI_DEFAULTS = {
+    'yield_kg_per_tree': 25.0,   # kg of fruit per tree per year
+    'price_per_kg': 3.0,         # sale price of one kg of fruit
+    'cost_per_tree_year': 60.0,  # water, labour, inputs per tree per year
+    'maintenance_pct': 3.0,      # yearly upkeep, as a % of the investment
+    'other_annual_cost': 0.0,    # anything else, per year
+}
+
+
+def roi_assumptions(estimation):
+    """Saved ROI assumptions, completed with the defaults."""
+    saved = estimation.get('roi') or {}
+    result = dict(ROI_DEFAULTS)
+    for key, default in ROI_DEFAULTS.items():
+        if saved.get(key) is not None:
+            result[key] = _as_float(saved.get(key), default)
+    return result
+
+
+def compute_roi(lines, estimation, assumptions, trees_count):
+    """Return on investment after ``ROI_HORIZON_YEARS`` years of exploitation.
+
+    The investment is the priced quote (discount and tax applied).  Each year
+    earns ``trees x yield x price`` and spends ``trees x cost per tree``, plus
+    maintenance as a share of the investment and any other annual cost.  ROI is
+    the net profit left once the investment is recovered, over the investment.
+    """
+    totals = quote_totals(lines, estimation)
+    investment = totals['total']
+    trees = int(trees_count or 0)
+
+    annual_revenue = trees * assumptions['yield_kg_per_tree'] * assumptions['price_per_kg']
+    maintenance_cost = investment * assumptions['maintenance_pct'] / 100.0
+    annual_cost = (trees * assumptions['cost_per_tree_year']
+                   + maintenance_cost
+                   + assumptions['other_annual_cost'])
+    annual_net = annual_revenue - annual_cost
+
+    years = []
+    cumulative = -investment
+    for year in range(1, ROI_HORIZON_YEARS + 1):
+        cumulative += annual_net
+        years.append({
+            'year': year,
+            'revenue': annual_revenue,
+            'cost': annual_cost,
+            'net': annual_net,
+            'cumulative': cumulative,
+        })
+
+    net_cash_5y = annual_net * ROI_HORIZON_YEARS
+    # A tree planted today does not carry the investment alone: the project is
+    # profitable only once the five years have repaid what was spent to build it.
+    profit_5y = net_cash_5y - investment
+    roi_pct = (profit_5y / investment * 100.0) if investment > 0 else None
+    annualized_roi_pct = (roi_pct / ROI_HORIZON_YEARS) if roi_pct is not None else None
+    payback_years = (investment / annual_net) if annual_net > 0 and investment > 0 else None
+    margin_pct = (annual_net / annual_revenue * 100.0) if annual_revenue > 0 else None
+
+    return {
+        'horizon': ROI_HORIZON_YEARS,
+        'currency': estimation.get('currency') or 'MAD',
+        'investment': investment,
+        'subtotal': totals['subtotal'],
+        'discount_amount': totals['discount_amount'],
+        'tax_amount': totals['tax_amount'],
+        'trees_count': trees,
+        'annual_revenue': annual_revenue,
+        'annual_cost': annual_cost,
+        'maintenance_cost': maintenance_cost,
+        'annual_net': annual_net,
+        'margin_pct': margin_pct,
+        'net_cash_5y': net_cash_5y,
+        'profit_5y': profit_5y,
+        'roi_pct': roi_pct,
+        'annualized_roi_pct': annualized_roi_pct,
+        'payback_years': payback_years,
+        'years': years,
     }
 
 
@@ -168,17 +283,11 @@ def quote_save(project_id):
     if not project:
         return redirect(url_for('project.index'))
 
-    def _float(value, default=0.0):
-        try:
-            return float(str(value).strip() or default)
-        except (TypeError, ValueError):
-            return default
-
     prices = {}
     for key in request.form.getlist('price_key'):
         key = key.strip()
         if key:
-            prices[key] = _float(request.form.get(f'price_{key}', 0))
+            prices[key] = _as_float(request.form.get(f'price_{key}', 0))
 
     items = []
     descriptions = request.form.getlist('item_description')
@@ -191,9 +300,9 @@ def quote_save(project_id):
             continue
         items.append({
             'description': desc,
-            'quantity': _float(quantities[i] if i < len(quantities) else 0, 1),
+            'quantity': _as_float(quantities[i] if i < len(quantities) else 0, 1),
             'unit': (units[i].strip() if i < len(units) else '') or 'unit',
-            'unit_price': _float(unit_prices[i] if i < len(unit_prices) else 0),
+            'unit_price': _as_float(unit_prices[i] if i < len(unit_prices) else 0),
         })
 
     estimation = {
@@ -201,12 +310,62 @@ def quote_save(project_id):
         'prices': prices,
         'items': items,
         'notes': request.form.get('notes', '').strip(),
-        'discount_pct': _float(request.form.get('discount_pct'), 0),
-        'tax_pct': _float(request.form.get('tax_pct'), 0),
+        'discount_pct': _as_float(request.form.get('discount_pct'), 0),
+        'tax_pct': _as_float(request.form.get('tax_pct'), 0),
     }
+    # Saving the quote must not throw away the ROI assumptions stored next to it.
+    saved_roi = ((project.get('spec') or {}).get('estimation') or {}).get('roi')
+    if saved_roi:
+        estimation['roi'] = saved_roi
     mongo.db.projects.update_one(
         {'id': project_id},
         {'$set': {'spec.estimation': estimation}}
     )
     flash('Estimation saved / تم حفظ التقدير', 'success')
     return redirect(url_for('estimation.quote_view', project_id=project_id))
+
+
+@estimation_bp.route('/<int:project_id>/roi')
+@login_required
+def roi_view(project_id):
+    """Return on investment after five years of exploitation."""
+    project = get_project_or_redirect(project_id)
+    if not project:
+        return redirect(url_for('project.index'))
+
+    lines, kpis = compute_quantities(project)
+    estimation = _get_saved_estimation(project)
+    assumptions = roi_assumptions(estimation)
+    trees_count = mongo.db.trees.count_documents({'project_id': project_id})
+    roi = compute_roi(lines, estimation, assumptions, trees_count)
+    return render_template(
+        'estimation/roi.html',
+        project=project,
+        estimation=estimation,
+        assumptions=assumptions,
+        roi=roi,
+        kpis=kpis,
+    )
+
+
+@estimation_bp.route('/<int:project_id>/roi/save', methods=['POST'])
+@login_required
+def roi_save(project_id):
+    """Store the exploitation assumptions used by the ROI subtab."""
+    project = get_project_or_redirect(project_id)
+    if not project:
+        return redirect(url_for('project.index'))
+
+    saved = {}
+    for key, default in ROI_DEFAULTS.items():
+        value = _as_float(request.form.get(key), default)
+        saved[key] = max(0.0, value)
+    # A share above 100% of the investment per year makes no sense.
+    saved['maintenance_pct'] = min(100.0, saved['maintenance_pct'])
+
+    mongo.db.projects.update_one(
+        {'id': project_id},
+        {'$set': {'spec.estimation.roi': saved}}
+    )
+    flash('ROI assumptions saved / تم حفظ افتراضات العائد على الاستثمار', 'success')
+    return redirect(url_for('estimation.roi_view', project_id=project_id))
