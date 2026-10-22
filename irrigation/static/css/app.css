@@ -649,26 +649,24 @@ textarea {
     border-bottom: 1px solid #dee2e6;
 }
 
+/* Tabs wrap onto extra rows instead of scrolling sideways. Ten bilingual
+   tabs do not fit a narrow window, and the hidden horizontal scrollbar made
+   Map Overview, Estimation and Report look as if they had been removed. */
 .project-workflow-nav .nav-tabs {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    overflow-y: hidden;
-    gap: 0.35rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(7.75rem, 1fr));
+    gap: 0.25rem;
     border-bottom: 0;
 }
 
 .project-workflow-nav .nav-item {
-    flex: 1 0 8rem;
+    min-width: 0;
 }
 
-/* Admins get the extra Users tab: tighten the row so all nine tabs fit
-   without hiding the last one behind a horizontal scroll. */
+/* Admins get the extra Users tab: a tighter gap buys the grid the room it
+   needs to keep ten tabs on a row for longer. */
 .project-workflow-nav .nav-tabs.nav-tabs-admin {
     gap: 0.2rem;
-}
-
-.project-workflow-nav .nav-tabs.nav-tabs-admin .nav-item {
-    flex-basis: 7.4rem;
 }
 
 .project-workflow-nav .nav-link {

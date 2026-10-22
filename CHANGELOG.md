@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.14 - 2026-10-22
+
+### Fixed
+- the project tab strip no longer scrolls Map Overview, Estimation and Report out of sight; the tabs wrap onto a second row on narrow windows
+
 ## 0.4.13 - 2026-10-22
 
 ### Added
