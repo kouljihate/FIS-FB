@@ -415,6 +415,12 @@ function syncMapSize() {
 window.addEventListener('resize', placeFullPageMap);
 window.addEventListener('orientationchange', placeFullPageMap);
 
+// The bilingual tab labels use a webfont that lands after the first layout;
+// measure again once it is ready so the fixed map never tucks under the tabs.
+if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(placeFullPageMap);
+}
+
 // ---------- Widget inside the map: sector-by-sector zoom ----------
 let pendingSectorZoom = null;
 

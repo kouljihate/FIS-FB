@@ -671,17 +671,45 @@ textarea {
 
 .project-workflow-nav .nav-link {
     display: grid;
-    width: 100%;
-    justify-content: center;
+    grid-auto-rows: min-content;
+    justify-items: center;
     align-content: center;
-    min-height: 3.75rem;
+    row-gap: 0.05rem;
+    width: 100%;
+    min-height: 4rem;
     height: 100%;
+    padding: 0.35rem 0.3rem;
     color: #343a40;
     background-color: #e9ecef;
     border: 1px solid #adb5bd;
     border-bottom: 3px solid #adb5bd;
     border-radius: 0.375rem 0.375rem 0 0;
     font-weight: 600;
+    line-height: 1.1;
+    text-align: center;
+    text-decoration: none;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+/* Stacked tab content: icon, then English, then Arabic. The Arabic line is a
+   little smaller so both labels stay inside the tab at the narrowest width. */
+.project-workflow-nav .nav-link > .workflow-tab-icon,
+.project-workflow-subnav .nav-link > .workflow-tab-icon {
+    display: block;
+    font-size: 1.05rem;
+    line-height: 1;
+}
+
+.workflow-tab-en {
+    font-size: 0.86rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.workflow-tab-ar {
+    font-size: 1rem;
+    font-weight: 500;
+    white-space: nowrap;
 }
 
 .project-workflow-nav .nav-link.active {
@@ -699,6 +727,27 @@ textarea {
     cursor: not-allowed;
 }
 
+/* Hovering a tab or sub-tab paints it in the planner's brown accent; the
+   current page keeps a darker brown so it stays recognisable while hovered. */
+.project-workflow-nav .nav-link:not(.disabled):hover,
+.project-workflow-nav .nav-link:not(.disabled):focus-visible,
+.project-workflow-subnav .nav-link:not(.disabled):hover,
+.project-workflow-subnav .nav-link:not(.disabled):focus-visible {
+    color: #fff;
+    background-color: #8a5a3b;
+    border-color: #6f452a;
+    text-decoration: none;
+}
+
+.project-workflow-nav .nav-link.active:hover,
+.project-workflow-nav .nav-link.active:focus-visible,
+.project-workflow-subnav .nav-link.active:hover,
+.project-workflow-subnav .nav-link.active:focus-visible {
+    color: #fff;
+    background-color: #6f452a;
+    border-color: #5a3720;
+}
+
 .project-workflow-subnav {
     background-color: #f8f9fa;
     border-bottom: 1px solid #dee2e6;
@@ -706,6 +755,7 @@ textarea {
 
 .project-workflow-subnav .nav {
     flex-wrap: nowrap;
+    align-items: center;
     gap: 0.25rem;
     overflow-x: auto;
     padding: 0.25rem 0;
@@ -717,9 +767,16 @@ textarea {
 
 .project-workflow-subnav .nav-link {
     display: inline-grid;
+    grid-auto-rows: min-content;
+    justify-items: center;
+    row-gap: 0.05rem;
     width: auto;
-    justify-content: center;
+    padding: 0.3rem 0.6rem;
     white-space: nowrap;
+    line-height: 1.15;
+    text-align: center;
+    text-decoration: none;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 @media (max-width: 991.98px) {

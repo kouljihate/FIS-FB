@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.15 - 2026-10-23
+
+### Changed
+- every workflow tab and sub-tab shows its icon above the English then Arabic label
+- tabs and sub-tabs turn brown on hover and keyboard focus
+
 ## 0.4.14 - 2026-10-22
 
 ### Fixed

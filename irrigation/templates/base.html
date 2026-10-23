@@ -78,96 +78,76 @@
     {% set workflow_project_id = request.view_args.get('project_id') if request.view_args else none %}
     {% set workflow_endpoint = request.endpoint or '' %}
     {% if current_user.is_authenticated %}
+    {# Workflow tabs stack their icon above the bilingual label: icon, then
+       English, then Arabic. Every tab keeps the same three-line rhythm so a
+       long label can never push its icon out of view. #}
+    {% macro workflow_tab(label, icon, href, active=false, locked_title='Open a project first') %}
+        {% set label_parts = label.split(' / ', 1) %}
+        {% if href %}
+        <a class="nav-link{% if active %} active{% endif %}" href="{{ href }}" title="{{ label }}">
+        {% else %}
+        <span class="nav-link disabled" aria-disabled="true" title="{{ locked_title }}">
+        {% endif %}
+            <i class="bi {{ icon }} workflow-tab-icon" aria-hidden="true"></i>
+            <span class="workflow-tab-en">{{ label_parts[0] }}</span>
+            {% if label_parts|length > 1 %}
+            <span class="workflow-tab-ar" lang="ar" dir="rtl">{{ label_parts[1] }}</span>
+            {% endif %}
+        {% if href %}</a>{% else %}</span>{% endif %}
+    {% endmacro %}
     <nav class="project-workflow-nav" aria-label="Project workflow">
         <div class="container">
             <ul class="nav nav-tabs{% if current_user.is_admin %} nav-tabs-admin{% endif %}">
                 {% if current_user.is_admin %}
                 <li class="nav-item">
-                    <a class="nav-link{% if workflow_endpoint == 'auth.users' %} active{% endif %}" href="{{ url_for('auth.users') }}">
-                        <i class="bi bi-people"></i> Users / المستخدمون
-                    </a>
+                    {{ workflow_tab('Users / المستخدمون', 'bi-people',
+                                    url_for('auth.users'), workflow_endpoint == 'auth.users') }}
                 </li>
                 {% endif %}
                 <li class="nav-item">
-                    {% if workflow_project_id %}
-                    <a class="nav-link{% if workflow_endpoint in ['project.detail', 'project.index', 'project.create'] %} active{% endif %}" href="{{ url_for('project.detail', project_id=workflow_project_id) }}">
-                    {% else %}
-                    <a class="nav-link{% if workflow_endpoint in ['project.index', 'project.create'] %} active{% endif %}" href="{{ url_for('project.index') }}">
-                    {% endif %}
-                        <i class="bi bi-folder"></i> Project / المشروع
-                    </a>
+                    {{ workflow_tab('Project / المشروع', 'bi-folder',
+                                    url_for('project.detail', project_id=workflow_project_id) if workflow_project_id else url_for('project.index'),
+                                    workflow_endpoint in ['project.detail', 'project.index', 'project.create']) }}
                 </li>
                 <li class="nav-item">
-                    {% if workflow_project_id %}
-                    <a class="nav-link{% if workflow_endpoint in ['water.well', 'water.basin', 'water.other'] %} active{% endif %}" href="{{ url_for('water.well', project_id=workflow_project_id) }}">
-                    {% else %}
-                    <span class="nav-link disabled" aria-disabled="true" title="Open a project first">
-                    {% endif %}
-                        <i class="bi bi-droplet-half"></i> Water Resource / الموارد المائية
-                    {% if workflow_project_id %}</a>{% else %}</span>{% endif %}
+                    {{ workflow_tab('Water Resource / الموارد المائية', 'bi-droplet-half',
+                                    url_for('water.well', project_id=workflow_project_id) if workflow_project_id else none,
+                                    workflow_endpoint in ['water.well', 'water.basin', 'water.other']) }}
                 </li>
                 <li class="nav-item">
-                    {% if workflow_project_id %}
-                    <a class="nav-link{% if workflow_endpoint in ['geometry.sectors_view', 'geometry.zones_view'] %} active{% endif %}" href="{{ url_for('geometry.sectors_view', project_id=workflow_project_id) }}">
-                    {% else %}
-                    <span class="nav-link disabled" aria-disabled="true" title="Open a project first">
-                    {% endif %}
-                        <i class="bi bi-bounding-box"></i> Geometry / الهندسة
-                    {% if workflow_project_id %}</a>{% else %}</span>{% endif %}
+                    {{ workflow_tab('Geometry / الهندسة', 'bi-bounding-box',
+                                    url_for('geometry.sectors_view', project_id=workflow_project_id) if workflow_project_id else none,
+                                    workflow_endpoint in ['geometry.sectors_view', 'geometry.zones_view']) }}
                 </li>
                 <li class="nav-item">
-                    {% if workflow_project_id %}
-                    <a class="nav-link{% if workflow_endpoint in ['hydrology.main_pipe', 'hydrology.second_pipe', 'hydrology.sub_pipe'] %} active{% endif %}" href="{{ url_for('hydrology.main_pipe', project_id=workflow_project_id) }}">
-                    {% else %}
-                    <span class="nav-link disabled" aria-disabled="true" title="Open a project first">
-                    {% endif %}
-                        <i class="bi bi-pipe"></i> Pipes / الأنابيب
-                    {% if workflow_project_id %}</a>{% else %}</span>{% endif %}
+                    {{ workflow_tab('Pipes / الأنابيب', 'bi-pipe',
+                                    url_for('hydrology.main_pipe', project_id=workflow_project_id) if workflow_project_id else none,
+                                    workflow_endpoint in ['hydrology.main_pipe', 'hydrology.second_pipe', 'hydrology.sub_pipe']) }}
                 </li>
                 <li class="nav-item">
-                    {% if workflow_project_id %}
-                    <a class="nav-link{% if workflow_endpoint in ['trees.rows_view', 'trees.trees_view'] %} active{% endif %}" href="{{ url_for('trees.rows_view', project_id=workflow_project_id) }}">
-                    {% else %}
-                    <span class="nav-link disabled" aria-disabled="true" title="Open a project first">
-                    {% endif %}
-                        <i class="bi bi-tree"></i> Trees / الأشجار
-                    {% if workflow_project_id %}</a>{% else %}</span>{% endif %}
+                    {{ workflow_tab('Trees / الأشجار', 'bi-tree',
+                                    url_for('trees.rows_view', project_id=workflow_project_id) if workflow_project_id else none,
+                                    workflow_endpoint in ['trees.rows_view', 'trees.trees_view']) }}
                 </li>
                 <li class="nav-item">
-                    {% if workflow_project_id %}
-                    <a class="nav-link{% if workflow_endpoint in ['components.valves', 'components.connectors', 'components.reductors', 'components.air_removal', 'components.pressure_reduction', 'components.terminators'] %} active{% endif %}" href="{{ url_for('components.valves', project_id=workflow_project_id) }}">
-                    {% else %}
-                    <span class="nav-link disabled" aria-disabled="true" title="Open a project first">
-                    {% endif %}
-                        <i class="bi bi-gear"></i> Components / المكونات
-                    {% if workflow_project_id %}</a>{% else %}</span>{% endif %}
+                    {{ workflow_tab('Components / المكونات', 'bi-gear',
+                                    url_for('components.valves', project_id=workflow_project_id) if workflow_project_id else none,
+                                    workflow_endpoint in ['components.valves', 'components.connectors', 'components.reductors', 'components.air_removal', 'components.pressure_reduction', 'components.terminators']) }}
                 </li>
                 <li class="nav-item">
-                    {% if workflow_project_id %}
-                    <a class="nav-link{% if workflow_endpoint == 'overview.index' %} active{% endif %}" href="{{ url_for('overview.index', project_id=workflow_project_id) }}">
-                    {% else %}
-                    <span class="nav-link disabled" aria-disabled="true" title="Open a project first">
-                    {% endif %}
-                        <i class="bi bi-map"></i> Map Overview / نظرة عامة
-                    {% if workflow_project_id %}</a>{% else %}</span>{% endif %}
+                    {{ workflow_tab('Map Overview / نظرة عامة', 'bi-map',
+                                    url_for('overview.index', project_id=workflow_project_id) if workflow_project_id else none,
+                                    workflow_endpoint == 'overview.index') }}
                 </li>
                 <li class="nav-item">
-                    {% if workflow_project_id %}
-                    <a class="nav-link{% if workflow_endpoint in ['estimation.quote_view', 'estimation.quote_save', 'estimation.roi_view', 'estimation.roi_save'] %} active{% endif %}" href="{{ url_for('estimation.quote_view', project_id=workflow_project_id) }}">
-                    {% else %}
-                    <span class="nav-link disabled" aria-disabled="true" title="Open a project first">
-                    {% endif %}
-                        <i class="bi bi-calculator"></i> Estimation / التقدير
-                    {% if workflow_project_id %}</a>{% else %}</span>{% endif %}
+                    {{ workflow_tab('Estimation / التقدير', 'bi-calculator',
+                                    url_for('estimation.quote_view', project_id=workflow_project_id) if workflow_project_id else none,
+                                    workflow_endpoint in ['estimation.quote_view', 'estimation.quote_save', 'estimation.roi_view', 'estimation.roi_save']) }}
                 </li>
                 <li class="nav-item">
-                    {% if workflow_project_id %}
-                    <a class="nav-link{% if workflow_endpoint in ['engineering.validation_view', 'engineering.technical_report_view'] %} active{% endif %}" href="{{ url_for('engineering.validation_view', project_id=workflow_project_id) }}">
-                    {% else %}
-                    <span class="nav-link disabled" aria-disabled="true" title="Open a project first">
-                    {% endif %}
-                        <i class="bi bi-clipboard-check"></i> Report / التقرير
-                    {% if workflow_project_id %}</a>{% else %}</span>{% endif %}
+                    {{ workflow_tab('Report / التقرير', 'bi-clipboard-check',
+                                    url_for('engineering.validation_view', project_id=workflow_project_id) if workflow_project_id else none,
+                                    workflow_endpoint in ['engineering.validation_view', 'engineering.technical_report_view']) }}
                 </li>
             </ul>
         </div>
@@ -224,15 +204,8 @@
             <ul class="nav nav-pills">
                 {% for sub_endpoint, sub_url, sub_label, sub_icon, sub_soon in workflow_subnav %}
                 <li class="nav-item">
-                    {% if sub_url %}
-                    <a class="nav-link{% if workflow_endpoint == sub_endpoint %} active{% endif %}" href="{{ sub_url }}">
-                        <i class="bi {{ sub_icon }}"></i> {{ sub_label }}
-                    </a>
-                    {% else %}
-                    <span class="nav-link disabled" aria-disabled="true" title="{% if sub_soon %}Coming Soon{% else %}Open a project first{% endif %}">
-                        <i class="bi {{ sub_icon }}"></i> {{ sub_label }}
-                    </span>
-                    {% endif %}
+                    {{ workflow_tab(sub_label, sub_icon, sub_url, workflow_endpoint == sub_endpoint,
+                                    'Coming Soon' if sub_soon else 'Open a project first') }}
                 </li>
                 {% endfor %}
             </ul>
