@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.21 - 2026-10-23
+
+### Added
+- Elevation heatmap toggle in the Map Overview filter widget, drawn on first press from the project's cached elevation model with the blue-red ramp
+
+### Changed
+- Heatmap legend now appears only while the surface is shown when a page drives the heatmap from its own control
+
 ## 0.4.20 - 2026-10-23
 
 ### Changed

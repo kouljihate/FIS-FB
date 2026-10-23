@@ -321,6 +321,14 @@ const FILTER_CATEGORIES = [
 const filterState = {};
 FILTER_CATEGORIES.forEach(function(category) { filterState[category.key] = true; });
 
+// A page may give the funnel widget an elevation heatmap to switch from the same
+// button strip (`options.elevationHeatmap`: {url, ramp}).  It is drawn the first
+// time its button is pressed, like a lazy geometry category, so a page that
+// never asks for it never downloads the samples.
+let elevationHeatmapConfig = null;
+let elevationHeatmapController = null;
+let elevationHeatmapVisible = false;
+
 // ---------- On-demand geometry loading ----------
 // A page can pass `lazyFilters: true`: the first request asks only for the
 // categories listed in `mapFiltersOn`, and each category is fetched the first
@@ -498,7 +506,7 @@ function setupMapFilterWidget(targetMap, filterKeys, componentCategories, listen
         return (filterKeys || []).indexOf(category.key) !== -1;
     });
     const fittingCategories = componentCategories || [];
-    if (!geometryCategories.length && !fittingCategories.length) return;
+    if (!geometryCategories.length && !fittingCategories.length && !elevationHeatmapConfig) return;
 
     componentFilterListener = listener || null;
     fittingCategories.forEach(function(category) {
@@ -587,6 +595,70 @@ function setupMapFilterWidget(targetMap, filterKeys, componentCategories, listen
                 }
             });
         });
+
+        if (elevationHeatmapConfig) {
+            // The toggle sits in the widget's header, next to the funnel: as a
+            // grid cell it would add a row and push the last category buttons
+            // under the scale bar on a short map.
+            head.style.display = 'flex';
+            head.style.alignItems = 'center';
+            head.style.justifyContent = 'center';
+            head.style.gap = '4px';
+            const label = 'Elevation Heatmap / خريطة الارتفاع';
+            const button = L.DomUtil.create('button', 'map-filter-elevation-button', head);
+            button.type = 'button';
+            button.innerHTML = '<i class="bi bi-thermometer-half"></i>';
+            button.title = (elevationHeatmapVisible ? 'Hide ' : 'Show ') + label;
+            button.setAttribute('aria-label', 'Toggle ' + label);
+            button.setAttribute('aria-pressed', String(elevationHeatmapVisible));
+            button.dataset.filterKey = 'elevation';
+            button.classList.toggle('active', elevationHeatmapVisible);
+            L.DomEvent.on(button, 'click', function(event) {
+                L.DomEvent.stop(event);
+                if (button.disabled) return;
+                elevationHeatmapVisible = !elevationHeatmapVisible;
+                button.classList.toggle('active', elevationHeatmapVisible);
+                button.setAttribute('aria-pressed', String(elevationHeatmapVisible));
+                button.title = (elevationHeatmapVisible ? 'Hide ' : 'Show ') + label;
+
+                if (elevationHeatmapController) {
+                    elevationHeatmapController.setVisible(elevationHeatmapVisible);
+                    return;
+                }
+                if (!elevationHeatmapVisible) return;
+
+                // First press: fetch and draw the surface now.
+                button.classList.add('map-filter-loading');
+                button.setAttribute('aria-busy', 'true');
+                elevationHeatmapController = addElevationHeatmap(targetMap, elevationHeatmapConfig.url, {
+                    ramp: elevationHeatmapConfig.ramp,
+                    visible: true,
+                    showButton: false,
+                    legendFollowsLayer: true,
+                    onStats: function(stats) {
+                        button.classList.remove('map-filter-loading');
+                        button.removeAttribute('aria-busy');
+                        if (stats) return;
+                        // No elevation model: leave the button inert, like the
+                        // standalone heatmap toggle does, and take the empty
+                        // legend away with the layer.
+                        button.disabled = true;
+                        button.title = 'No elevation data yet / لا توجد بيانات ارتفاع بعد';
+                        elevationHeatmapVisible = false;
+                        button.classList.remove('active');
+                        button.setAttribute('aria-pressed', 'false');
+                        if (elevationHeatmapController) elevationHeatmapController.setVisible(false);
+                    }
+                });
+                if (!elevationHeatmapController) {
+                    button.classList.remove('map-filter-loading');
+                    button.removeAttribute('aria-busy');
+                    elevationHeatmapVisible = false;
+                    button.classList.remove('active');
+                    button.setAttribute('aria-pressed', 'false');
+                }
+            });
+        }
 
         return group;
     };
@@ -1060,7 +1132,10 @@ function initMap(elementId, geojsonUrl, options = {}) {
     const geometryFilters = Array.isArray(options.mapFilters) ? options.mapFilters : [];
     const componentFilters = Array.isArray(options.componentFilters) ? options.componentFilters : [];
     currentComponentFilters = componentFilters;
-    if (geometryFilters.length || componentFilters.length) {
+    elevationHeatmapConfig = options.elevationHeatmap || null;
+    elevationHeatmapController = null;
+    elevationHeatmapVisible = false;
+    if (geometryFilters.length || componentFilters.length || elevationHeatmapConfig) {
         setupMapFilterWidget(map, geometryFilters, componentFilters,
                               options.onComponentFilterChange, options.mapFiltersOn);
     }
@@ -1927,6 +2002,9 @@ function buildElevationHeatOverlay(features, spacingM, paneName, ramp) {
 // called with {min, max, range, count} once the model arrives (or null when the
 // project has no elevation data yet).  options.ramp picks a colour scale
 // ('blue-red' = lowest ground blue, highest red) instead of the API colours.
+// options.showButton === false leaves the on-map toggle out, for pages that
+// switch the heatmap from their own control (the Map Overview filter widget);
+// options.legendFollowsLayer then keeps the legend hidden while the heatmap is.
 function addElevationHeatmap(targetMap, url, options) {
     options = options || {};
     if (!targetMap || !url) return null;
@@ -1945,16 +2023,21 @@ function addElevationHeatmap(targetMap, url, options) {
     let lowLabel = null;
     let highLabel = null;
     let rangeLabel = null;
+    let legendNode = null;
 
     function paint() {
-        if (!button) return;
-        button.classList.toggle('active', state.visible);
-        button.setAttribute('aria-pressed', String(state.visible));
-        button.title = (state.visible ? 'Hide' : 'Show') + ' elevation heatmap / خريطة الارتفاع';
+        if (button) {
+            button.classList.toggle('active', state.visible);
+            button.setAttribute('aria-pressed', String(state.visible));
+            button.title = (state.visible ? 'Hide' : 'Show') + ' elevation heatmap / خريطة الارتفاع';
+        }
         if (state.visible) {
             if (!targetMap.hasLayer(state.layer)) state.layer.addTo(targetMap);
         } else if (targetMap.hasLayer(state.layer)) {
             targetMap.removeLayer(state.layer);
+        }
+        if (legendNode && options.legendFollowsLayer) {
+            legendNode.style.display = state.visible ? '' : 'none';
         }
     }
 
@@ -1975,11 +2058,12 @@ function addElevationHeatmap(targetMap, url, options) {
         });
         return group;
     };
-    control.addTo(targetMap);
+    if (options.showButton !== false) control.addTo(targetMap);
 
     const legend = L.control({ position: 'bottomright' });
     legend.onAdd = function() {
         const div = L.DomUtil.create('div', 'map-legend map-elevation-legend');
+        legendNode = div;
         div.innerHTML =
             '<h6>Elevation / الارتفاع</h6>' +
             '<div class="elevation-gradient" style="background:' + (ramp ? ramp.gradient : ELEVATION_GRADIENT) + '"></div>' +

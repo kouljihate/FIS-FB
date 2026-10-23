@@ -48,6 +48,33 @@
         padding: 0.3rem;
     }
 
+    /* Elevation heatmap toggle, in the filter widget header (see map.js). */
+    .map-filter-head .map-filter-elevation-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        padding: 0;
+        border: 1px solid rgba(0, 0, 0, 0.2);
+        border-radius: 50%;
+        background: #f8f9fa;
+        color: #adb5bd;
+        font-size: 11px;
+        line-height: 1;
+    }
+
+    .map-filter-head .map-filter-elevation-button.active {
+        background: #0d6efd;
+        border-color: #0d6efd;
+        color: #fff;
+    }
+
+    .map-filter-head .map-filter-elevation-button.map-filter-loading {
+        animation: map-filter-pulse 1s ease-in-out infinite;
+        cursor: progress;
+    }
+
     .map-overview-panel .panel-title {
         display: block;
         padding: 0.1rem 0.25rem 0.25rem;
@@ -377,7 +404,13 @@ document.addEventListener('DOMContentLoaded', function () {
         // on: drawing a whole orchard (thousands of trees and driplines) froze
         // the browser, and a basin had to be asked for to be seen at all.
         mapFiltersOn: ['sector', 'water_source'],
-        lazyFilters: true
+        lazyFilters: true,
+        // The elevation surface belongs to the funnel widget too: its header
+        // toggle draws the heatmap on first press (see map.js).
+        elevationHeatmap: {
+            url: '{{ url_for("engineering.elevation_heatmap", project_id=project.id) }}',
+            ramp: 'blue-red'
+        }
     });
 
     buildSectorControl();
