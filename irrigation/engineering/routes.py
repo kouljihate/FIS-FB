@@ -292,6 +292,16 @@ def clear_elevation(project_id):
     flash('Elevation data cleared / تم مسح بيانات الارتفاع', 'info')
     return redirect(url_for('engineering.validation_view', project_id=project_id))
 
+@engineering_bp.route('/<int:project_id>/report/view')
+@login_required
+def report_view(project_id):
+    """Report tab: a placeholder until the printable report is built."""
+    project = get_project_or_redirect(project_id)
+    if not project:
+        return redirect(url_for('project.index'))
+    return render_template('engineering/report_coming_soon.html', project=project)
+
+
 @engineering_bp.route('/<int:project_id>/technical-report')
 @login_required
 def technical_report_view(project_id):

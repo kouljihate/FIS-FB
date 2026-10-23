@@ -140,14 +140,19 @@
                                     workflow_endpoint == 'overview.index') }}
                 </li>
                 <li class="nav-item">
+                    {{ workflow_tab('Validation / التحقق', 'bi-clipboard-check',
+                                    url_for('engineering.validation_view', project_id=workflow_project_id) if workflow_project_id else none,
+                                    workflow_endpoint in ['engineering.validation_view', 'engineering.technical_report_view']) }}
+                </li>
+                <li class="nav-item">
                     {{ workflow_tab('Estimation / التقدير', 'bi-calculator',
                                     url_for('estimation.quote_view', project_id=workflow_project_id) if workflow_project_id else none,
                                     workflow_endpoint in ['estimation.quote_view', 'estimation.quote_save', 'estimation.roi_view', 'estimation.roi_save']) }}
                 </li>
                 <li class="nav-item">
-                    {{ workflow_tab('Report / التقرير', 'bi-clipboard-check',
-                                    url_for('engineering.validation_view', project_id=workflow_project_id) if workflow_project_id else none,
-                                    workflow_endpoint in ['engineering.validation_view', 'engineering.technical_report_view']) }}
+                    {{ workflow_tab('Report / التقرير', 'bi-file-earmark-bar-graph',
+                                    url_for('engineering.report_view', project_id=workflow_project_id) if workflow_project_id else none,
+                                    workflow_endpoint == 'engineering.report_view') }}
                 </li>
             </ul>
         </div>

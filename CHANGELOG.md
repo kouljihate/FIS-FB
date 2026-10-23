@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.22 - 2026-10-23
+
+### Added
+- Validation tab between Map Overview and Estimation, carrying the Report tab's contents: the Charts placeholder plus the Standard and Technical (DPA) pages
+- Report tab now opens a Coming Soon placeholder with a link back to Validation
+
 ## 0.4.21 - 2026-10-23
 
 ### Added
