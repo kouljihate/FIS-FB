@@ -334,6 +334,7 @@
                         <th>Message / الرسالة</th>
                         <th>Metrics / القياسات</th>
                         <th>Recommendation / التوصية</th>
+                        <th width="70" class="text-center">Action / الإجراء</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -371,6 +372,28 @@
                             <small class="ar-text">{{ check.recommendation_ar }}</small>
                             {% else %}
                             <small class="text-muted">-</small>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if check.severity != 'pass' %}
+                                {% if check.can_fix %}
+                                <form method="POST" class="d-inline"
+                                      action="{{ url_for('engineering.fix_check', project_id=project.id, check_index=loop.index0) }}">
+                                    <button type="submit" class="btn btn-circle-sm btn-success"
+                                            title="Correct this issue and re-run validation / صحح المشكلة وأعد التحقق"
+                                            aria-label="Correct this issue / صحح هذه المشكلة">
+                                        <i class="bi bi-magic"></i>
+                                    </button>
+                                </form>
+                                {% else %}
+                                <span class="btn btn-circle-sm btn-outline-secondary disabled"
+                                      title="No automatic correction - apply the recommendation manually / لا تصحيح تلقائي - طبّق التوصية يدوياً"
+                                      aria-label="Manual correction needed / تصحيح يدوي مطلوب">
+                                    <i class="bi bi-slash-circle"></i>
+                                </span>
+                                {% endif %}
+                            {% else %}
+                            <span class="text-muted">-</span>
                             {% endif %}
                         </td>
                     </tr>

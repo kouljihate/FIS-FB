@@ -9,6 +9,7 @@ from irrigation.engineering.validation import (
 from irrigation.engineering.regeneration import (
     regenerate_sectors, regenerate_zones, get_regeneration_report
 )
+from irrigation.engineering.corrections import apply_correction, can_auto_fix
 from irrigation.engineering.elevation import (
     get_or_build_elevation_model, build_elevation_heatmap_geojson,
     has_elevation_model, delete_elevation_model
@@ -38,6 +39,11 @@ def validation_view(project_id):
     # Get last validation
     last_validation = get_last_validation(project_id)
     history = get_validation_history(project_id, limit=5)
+
+    # The table shows a correction button only where the app knows the fix.
+    if last_validation:
+        for check in last_validation.get('checks') or []:
+            check['can_fix'] = can_auto_fix(check)
 
     # Get regeneration report
     regen_report = get_regeneration_report(project_id)
@@ -108,6 +114,38 @@ def run_validation(project_id):
         flash(f'Validation: {passes} passed, {warnings} warnings / التحقق: {passes} نجح، {warnings} تحذيرات', 'warning')
     else:
         flash(f'Validation: {failures} failures, {warnings} warnings / التحقق: {failures} فشل، {warnings} تحذيرات', 'danger')
+
+    return redirect(url_for('engineering.validation_view', project_id=project_id))
+
+
+@engineering_bp.route('/<int:project_id>/checks/<int:check_index>/fix', methods=['POST'])
+@login_required
+def fix_check(project_id, check_index):
+    """Apply the automatic correction a validation rule recommends."""
+    project = get_project_or_redirect(project_id)
+    if not project:
+        return redirect(url_for('project.index'))
+
+    last_validation = get_last_validation(project_id)
+    checks = (last_validation or {}).get('checks') or []
+    if check_index < 0 or check_index >= len(checks):
+        flash('Validation result not found - run the validation again / نتيجة التحقق غير موجودة - أعد تشغيل التحقق', 'warning')
+        return redirect(url_for('engineering.validation_view', project_id=project_id))
+
+    check = checks[check_index]
+    if check.get('severity') == 'pass':
+        flash('This check already passes / هذا الفحص ناجح بالفعل', 'info')
+        return redirect(url_for('engineering.validation_view', project_id=project_id))
+
+    # Re-run with the parameters this result was produced with, so the table
+    # shows whether the correction cleared the rule.
+    config = (last_validation or {}).get('config') or ENGINEERING_DEFAULTS.copy()
+    result = apply_correction(project_id, check, config)
+    if result.get('applied'):
+        run_full_validation(project_id, config)
+        flash(result.get('message_en', '') + ' / ' + result.get('message_ar', ''), 'success')
+    else:
+        flash(result.get('message_en', '') + ' / ' + result.get('message_ar', ''), 'warning')
 
     return redirect(url_for('engineering.validation_view', project_id=project_id))
 

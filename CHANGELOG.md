@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.18 - 2026-10-23
+
+### Added
+- Action column in the Report Validation Rules table, with a round button that corrects the rule where the app knows the fix and then re-runs the validation
+
+### Changed
+- pipe velocity checks resize the flagged pipe to the diameter the check recommends
+- pressure-loss checks jump straight to the standard diameter that clears the 20% loss threshold
+- missing master, sector and zone valves are placed with the same generator the Components page uses
+- rules without an automatic correction show a disabled circle whose tooltip points to the manual recommendation
+
 ## 0.4.17 - 2026-10-23
 
 ### Added
