@@ -53,6 +53,21 @@
                                     data-bs-target="#aiGenerateModal" title="Auto Generate / توليد تلقائي">
                                 <i class="bi bi-magic"></i>
                             </button>
+                            {% if sectors|length >= 1 %}
+                            <form method="POST" action="{{ url_for('geometry.sector_arrange', project_id=project.id) }}"
+                                  class="d-inline"
+                                  data-confirm="Arrange will clip every sector to the land boundary and remove the overlaps between sectors. Continue? / سيقص الترتيب كل قطاع على حدود الأرض ويزيل التداخلات بين القطاعات. متابعة؟">
+                                <button type="submit" class="btn btn-circle btn-sm btn-outline-success"
+                                        title="Arrange: clip every sector to the land boundary and fix the overlaps / ترتيب: قص كل قطاع على حدود الأرض وإصلاح التداخلات">
+                                    <i class="bi bi-bounding-box-circles"></i>
+                                </button>
+                            </form>
+                            {% else %}
+                            <button type="button" class="btn btn-circle btn-sm btn-outline-success" disabled
+                                    title="Create sectors first / أنشئ القطاعات أولاً">
+                                <i class="bi bi-bounding-box-circles"></i>
+                            </button>
+                            {% endif %}
                             <form method="POST" action="{{ url_for('geometry.sector_validate', project_id=project.id) }}" class="d-inline">
                                 <button type="submit" class="btn btn-circle btn-sm btn-primary" title="Validate /_ENABLED">
                                     <i class="bi bi-check-circle"></i>

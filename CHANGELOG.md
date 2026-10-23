@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.27 - 2026-10-23
+
+### Added
+- Arrange button on the Sectors toolbar (enabled as soon as a sector exists): clips every sector to the land boundary and removes the overlaps between sectors, then recalculates their areas
+- A sector the repair would erase keeps its old shape and is named in the warning instead of silently disappearing
+
+### Changed
+- Sectors are repaired in id order, so a contested strip stays with the lower id
+
 ## 0.4.26 - 2026-10-23
 
 ### Changed

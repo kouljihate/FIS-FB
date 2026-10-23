@@ -7,7 +7,7 @@ from irrigation.engineering.projection import projected_shape, get_project_centr
 from irrigation.engineering.elevation import (
     get_or_build_elevation_model, aspect_for_polygon, compass_from_bearing,
     ORIENTATION_DEGREES, ORIENTATION_OPTIONS, COMPASS_POINTS, ORIENTATION_ALIASES)
-from shapely.geometry import shape
+from shapely.geometry import shape, mapping
 import json
 import math
 
@@ -40,6 +40,51 @@ def auto_polygon_orientation(project_id, project, polygon_geojson):
         return aspect['compass'] if aspect else None
     except Exception:
         return None
+
+
+def _land_boundary_geometry(project):
+    """The project's land boundary as a valid Shapely geometry (None if unknown)."""
+    boundary = project.get('boundary') or (project.get('land') or {}).get('map')
+    if not boundary:
+        return None
+    try:
+        geom = shape(boundary)
+    except Exception:
+        return None
+    if geom.is_empty:
+        return None
+    return geom if geom.is_valid else geom.buffer(0)
+
+
+def _valid_polygon(polygon_geojson):
+    """One valid polygon from a GeoJSON polygon (self-intersections repaired)."""
+    try:
+        geom = shape(polygon_geojson)
+    except Exception:
+        return None
+    if not geom.is_valid:
+        geom = geom.buffer(0)
+    return _largest_polygon(geom)
+
+
+def _largest_polygon(geom):
+    """Largest polygon part of any Shapely geometry (None if it holds none)."""
+    if geom is None or geom.is_empty:
+        return None
+    if geom.geom_type == 'Polygon':
+        return geom
+    if geom.geom_type == 'MultiPolygon':
+        parts = list(geom.geoms)
+    elif geom.geom_type == 'GeometryCollection':
+        parts = [part for part in geom.geoms
+                 if part.geom_type in ('Polygon', 'MultiPolygon')]
+        parts = [p for part in parts
+                 for p in (list(part.geoms) if part.geom_type == 'MultiPolygon' else [part])]
+    else:
+        return None
+    if not parts:
+        return None
+    return max(parts, key=lambda part: part.area)
 
 
 def _polygon_area_m2(polygon):
@@ -440,6 +485,100 @@ def sector_ai_regenerate(project_id):
         flash(f'Auto Generated {len(sectors)} sectors / الذكاء الاصطناعي أنشأ {len(sectors)} قطاعات', 'success')
     else:
         flash('AI generation failed — check that the project has a valid boundary / فشل الإنشاء — تحقق من وجود حدود صالحة للمشروع', 'danger')
+    return redirect(url_for('geometry.sectors_view', project_id=project_id))
+
+
+@geometry_bp.route('/<int:project_id>/sectors/arrange', methods=['POST'])
+@login_required
+def sector_arrange(project_id):
+    """Repair every sector polygon: clip it to the land boundary and remove overlaps.
+
+    Sectors are repaired in id order, so a contested strip stays with the lower
+    id and the later sector gives it up. None of this is destructive on purpose:
+    a sector the repair would erase (it sits almost entirely outside the land
+    boundary) keeps its old shape and is reported in the flash message instead.
+    """
+    project = get_project_or_redirect(project_id)
+    if not project:
+        return redirect(url_for('project.index'))
+
+    sectors = list(mongo.db.sectors.find({'project_id': project_id}).sort('id', 1))
+    if not sectors:
+        flash('No sectors to arrange / لا توجد قطاعات لترتيبها', 'warning')
+        return redirect(url_for('geometry.sectors_view', project_id=project_id))
+
+    boundary_geom = _land_boundary_geometry(project)
+    claimed = None
+    arranged = 0
+    clipped = 0
+    deoverlapped = 0
+    skipped = []
+
+    for sector in sectors:
+        polygon = sector.get('polygon')
+        if not polygon:
+            continue
+        original = _valid_polygon(polygon)
+        if original is None:
+            skipped.append(sector.get('name_en') or str(sector.get('id')))
+            continue
+
+        geom = original
+        was_clipped = False
+        if boundary_geom is not None and not boundary_geom.covers(geom):
+            geom = _largest_polygon(geom.intersection(boundary_geom))
+            was_clipped = geom is not None
+
+        was_deoverlapped = False
+        if geom is not None and claimed is not None:
+            before_area = geom.area
+            geom = _largest_polygon(geom.difference(claimed))
+            if geom is not None:
+                was_deoverlapped = geom.area < before_area - 1e-6
+
+        # Too little left to be a sector: keep the original rather than leaving
+        # a sliver (or nothing) behind without the user noticing.  The areas are
+        # compared in the polygon's own units, so the ratio holds in degrees as
+        # well as in metres.
+        if geom is None or geom.is_empty or geom.area < original.area * 0.01:
+            skipped.append(sector.get('name_en') or str(sector.get('id')))
+            geom = original
+
+        # Keep the whole claim build-up: sectors are often disjoint, and the
+        # union of two of them is a MultiPolygon that must not be reduced to its
+        # biggest part or the other sector's area would look unclaimed again.
+        claimed = geom if claimed is None else claimed.union(geom)
+
+        if geom.equals(original):
+            continue
+
+        new_geojson = mapping(geom)
+        mongo.db.sectors.update_one(
+            {'id': sector['id'], 'project_id': project_id},
+            {'$set': {'polygon': new_geojson, 'area_m2': _polygon_area_m2(new_geojson)}}
+        )
+        arranged += 1
+        clipped += 1 if was_clipped else 0
+        deoverlapped += 1 if was_deoverlapped else 0
+
+    if arranged:
+        flash(
+            f'Arranged {arranged} sector(s): {clipped} clipped to the land boundary, '
+            f'{deoverlapped} overlap(s) removed / '
+            f'تم ترتيب {arranged} قطاع: {clipped} مقصوص على حدود الأرض و{deoverlapped} تداخل تمت إزالته',
+            'success'
+        )
+    elif not skipped:
+        flash('Every sector already sits inside the land boundary without overlap / '
+              'كل القطاعات داخل حدود الأرض دون تداخل', 'info')
+
+    if skipped:
+        flash(
+            'Kept as-is (nothing left inside the boundary): ' + ', '.join(skipped) +
+            ' / تم الاحتفاظ بها كما هي (لم يبق منها شيء داخل الحدود)',
+            'warning'
+        )
+
     return redirect(url_for('geometry.sectors_view', project_id=project_id))
 
 
