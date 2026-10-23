@@ -973,11 +973,31 @@ def zone_ai_regenerate(project_id):
             except ValueError:
                 pass
 
-    mongo.db.zones.delete_many({'project_id': project_id})
+    # Only the sectors ticked in the modal are rebuilt; the rest keep the zones
+    # they already have.  A submission with nothing ticked changes nothing.
+    selected = []
+    for raw in request.form.getlist('sector_ids'):
+        try:
+            value = int(str(raw).strip())
+        except (TypeError, ValueError):
+            continue
+        if value not in selected:
+            selected.append(value)
+
+    known = {s['id'] for s in mongo.db.sectors.find({'project_id': project_id}, {'id': 1})}
+    selected = [sid for sid in selected if sid in known]
+    if not selected:
+        flash('Select at least one sector to generate its zones / اختر قطاعاً واحداً على الأقل لإنشاء مناطقه',
+              'warning')
+        return redirect(url_for('geometry.zones_view', project_id=project_id))
+
+    mongo.db.zones.delete_many({'project_id': project_id, 'sector_id': {'$in': selected}})
     zones = regenerate_zones(project_id, zones_per_sector=zones_per_sector,
                              use_elevation=use_elevation, orientation=orientation or None,
-                             sector_orientations=sector_orientations or None)
-    flash(f'Auto Generated {len(zones)} zones / الذكاء الاصطناعي أنشأ {len(zones)} مناطق', 'success')
+                             sector_orientations=sector_orientations or None,
+                             sector_ids=selected)
+    flash(f'Auto Generated {len(zones)} zones in {len(selected)} sector(s) / '
+          f'الذكاء الاصطناعي أنشأ {len(zones)} منطقة في {len(selected)} قطاع', 'success')
     return redirect(url_for('geometry.zones_view', project_id=project_id))
 
 

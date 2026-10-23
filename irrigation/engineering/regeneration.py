@@ -705,7 +705,7 @@ def _target_orientation(value):
 
 
 def regenerate_zones(project_id, sector_id=None, zones_per_sector=None, use_elevation=True,
-                     orientation=None, sector_orientations=None):
+                     orientation=None, sector_orientations=None, sector_ids=None):
     """AI regeneration: optimally divide sectors into zones.
 
     Uses the same optimization approach but applied within each sector's polygon.
@@ -723,6 +723,10 @@ def regenerate_zones(project_id, sector_id=None, zones_per_sector=None, use_elev
     wins over the global ``orientation`` argument. If a float is provided, the
     exact degree is stored in ``orientation_deg`` and the nearest compass point
     is stored in ``orientation``.
+
+    ``sector_ids`` narrows the rebuild to those sectors (Auto Generate Zones with
+    a subset ticked); ``sector_id`` still takes precedence for the single-sector
+    callers.
     """
     target_orientation = _target_orientation(orientation)
     sector_orientations = sector_orientations or {}
@@ -730,6 +734,8 @@ def regenerate_zones(project_id, sector_id=None, zones_per_sector=None, use_elev
     query = {'project_id': project_id}
     if sector_id:
         query['id'] = sector_id
+    elif sector_ids:
+        query['id'] = {'$in': list(sector_ids)}
 
     sectors = list(mongo.db.sectors.find(query))
     if not sectors:

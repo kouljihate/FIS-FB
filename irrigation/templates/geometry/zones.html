@@ -731,7 +731,7 @@
         <div class="modal-content modal-green">
             <form method="POST"
                 action="{{ url_for('geometry.zone_ai_regenerate', project_id=project.id) }}"
-                data-confirm="AI will rebuild all zones. Continue? / سيعيد الذكاء الاصطناعي بناء المناطق. متابعة؟">
+                data-confirm="AI will rebuild the zones of the selected sectors only; unchecked sectors keep their zones. Continue? / سيعيد الذكاء الاصطناعي بناء مناطق القطاعات المحددة فقط، والقطاعات غير المحددة تحتفظ بمناطقها. متابعة؟">
                 <div class="modal-header">
                     <h5 class="modal-title"><i class="bi bi-magic"></i> Auto
                         Generate Zones / إنشاء المناطق بالذكاء الاصطناعي</h5>
@@ -751,12 +751,27 @@
                             الاتجاه لكل قطاع</label>
                         {% if sectors %}
                         <div class="border rounded p-2" style="max-height: 280px; overflow-y: auto;">
+                            <div class="d-flex align-items-center gap-2 pb-2 mb-2 border-bottom">
+                                <input class="form-check-input mt-0" type="checkbox"
+                                    id="zoneSectorSelectAll" checked
+                                    title="Select / deselect every sector / تحديد / إلغاء تحديد كل القطاعات">
+                                <label class="form-check-label small fw-semibold flex-grow-1"
+                                    for="zoneSectorSelectAll">
+                                    All sectors / كل القطاعات
+                                </label>
+                                <div class="small text-muted" style="width: 45%;">
+                                    Orientation (°) / الاتجاه
+                                </div>
+                            </div>
                             {% for s in sectors %}
                             <div class="d-flex align-items-center gap-2 mb-2">
-                                <div class="small flex-grow-1" style="min-width: 0;">
-                                    <code>{{ s.short_name or s.id }}</code>
-                                    <span class="text-muted">{{ s.name_en }}</span>
-                                </div>
+                                <input class="form-check-input mt-0 zone-sector-checkbox" type="checkbox"
+                                    name="sector_ids" value="{{ s.id }}" id="zoneSector{{ s.id }}" checked
+                                    title="Generate zones in this sector / إنشاء المناطق في هذا القطاع">
+                                <label class="small flex-grow-1 text-muted" style="min-width: 0;"
+                                    for="zoneSector{{ s.id }}">
+                                    {{ s.name_en }}
+                                </label>
                                 <div style="width: 45%;">
                                     <input type="number" name="orientation_deg_{{ s.id }}"
                                         class="form-control form-control-sm orientation-deg-input"
@@ -789,11 +804,12 @@
                         </label>
                     </div>
                     <div class="alert alert-info py-2 small mb-0">
-                        All zones are rebuilt from scratch inside every sector
-                        with elevation-aware partitioning.
+                        Zones are rebuilt from scratch inside every selected sector
+                        with elevation-aware partitioning; unchecked sectors keep
+                        the zones they already have.
                         <br>
-                        يتم إعادة إنشاء جميع المناطق من الصفر داخل كل قطاع مع
-                        تقسيم يراعي التضاريس.
+                        يتم إعادة إنشاء المناطق من الصفر داخل كل قطاع محدد مع
+                        تقسيم يراعي التضاريس، والقطاعات غير المحددة تحتفظ بمناطقها.
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -859,6 +875,26 @@ function compassHintFor(raw) {
     const opt = ZONE_ORIENTATION_OPTIONS[index];
     return '→ ' + opt.en + ' / ' + opt.ar + ' (' + opt.deg + '°) ' + opt.code;
 }
+
+// Auto Generate Zones modal: the header checkbox ticks or clears every sector
+// row, and reflects the rows the user toggles one by one.
+(function () {
+    const selectAll = document.getElementById('zoneSectorSelectAll');
+    if (!selectAll) return;
+    const boxes = Array.prototype.slice.call(document.querySelectorAll('.zone-sector-checkbox'));
+    if (!boxes.length) return;
+    const sync = function () {
+        const checked = boxes.filter(function (box) { return box.checked; }).length;
+        selectAll.checked = checked === boxes.length;
+        selectAll.indeterminate = checked > 0 && checked < boxes.length;
+    };
+    selectAll.addEventListener('change', function () {
+        boxes.forEach(function (box) { box.checked = selectAll.checked; });
+        sync();
+    });
+    boxes.forEach(function (box) { box.addEventListener('change', sync); });
+    sync();
+})();
 
 // Auto Generate Zones modal: preview compass point for degree inputs
 function bindOrientationHint(input) {

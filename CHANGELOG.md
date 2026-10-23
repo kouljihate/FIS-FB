@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.28 - 2026-10-23
+
+### Added
+- Checkbox column in the Auto Generate Zones modal: only the ticked sectors are rebuilt and the unchecked ones keep their zones
+- Select-all checkbox in that modal's header, ticking or clearing every sector at once and showing the mixed state when only some are ticked
+
+### Changed
+- Auto Generate Zones no longer wipes the project's zones: it removes and recreates the zones of the selected sectors only, and a submission with no sector ticked changes nothing and warns instead
+
 ## 0.4.27 - 2026-10-23
 
 ### Added
