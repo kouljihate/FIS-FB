@@ -713,6 +713,32 @@ textarea {
     white-space: nowrap;
 }
 
+/* From laptop width up every tab shares one row: the columns split the strip
+   evenly instead of reserving 7.75rem each, and the two label lines scale with
+   the viewport so even "Water Resource" stays inside its tab. Below this width
+   the grid keeps wrapping into extra rows rather than shrinking the labels
+   past legibility. */
+@media (min-width: 1200px) {
+    .project-workflow-nav .nav-tabs {
+        grid-template-columns: none;
+        grid-auto-flow: column;
+        grid-auto-columns: 1fr;
+    }
+
+    .project-workflow-nav .nav-link {
+        padding-left: 0.15rem;
+        padding-right: 0.15rem;
+    }
+
+    .project-workflow-nav .workflow-tab-en {
+        font-size: clamp(0.7rem, 0.5vw + 0.25rem, 0.86rem);
+    }
+
+    .project-workflow-nav .workflow-tab-ar {
+        font-size: clamp(0.92rem, 0.55vw + 0.5rem, 1.2rem);
+    }
+}
+
 .project-workflow-nav .nav-link.active {
     color: #fff;
     background-color: var(--bs-primary, #0d6efd);

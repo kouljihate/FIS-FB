@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.24 - 2026-10-23
+
+### Changed
+- Workflow tabs share a single row from 1200 px wide: the strip splits evenly across every tab and both label lines scale with the viewport, so the eleven tabs no longer wrap and no label is clipped
+
 ## 0.4.23 - 2026-10-23
 
 ### Changed
