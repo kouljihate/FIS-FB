@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.19 - 2026-10-23
+
+### Added
+- Validation Results table: a status filter row under the column headers (All / Failed / Warnings / Passed, live match counter, empty-state row).
+
 ## 0.4.18 - 2026-10-23
 
 ### Added

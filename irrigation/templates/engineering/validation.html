@@ -325,7 +325,7 @@
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover mb-0">
+            <table class="table table-hover mb-0" id="validationResultsTable">
                 <thead>
                     <tr>
                         <th width="80">Status / الحالة</th>
@@ -336,12 +336,34 @@
                         <th>Recommendation / التوصية</th>
                         <th width="70" class="text-center">Action / الإجراء</th>
                     </tr>
+
+                    <tr class="validation-filter-row">
+                        <th colspan="7" class="bg-light fw-normal py-2">
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <label class="mb-0 small text-muted" for="statusFilter">
+                                    <i class="bi bi-funnel"></i>
+                                    Filter by result / تصفية حسب النتيجة
+                                </label>
+                                <select id="statusFilter" class="form-select form-select-sm w-auto"
+                                        aria-label="Filter validation results by status / تصفية النتائج حسب الحالة">
+                                    <option value="all" selected>All / الكل ({{ validation.checks|length }})</option>
+                                    <option value="fail">Failed / فشل ({{ validation.summary.failures }})</option>
+                                    <option value="warning">Warnings / تحذيرات ({{ validation.summary.warnings }})</option>
+                                    <option value="pass">Passed / ناجح ({{ validation.summary.passes }})</option>
+                                </select>
+                                <span class="small text-muted">
+                                    <span id="statusFilterCount">{{ validation.checks|length }}</span> / {{ validation.checks|length }}
+                                </span>
+                            </div>
+                        </th>
+                    </tr>
                 </thead>
                 <tbody>
                     {% for check in validation.checks %}
                     <tr class="
                         {% if check.severity == 'fail' %}table-danger
-                        {% elif check.severity == 'warning' %}table-warning{% endif %}">
+                        {% elif check.severity == 'warning' %}table-warning{% endif %}"
+                        data-severity="{{ check.severity }}">
                         <td>
                             {% if check.severity == 'pass' %}
                             <span class="badge bg-success"><i class="bi bi-check"></i></span>
@@ -398,6 +420,12 @@
                         </td>
                     </tr>
                     {% endfor %}
+                    <tr id="statusFilterEmpty" class="d-none">
+                        <td colspan="7" class="text-center text-muted py-3">
+                            <i class="bi bi-funnel"></i>
+                            No checks match this filter / لا توجد فحوصات مطابقة
+                        </td>
+                    </tr>
                 </tbody>
             </table>
         </div>
@@ -453,6 +481,34 @@
 {% endblock %}
 
 {% block extra_js %}
+{% if validation %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const table = document.getElementById('validationResultsTable');
+    const select = document.getElementById('statusFilter');
+    if (!table || !select) return;
+
+    const rows = Array.from(table.querySelectorAll('tbody tr[data-severity]'));
+    const emptyRow = document.getElementById('statusFilterEmpty');
+    const countLabel = document.getElementById('statusFilterCount');
+
+    function applyStatusFilter() {
+        const wanted = select.value;
+        let visible = 0;
+        rows.forEach(function(row) {
+            const match = wanted === 'all' || row.dataset.severity === wanted;
+            row.classList.toggle('d-none', !match);
+            if (match) visible += 1;
+        });
+        if (emptyRow) emptyRow.classList.toggle('d-none', visible > 0);
+        if (countLabel) countLabel.textContent = visible;
+    }
+
+    select.addEventListener('change', applyStatusFilter);
+    applyStatusFilter();
+});
+</script>
+{% endif %}
 {% if regen_report.elevation_aware %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
