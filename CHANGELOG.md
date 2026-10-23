@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.25 - 2026-10-23
+
+### Changed
+- Pipes sub-tab maps (Main Pipe, Second Pipe, Zone Pipe) now open with a filter widget that lists only Sector, Zone, MP, SP and ZP; every other element kind stays out of the filter
+- The elevation heatmap toggle lives in that same widget, so one strip drives the layout filters and the terrain surface
+- A page that offers MP, SP and ZP separately filters each pipe level on its own, while pages with the grouped Pipes button still hide or show every level at once
+
 ## 0.4.24 - 2026-10-23
 
 ### Changed

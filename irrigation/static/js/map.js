@@ -304,6 +304,11 @@ const FILTER_CATEGORIES = [
     { key: 'zone', letter: 'Z', label: 'Zones / المناطق', types: ['zone'] },
     { key: 'tree_row', letter: 'R', label: 'Rows / الصفوف', types: ['tree_row'] },
     { key: 'tree', letter: 'T', label: 'Trees / الأشجار', types: ['tree'] },
+    // The three pipe levels can be filtered one at a time (the Pipes tabs) or
+    // together through the grouped `pipe` category below (overview, fittings).
+    { key: 'main_pipe', letter: 'MP', label: 'Main Pipes / الأنابيب الرئيسية', types: ['main_pipe'] },
+    { key: 'second_pipe', letter: 'SP', label: 'Second Pipes / الأنابيب الثانوية', types: ['second_pipe'] },
+    { key: 'zone_pipe', letter: 'ZP', label: 'Zone Pipes / أنابيب المناطق', types: ['sub_pipe'] },
     { key: 'pipe', letter: 'P', label: 'Pipes / الأنابيب', types: ['main_pipe', 'second_pipe', 'sub_pipe', 'dripline'] },
     { key: 'master_valve', letter: 'VM', label: 'Main Valves / الصمامات الرئيسية', types: ['master_valve'] },
     { key: 'sector_valve', letter: 'VS', label: 'Sector Valves / صمامات القطاعات', types: ['sector_valve'] },
@@ -412,13 +417,26 @@ function loadFilterCategory(category, button) {
 }
 
 // Which filter category a feature belongs to (null = never filtered).
+// A pipe type is listed by both its own category (MP / SP / ZP) and the grouped
+// `pipe` category; the page's widget decides: a map that offers Main / Second /
+// Zone Pipe separately resolves each type to its own button, while a map that
+// only offers `pipe` keeps filtering every pipe level at once.
+let activeFilterKeys = null;
+
 function featureFilterKey(properties) {
     const type = (properties && properties.type) || '';
     if (!type) return null;
-    const category = FILTER_CATEGORIES.find(function(item) {
+    const matches = FILTER_CATEGORIES.filter(function(item) {
         return item.types.indexOf(type) !== -1;
     });
-    return category ? category.key : null;
+    if (!matches.length) return null;
+    if (activeFilterKeys) {
+        const own = matches.find(function(item) {
+            return activeFilterKeys.indexOf(item.key) !== -1;
+        });
+        if (own) return own.key;
+    }
+    return matches[matches.length - 1].key;
 }
 
 // Add/remove every feature of one category from the map.
@@ -1033,6 +1051,10 @@ function initMap(elementId, geojsonUrl, options = {}) {
     if (!mapElement) return null;
     currentGeojsonUrl = geojsonUrl || currentGeojsonUrl;
     hiddenFeatureTypes = Array.isArray(options.hiddenTypes) ? options.hiddenTypes : [];
+    // Which filter categories this page offers decides how overlapping ones
+    // (Main / Second / Zone Pipe vs. the grouped pipes) are resolved.
+    activeFilterKeys = Array.isArray(options.mapFilters) && options.mapFilters.length
+        ? options.mapFilters.slice() : null;
     // Pages that open on a subset (Map Overview: sectors only) fetch the other
     // categories later, when the matching filter button is switched on.
     lazyGeometry = !!(options.lazyFilters && Array.isArray(options.mapFiltersOn));

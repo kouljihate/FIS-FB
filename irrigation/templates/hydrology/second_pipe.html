@@ -233,7 +233,14 @@ document.addEventListener('DOMContentLoaded', function() {
     initMap('map', geojsonUrl, {
         center: [34.0, -6.0],
         zoom: 14,
-        selectable: { type: 'second_pipe', checkboxSelector: '.pipe-checkbox', toggleOnClick: true }
+        selectable: { type: 'second_pipe', checkboxSelector: '.pipe-checkbox', toggleOnClick: true },
+        // Pipes pages filter the layout only: sectors, zones and the three pipe
+        // levels (MP / SP / ZP). The elevation surface uses the same widget.
+        mapFilters: ['sector', 'zone', 'main_pipe', 'second_pipe', 'zone_pipe'],
+        elevationHeatmap: {
+            url: '{{ url_for("engineering.elevation_heatmap", project_id=project.id) }}',
+            ramp: 'blue-red'
+        }
     });
 
     initPipeEditor({
