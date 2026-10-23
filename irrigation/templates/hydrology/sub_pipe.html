@@ -243,6 +243,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // Pipes pages filter the layout only: sectors, zones and the three pipe
         // levels (MP / SP / ZP). The elevation surface uses the same widget.
         mapFilters: ['sector', 'zone', 'main_pipe', 'second_pipe', 'zone_pipe'],
+        // Rows and trees belong to the planting tabs; on a pipe map they only
+        // bury the layout under hundreds of markers.
+        hiddenTypes: ['tree_row', 'tree'],
         elevationHeatmap: {
             url: '{{ url_for("engineering.elevation_heatmap", project_id=project.id) }}',
             ramp: 'blue-red'

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.26 - 2026-10-23
+
+### Changed
+- The Pipes sub-tab maps no longer draw tree rows or trees, so the layout and the pipe itself stay readable; the Rows and Trees tabs keep drawing them
+
 ## 0.4.25 - 2026-10-23
 
 ### Changed
