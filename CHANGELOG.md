@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.17 - 2026-10-23
+
+### Added
+- blue-to-red elevation heatmap ramp, used by the Geometry map editor so the lowest ground reads blue and the highest red
+
+### Changed
+- the Sectors and Zones map editors load only sector and zone outlines: trees, rows, pipes, water sources and the land boundary no longer appear there
+- their drawing toolbar offers the polygon tool only, since a sector or zone is the only shape those pages save
+- both Geometry pages draw the project's elevation heatmap under the sector and zone outlines, with a legend on the same blue-red scale
+
 ## 0.4.16 - 2026-10-23
 
 ### Changed

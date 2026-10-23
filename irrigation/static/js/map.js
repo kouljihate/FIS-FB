@@ -983,12 +983,22 @@ function initMap(elementId, geojsonUrl, options = {}) {
     map.addLayer(drawnItems);
 
     if (options.editor) {
+        // options.drawTypes lists the tools the editor offers.  Sectors and zones
+        // are polygons, so their pages trim the toolbar to that single shape
+        // instead of offering lines and markers that have nowhere to be saved.
+        const drawTypes = Array.isArray(options.drawTypes)
+            ? options.drawTypes
+            : ['polygon', 'polyline', 'marker'];
         const drawControl = new L.Control.Draw({
             position: 'topleft',
             draw: {
-                polygon: { allowIntersection: false, showArea: true },
-                polyline: { allowIntersection: false },
-                marker: true,
+                polygon: drawTypes.indexOf('polygon') !== -1
+                    ? { allowIntersection: false, showArea: true }
+                    : false,
+                polyline: drawTypes.indexOf('polyline') !== -1
+                    ? { allowIntersection: false }
+                    : false,
+                marker: drawTypes.indexOf('marker') !== -1,
                 rectangle: false,
                 circle: false,
                 circlemarker: false
@@ -1749,6 +1759,43 @@ function addLegend(legendItems, options) {
 // pane) and is not interactive, so sector popups and clicks still work.
 const ELEVATION_GRADIENT = 'linear-gradient(90deg, #2f9e44 0%, #fcc419 50%, #e03131 100%)';
 
+// Optional ramps colour the surface from the sample elevations instead of the
+// per-point colours the API sends.  'blue-red' puts the lowest ground in blue
+// and the highest in red, which reads as a terrain heatmap.
+const ELEVATION_RAMPS = {
+    'blue-red': {
+        gradient: 'linear-gradient(90deg, #2166ac 0%, #67a9cf 28%, #ffffbf 55%, #fdae61 78%, #d73027 100%)',
+        stops: [
+            [0, [33, 102, 172]],
+            [0.28, [103, 169, 207]],
+            [0.55, [255, 255, 191]],
+            [0.78, [253, 174, 97]],
+            [1, [215, 48, 39]]
+        ]
+    }
+};
+
+function elevationRampColor(ramp, ratio) {
+    const value = Math.max(0, Math.min(1, Number(ratio) || 0));
+    const stops = ramp.stops;
+    const toHex = function(channels) {
+        return '#' + channels.map(function(channel) {
+            return Math.round(channel).toString(16).padStart(2, '0');
+        }).join('');
+    };
+    for (let i = 1; i < stops.length; i++) {
+        if (value > stops[i][0]) continue;
+        const start = stops[i - 1];
+        const end = stops[i];
+        const span = (end[0] - start[0]) || 1;
+        const t = (value - start[0]) / span;
+        return toHex(start[1].map(function(channel, index) {
+            return channel + (end[1][index] - channel) * t;
+        }));
+    }
+    return toHex(stops[stops.length - 1][1]);
+}
+
 function haversineMeters(a, b) {
     const radius = 6371000;
     const toRad = Math.PI / 180;
@@ -1800,12 +1847,21 @@ function colorWithAlpha(color, alpha) {
 // bounds.  A field of vector circles turned into bubbles as soon as the user
 // zoomed in; a raster surface keeps the same soft gradients at every zoom, and
 // the blobs blend into one terrain map instead of a grid of dots.
-function buildElevationHeatOverlay(features, spacingM, paneName) {
+function buildElevationHeatOverlay(features, spacingM, paneName, ramp) {
     const located = features.filter(function(feature) {
         const coords = feature.geometry && feature.geometry.coordinates;
         return coords && isFinite(Number((feature.properties || {}).elevation_m));
     });
     if (!located.length) return null;
+
+    // A ramp needs the model's own range to place each sample on the colour
+    // scale; without one the API's per-sample colour is used as before.
+    const elevations = located.map(function(feature) {
+        return Number((feature.properties || {}).elevation_m);
+    });
+    const minElevation = Math.min.apply(null, elevations);
+    const maxElevation = Math.max.apply(null, elevations);
+    const elevationSpan = (maxElevation - minElevation) || 1;
 
     const lats = located.map(function(f) { return f.geometry.coordinates[1]; });
     const lngs = located.map(function(f) { return f.geometry.coordinates[0]; });
@@ -1841,7 +1897,10 @@ function buildElevationHeatOverlay(features, spacingM, paneName) {
 
     located.forEach(function(feature) {
         const coords = feature.geometry.coordinates;
-        const color = (feature.properties || {}).color || '#fcc419';
+        const elevation = Number((feature.properties || {}).elevation_m);
+        const color = ramp
+            ? elevationRampColor(ramp, (elevation - minElevation) / elevationSpan)
+            : ((feature.properties || {}).color || '#fcc419');
         const x = xOf(coords[0]);
         const y = yOf(coords[1]);
         const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
@@ -1866,10 +1925,13 @@ function buildElevationHeatOverlay(features, spacingM, paneName) {
 // Draw the cached elevation model as a coloured surface with its own toggle and
 // legend.  options.spacingM skips the spacing measurement, options.onStats is
 // called with {min, max, range, count} once the model arrives (or null when the
-// project has no elevation data yet).
+// project has no elevation data yet).  options.ramp picks a colour scale
+// ('blue-red' = lowest ground blue, highest red) instead of the API colours.
 function addElevationHeatmap(targetMap, url, options) {
     options = options || {};
     if (!targetMap || !url) return null;
+
+    const ramp = options.ramp ? ELEVATION_RAMPS[options.ramp] : null;
 
     const paneName = 'elevationHeatPane';
     if (!targetMap.getPane(paneName)) {
@@ -1920,7 +1982,7 @@ function addElevationHeatmap(targetMap, url, options) {
         const div = L.DomUtil.create('div', 'map-legend map-elevation-legend');
         div.innerHTML =
             '<h6>Elevation / الارتفاع</h6>' +
-            '<div class="elevation-gradient" style="background:' + ELEVATION_GRADIENT + '"></div>' +
+            '<div class="elevation-gradient" style="background:' + (ramp ? ramp.gradient : ELEVATION_GRADIENT) + '"></div>' +
             '<div class="elevation-scale">' +
             '  <span data-role="low">Low / منخفض</span>' +
             '  <span data-role="high">High / عالي</span>' +
@@ -1960,7 +2022,7 @@ function addElevationHeatmap(targetMap, url, options) {
             const min = Math.min.apply(null, elevations);
             const max = Math.max.apply(null, elevations);
             const spacing = Number(options.spacingM) || elevationSampleSpacingM(features);
-            const overlay = buildElevationHeatOverlay(features, spacing, paneName);
+            const overlay = buildElevationHeatOverlay(features, spacing, paneName, ramp);
             if (overlay) state.layer.addLayer(overlay);
             state.stats = { min: min, max: max, range: max - min, count: features.length };
 

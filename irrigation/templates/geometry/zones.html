@@ -877,10 +877,11 @@ document.querySelectorAll('.orientation-deg-input').forEach(bindOrientationHint)
 
 document.addEventListener('DOMContentLoaded', function() {
     const geojsonUrl = '{{ url_for("api.get_geometry", project_id=project.id) }}';
-    initMap('map', geojsonUrl, {
+    const geometryMap = initMap('map', geojsonUrl + '?types=sector,zone', {
         center: [34.0, -6.0],
         zoom: 14,
         editor: true,
+        drawTypes: ['polygon'],
         ruler: true,
         showArea: true,
         selectable: { type: 'zone', checkboxSelector: '.zone-checkbox' },
@@ -915,6 +916,9 @@ document.addEventListener('DOMContentLoaded', function() {
             bootstrap.Modal.getOrCreateInstance(document.getElementById('addZoneModal')).show();
         }
     });
+    addElevationHeatmap(geometryMap,
+        '{{ url_for("engineering.elevation_heatmap", project_id=project.id) }}',
+        { ramp: 'blue-red' });
 
     document.getElementById('mergeZoneModal').addEventListener('show.bs.modal', function() {
         const selected = document.querySelectorAll('.zone-checkbox:checked');

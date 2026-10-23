@@ -508,10 +508,11 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const geojsonUrl = '{{ url_for("api.get_geometry", project_id=project.id) }}';
-    initMap('map', geojsonUrl, {
+    const geometryMap = initMap('map', geojsonUrl + '?types=sector,zone', {
         center: [34.0, -6.0],
         zoom: 14,
         editor: true,
+        drawTypes: ['polygon'],
         ruler: true,
         showArea: true,
         selectable: { type: 'sector', checkboxSelector: '.sector-checkbox' },
@@ -533,6 +534,9 @@ document.addEventListener('DOMContentLoaded', function() {
             bootstrap.Modal.getOrCreateInstance(document.getElementById('addSectorModal')).show();
         }
     });
+    addElevationHeatmap(geometryMap,
+        '{{ url_for("engineering.elevation_heatmap", project_id=project.id) }}',
+        { ramp: 'blue-red' });
 
     // Merge modal: collect selected sector IDs
     document.getElementById('mergeModal').addEventListener('show.bs.modal', function() {
