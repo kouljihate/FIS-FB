@@ -642,6 +642,7 @@ textarea {
     justify-self: end;
     text-align: right;
     white-space: nowrap;
+    font-size: 2rem;
 }
 
 .project-workflow-nav {
@@ -707,7 +708,7 @@ textarea {
 }
 
 .workflow-tab-ar {
-    font-size: 1rem;
+    font-size: 1.2rem;
     font-weight: 500;
     white-space: nowrap;
 }
@@ -1804,6 +1805,15 @@ body.map-fullscreen-lock {
 
 body {
     background-color: var(--pal-cream);
+    /* Site-wide trianglify backdrop. The cream veil keeps body text (headings,
+       labels and links that sit outside cards) readable over the dark facets. */
+    background-image:
+        linear-gradient(rgba(248, 245, 236, 0.8), rgba(248, 245, 236, 0.8)),
+        url("../img/trianglify1.png");
+    background-size: cover, cover;
+    background-position: center, center;
+    background-repeat: no-repeat, no-repeat;
+    background-attachment: fixed, fixed;
     color: var(--pal-ink);
 }
 

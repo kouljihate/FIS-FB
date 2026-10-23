@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.16 - 2026-10-23
+
+### Changed
+- every page now paints the trianglify1.png pattern behind its content, softened with a cream veil so text keeps its contrast
+
 ## 0.4.15 - 2026-10-23
 
 ### Changed
