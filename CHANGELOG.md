@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.23 - 2026-10-23
+
+### Changed
+- Technical (DPA) stays in the Report tab and its Report page is no longer active for the Validation tab; Validation keeps the Standard page and the Charts slot
+
 ## 0.4.22 - 2026-10-23
 
 ### Added

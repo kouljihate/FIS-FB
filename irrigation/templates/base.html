@@ -142,7 +142,7 @@
                 <li class="nav-item">
                     {{ workflow_tab('Validation / التحقق', 'bi-clipboard-check',
                                     url_for('engineering.validation_view', project_id=workflow_project_id) if workflow_project_id else none,
-                                    workflow_endpoint in ['engineering.validation_view', 'engineering.technical_report_view']) }}
+                                    workflow_endpoint == 'engineering.validation_view') }}
                 </li>
                 <li class="nav-item">
                     {{ workflow_tab('Estimation / التقدير', 'bi-calculator',
@@ -152,7 +152,7 @@
                 <li class="nav-item">
                     {{ workflow_tab('Report / التقرير', 'bi-file-earmark-bar-graph',
                                     url_for('engineering.report_view', project_id=workflow_project_id) if workflow_project_id else none,
-                                    workflow_endpoint == 'engineering.report_view') }}
+                                    workflow_endpoint in ['engineering.report_view', 'engineering.technical_report_view']) }}
                 </li>
             </ul>
         </div>
@@ -196,10 +196,13 @@
                 ('components.pressure_reduction', url_for('components.pressure_reduction', project_id=workflow_project_id), 'Reduce Pressure / خفض الضغط', 'bi-arrow-down-circle', False),
                 ('components.terminators', url_for('components.terminators', project_id=workflow_project_id), 'Terminators / النهايات', 'bi-stop-circle', False)
             ] %}
-        {% elif workflow_endpoint in ['engineering.validation_view', 'engineering.technical_report_view'] %}
+        {% elif workflow_endpoint == 'engineering.validation_view' %}
             {% set workflow_subnav = [
                 (None, None, 'Charts / الرسوم البيانية', 'bi-bar-chart', True),
-                ('engineering.validation_view', url_for('engineering.validation_view', project_id=workflow_project_id), 'Standard / قياسي', 'bi-clipboard-check', False),
+                ('engineering.validation_view', url_for('engineering.validation_view', project_id=workflow_project_id), 'Standard / قياسي', 'bi-clipboard-check', False)
+            ] %}
+        {% elif workflow_endpoint in ['engineering.report_view', 'engineering.technical_report_view'] %}
+            {% set workflow_subnav = [
                 ('engineering.technical_report_view', url_for('engineering.technical_report_view', project_id=workflow_project_id), 'Technical (DPA) / تقني (DPA)', 'bi-file-earmark-text', False)
             ] %}
         {% endif %}
