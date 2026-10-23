@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.20 - 2026-10-23
+
+### Changed
+- Changed the Validation Results status filter to the Trees - Rows filter layout: a centred pill dropdown in the header row with a shown/total counter badge and a clear button
+
 ## 0.4.19 - 2026-10-23
 
 ### Added

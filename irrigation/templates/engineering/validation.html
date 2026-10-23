@@ -337,23 +337,27 @@
                         <th width="70" class="text-center">Action / الإجراء</th>
                     </tr>
 
-                    <tr class="validation-filter-row">
-                        <th colspan="7" class="bg-light fw-normal py-2">
-                            <div class="d-flex flex-wrap align-items-center gap-2">
-                                <label class="mb-0 small text-muted" for="statusFilter">
-                                    <i class="bi bi-funnel"></i>
-                                    Filter by result / تصفية حسب النتيجة
-                                </label>
-                                <select id="statusFilter" class="form-select form-select-sm w-auto"
-                                        aria-label="Filter validation results by status / تصفية النتائج حسب الحالة">
-                                    <option value="all" selected>All / الكل ({{ validation.checks|length }})</option>
-                                    <option value="fail">Failed / فشل ({{ validation.summary.failures }})</option>
-                                    <option value="warning">Warnings / تحذيرات ({{ validation.summary.warnings }})</option>
-                                    <option value="pass">Passed / ناجح ({{ validation.summary.passes }})</option>
-                                </select>
-                                <span class="small text-muted">
-                                    <span id="statusFilterCount">{{ validation.checks|length }}</span> / {{ validation.checks|length }}
-                                </span>
+                    <tr class="table-light validation-filter-row">
+                        <th colspan="7" class="text-center align-middle">
+                            <div class="input-group input-group-sm search-zone">
+                                <div class="search-field">
+                                    <select id="statusFilter" class="form-select search-input"
+                                            style="appearance: none; -webkit-appearance: none; background-image: none;"
+                                            aria-label="Filter validation results by status / تصفية النتائج حسب الحالة">
+                                        <option value="all" selected>All results / كل النتائج</option>
+                                        <option value="fail">Failed / فشل</option>
+                                        <option value="warning">Warnings / تحذيرات</option>
+                                        <option value="pass">Passed / ناجح</option>
+                                    </select>
+                                    <div class="search-suffix">
+                                        <i class="bi bi-chevron-down small text-muted" aria-hidden="true"></i>
+                                        <span class="badge rounded-pill text-bg-secondary search-row-count"
+                                              id="statusFilterCount"
+                                              title="Shown / total checks / الفحوصات المعروضة من الإجمالي">0/0</span>
+                                        <button type="button" class="search-clear d-none" id="statusFilterClear"
+                                                aria-label="Clear / مسح"><i class="bi bi-x-lg"></i></button>
+                                    </div>
+                                </div>
                             </div>
                         </th>
                     </tr>
@@ -491,6 +495,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const rows = Array.from(table.querySelectorAll('tbody tr[data-severity]'));
     const emptyRow = document.getElementById('statusFilterEmpty');
     const countLabel = document.getElementById('statusFilterCount');
+    const clearButton = document.getElementById('statusFilterClear');
+    const total = rows.length;
 
     function applyStatusFilter() {
         const wanted = select.value;
@@ -501,10 +507,18 @@ document.addEventListener('DOMContentLoaded', function() {
             if (match) visible += 1;
         });
         if (emptyRow) emptyRow.classList.toggle('d-none', visible > 0);
-        if (countLabel) countLabel.textContent = visible;
+        if (countLabel) countLabel.textContent = visible + '/' + total;
+        if (clearButton) clearButton.classList.toggle('d-none', wanted === 'all');
     }
 
     select.addEventListener('change', applyStatusFilter);
+    if (clearButton) {
+        clearButton.addEventListener('click', function() {
+            select.value = 'all';
+            applyStatusFilter();
+            select.focus();
+        });
+    }
     applyStatusFilter();
 });
 </script>
