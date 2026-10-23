@@ -6,6 +6,7 @@ from irrigation.engineering.piping import generate_piping_structure
 from irrigation.engineering.hydraulics import (
     calculate_pipe_length_m, main_pipe_rules, second_pipe_rules, zone_pipe_rules)
 from irrigation.engineering.projection import get_project_centroid
+from shapely.geometry import shape as geo_shape
 import json
 
 hydrology_bp = Blueprint('hydrology', __name__)
@@ -47,6 +48,94 @@ def _invalidate_piping_report(project_id):
     mongo.db.piping_reports.delete_many({'project_id': project_id})
 
 
+# === PIPE SECTOR / ZONE COLUMNS ===
+
+def _pipe_shape(geometry):
+    """Shapely shape for a pipe path, or None when it cannot be read."""
+    if not geometry:
+        return None
+    try:
+        geom = geo_shape(geometry)
+    except Exception:
+        return None
+    return None if geom.is_empty else geom
+
+
+def _crossed_docs(path, docs, shapes):
+    """Sector/zone docs the pipe path traverses, ordered by id.
+
+    A pipe drawn outside every outline still gets an answer: the nearest one.
+    """
+    hits = [doc for doc_id, doc in docs.items()
+            if doc_id in shapes and path.intersects(shapes[doc_id])]
+    if hits:
+        return sorted(hits, key=lambda d: d.get('id', 0))
+    candidates = [doc for doc_id, doc in docs.items() if doc_id in shapes]
+    if not candidates:
+        return []
+    return [min(candidates, key=lambda d: shapes[d['id']].distance(path))]
+
+
+def _location_label(docs, field, sep=', ', limit=3):
+    """Join the names of a few docs; a long list is shortened to ``+N``."""
+    names = [doc.get(field) for doc in docs if doc.get(field)]
+    if len(names) > limit:
+        return sep.join(names[:limit]) + ' +%d' % (len(names) - limit)
+    return sep.join(names)
+
+
+def _attach_pipe_locations(project_id, pipes):
+    """Fill ``pipe['location']`` with the sector and zone of every pipe row.
+
+    Generated pipes record the zone (and sector) they were built for in their
+    properties, so the table reads the names straight from those ids.  A pipe
+    drawn by hand, and the Main Pipe that serves several sectors, carries no
+    such link: those fall back to the outlines the pipe path crosses, so the
+    columns still show where the pipe runs.
+    """
+    sectors = {s['id']: s for s in mongo.db.sectors.find({'project_id': project_id})}
+    zones = {z['id']: z for z in mongo.db.zones.find({'project_id': project_id})}
+
+    sector_shapes = {}
+    for sector in sectors.values():
+        shape_ = _pipe_shape(sector.get('polygon'))
+        if shape_ is not None:
+            sector_shapes[sector['id']] = shape_
+
+    zone_shapes = {}
+    for zone in zones.values():
+        shape_ = _pipe_shape(zone.get('polygon'))
+        if shape_ is not None:
+            zone_shapes[zone['id']] = shape_
+
+    for pipe in pipes:
+        props = pipe.get('properties') or {}
+        zone_docs = []
+        sector_docs = []
+
+        zone = zones.get(props.get('zone_id'))
+        if zone:
+            zone_docs.append(zone)
+        sector = sectors.get(props.get('sector_id')) or sectors.get((zone or {}).get('sector_id'))
+        if sector:
+            sector_docs.append(sector)
+
+        if not zone_docs or not sector_docs:
+            path = _pipe_shape(pipe.get('geometry'))
+            if path is not None:
+                if not sector_docs:
+                    sector_docs = _crossed_docs(path, sectors, sector_shapes)
+                if not zone_docs:
+                    zone_docs = _crossed_docs(path, zones, zone_shapes)
+
+        pipe['location'] = {
+            'sector_en': _location_label(sector_docs, 'name_en'),
+            'sector_ar': _location_label(sector_docs, 'name_ar', sep='، '),
+            'zone_en': _location_label(zone_docs, 'name_en'),
+            'zone_ar': _location_label(zone_docs, 'name_ar', sep='، '),
+        }
+
+
 # === MAIN PIPE ===
 
 @hydrology_bp.route('/<int:project_id>/main_pipe')
@@ -67,6 +156,7 @@ def main_pipe(project_id):
     main_pipes = list(mongo.db.network_elements.find({'project_id': project_id, 'type': 'main_pipe'}))
     for p in main_pipes:
         p['_id'] = str(p['_id'])
+    _attach_pipe_locations(project_id, main_pipes)
 
     water_source = project.get('water_source')
 
@@ -136,6 +226,7 @@ def second_pipe(project_id):
     second_pipes = list(mongo.db.network_elements.find({'project_id': project_id, 'type': 'second_pipe'}))
     for p in second_pipes:
         p['_id'] = str(p['_id'])
+    _attach_pipe_locations(project_id, second_pipes)
 
     piping_report = mongo.db.piping_reports.find_one({'project_id': project_id})
 
@@ -272,6 +363,7 @@ def sub_pipe(project_id):
     sub_pipes = list(mongo.db.network_elements.find({'project_id': project_id, 'type': 'sub_pipe'}))
     for p in sub_pipes:
         p['_id'] = str(p['_id'])
+    _attach_pipe_locations(project_id, sub_pipes)
 
     piping_report = mongo.db.piping_reports.find_one({'project_id': project_id})
 

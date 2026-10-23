@@ -64,7 +64,7 @@
             <table class="table table-hover mb-0" id="pipeTable">
                 <thead>
                     <tr class="table-light">
-                        <th colspan="8" class="text-center">
+                        <th colspan="10" class="text-center">
                             <button class="btn btn-circle btn-sm btn-success" id="pipeHeaderAdd" type="button"
                                     data-bs-toggle="modal" data-bs-target="#addSecondPipeModal" title="Add / إضافة">
                                 <i class="bi bi-plus-circle"></i>
@@ -96,6 +96,8 @@
                         <th width="40" style="vertical-align: middle;"><input type="checkbox" id="selectAllPipes" onclick="toggleAllPipes(this)"></th>
                         <th style="text-align: center; vertical-align: middle;">ID</th>
                         <th style="text-align: center; vertical-align: middle;" aria-label="Short Name"><span class="ar-text">الاسم المختصر</span><br>Short Name</th>
+                        <th style="text-align: center; vertical-align: middle;" aria-label="Sector"><span class="ar-text">القطاع</span><br>Sector</th>
+                        <th style="text-align: center; vertical-align: middle;" aria-label="Zone"><span class="ar-text">المنطقة</span><br>Zone</th>
                         <th style="text-align: center; vertical-align: middle;" aria-label="Name ar top / Name en bottom"><span class="ar-text">الاسم</span><br>Name</th>
                         <th style="text-align: center; vertical-align: middle;" aria-label="Diameter ar top / Diameter en bottom"><span class="ar-text">قُطْر</span><br>Diameter</th>
                         <th style="text-align: center; vertical-align: middle;" aria-label="Length ar top / Length en bottom"><span class="ar-text">طول</span><br>Length (m)</th>
@@ -115,6 +117,19 @@
                         </td>
                         <td>{{ p.id }}</td>
                         <td class="text-center"><code>{{ 'SP' ~ loop.index }}</code></td>
+                        {% set loc = p.location or {} %}
+                        <td>
+                            {% if loc.sector_en %}
+                            <div>{{ loc.sector_en }}</div>
+                            <div class="ar-text">{{ loc.sector_ar }}</div>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td>
+                            {% if loc.zone_en %}
+                            <div>{{ loc.zone_en }}</div>
+                            <div class="ar-text">{{ loc.zone_ar }}</div>
+                            {% else %}—{% endif %}
+                        </td>
                         <td>
                             <div>{{ p.name_en }}</div>
                             <div class="ar-text">{{ p.name_ar }}</div>
@@ -138,7 +153,7 @@
                         </td>
                     </tr>
                     {% else %}
-                    <tr><td colspan="8" class="text-center text-muted py-3">No second pipes yet / لا توجد أنابيب ثانوية بعد</td></tr>
+                    <tr><td colspan="10" class="text-center text-muted py-3">No second pipes yet / لا توجد أنابيب ثانوية بعد</td></tr>
                     {% endfor %}
                 </tbody>
                 <tfoot class="table-light fw-bold">
@@ -146,7 +161,7 @@
                     {% for p in second_pipes %}{% set length_ns.total = length_ns.total + (p.properties.get('length_m') or 0) %}{% endfor %}
                     <tr>
                         <td></td>
-                        <td colspan="4" class="text-center">Total / المجموع</td>
+                        <td colspan="6" class="text-center">Total / المجموع</td>
                         <td class="text-center">{{ '%.2f' | format(length_ns.total) }}</td>
                         <td colspan="2"></td>
                     </tr>

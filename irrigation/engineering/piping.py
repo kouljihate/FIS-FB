@@ -1399,6 +1399,8 @@ def _insert_elements(project_id, net, unproj, valve_elements,
         }
         if e.get('zone_id'):
             props['zone_id'] = e['zone_id']
+        if e.get('sector_id'):
+            props['sector_id'] = e['sector_id']
         if e.get('row_id'):
             props['row_id'] = e['row_id']
         if kind == 'lat':
@@ -1460,6 +1462,7 @@ def _insert_elements(project_id, net, unproj, valve_elements,
                 'diameter': rep['diameter'],
                 'flow_lps': rep['flow_lps'],
                 'zone_id': frags[0].get('zone_id'),
+                'sector_id': frags[0].get('sector_id'),
                 'row_id': frags[0].get('row_id'),
             })
         merged_pipes.sort(key=lambda p: p['type'])

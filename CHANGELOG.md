@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.29 - 2026-10-23
+
+### Added
+- Sector and Zone columns, placed right after Short Name, in the Main Pipe, Second Pipe and Zone Pipe tables
+- Every pipe row shows the sector(s) and zone(s) it belongs to: the linked zone and its parent sector when the generator recorded them, otherwise the outlines the pipe path crosses (hand-drawn pipes and the multi-sector Main Pipe)
+
+### Changed
+- Generated Second and Zone pipes now store their sector id next to the zone id, so the tables can name the sector without a spatial lookup
+
 ## 0.4.28 - 2026-10-23
 
 ### Added
