@@ -1,0 +1,74 @@
+{# Floating voice assistant. Rendered only on a project page, where it can
+   navigate the workflow and answer questions from the project summary.
+   Commands work by voice (Web Speech API) and by typing, so the bar also
+   works in browsers without speech recognition. #}
+{% set va_project_id = request.view_args.get('project_id') if request.view_args else none %}
+{% if va_project_id %}
+<aside class="voice-assistant" id="voiceAssistant"
+       data-summary-url="{{ url_for('api.assistant_summary', project_id=va_project_id) }}"
+       data-current="{{ request.endpoint }}"
+       data-destinations='{{ {
+            'project': url_for('project.detail', project_id=va_project_id),
+            'water': url_for('water.well', project_id=va_project_id),
+            'sectors': url_for('geometry.sectors_view', project_id=va_project_id),
+            'zones': url_for('geometry.zones_view', project_id=va_project_id),
+            'main_pipe': url_for('hydrology.main_pipe', project_id=va_project_id),
+            'second_pipe': url_for('hydrology.second_pipe', project_id=va_project_id),
+            'zone_pipe': url_for('hydrology.sub_pipe', project_id=va_project_id),
+            'dripline': url_for('hydrology.dripline', project_id=va_project_id),
+            'rows': url_for('trees.rows_view', project_id=va_project_id),
+            'trees': url_for('trees.trees_view', project_id=va_project_id),
+            'valves': url_for('components.valves', project_id=va_project_id),
+            'connectors': url_for('components.connectors', project_id=va_project_id),
+            'reductors': url_for('components.reductors', project_id=va_project_id),
+            'air_removal': url_for('components.air_removal', project_id=va_project_id),
+            'pressure_reduction': url_for('components.pressure_reduction', project_id=va_project_id),
+            'terminators': url_for('components.terminators', project_id=va_project_id),
+            'overview': url_for('overview.index', project_id=va_project_id),
+            'validation': url_for('engineering.validation_view', project_id=va_project_id),
+            'estimation': url_for('estimation.quote_view', project_id=va_project_id),
+            'report': url_for('engineering.report_view', project_id=va_project_id)
+       } | tojson }}'>
+    <div class="voice-assistant-panel" id="voiceAssistantPanel" hidden>
+        <div class="voice-assistant-head">
+            <span class="voice-assistant-title">
+                <i class="bi bi-mic-fill"></i> Voice assistant / المساعد الصوتي
+            </span>
+            <div class="d-flex align-items-center gap-2">
+                <div class="btn-group btn-group-sm" role="group" aria-label="Language / اللغة">
+                    <button type="button" class="btn btn-outline-secondary va-lang active" data-lang="en-US">EN</button>
+                    <button type="button" class="btn btn-outline-secondary va-lang" data-lang="ar-SA" lang="ar">ع</button>
+                </div>
+                <button type="button" class="btn-close" id="voiceAssistantClose" aria-label="Close / إغلاق"></button>
+            </div>
+        </div>
+        <div class="voice-assistant-log" id="voiceAssistantLog">
+            <div class="voice-assistant-line va-bot">
+                Say “open drip line”, “how many zones” or “total pipe length”.
+                <span class="ar-text d-block" lang="ar">قل «افتح خطوط التنقيط» أو «كم عدد المناطق» أو «طول الأنابيب».</span>
+            </div>
+        </div>
+        {# data-no-loader: typing a command is not a page submission, so the
+           global spinner must not appear and stay over the panel. #}
+        <form class="voice-assistant-input" id="voiceAssistantForm" autocomplete="off" data-no-loader>
+            <input type="text" id="voiceAssistantText" class="form-control form-control-sm"
+                   placeholder="Type a command… / اكتب أمرا…" aria-label="Command / أمر">
+            <button type="submit" class="btn btn-sm btn-success" title="Send / إرسال">
+                <i class="bi bi-send"></i>
+            </button>
+        </form>
+        <div class="voice-assistant-foot">
+            <button type="button" class="btn btn-success btn-sm voice-assistant-mic" id="voiceAssistantMic">
+                <i class="bi bi-mic-fill"></i> <span>Listen / استمع</span>
+            </button>
+            <span class="voice-assistant-status" id="voiceAssistantStatus"></span>
+        </div>
+    </div>
+    <button type="button" class="voice-assistant-fab" id="voiceAssistantToggle"
+            aria-expanded="false" aria-controls="voiceAssistantPanel"
+            title="Voice assistant / المساعد الصوتي">
+        <i class="bi bi-mic-fill"></i>
+    </button>
+</aside>
+<script src="{{ url_for('static', filename='js/voice_assistant.js') }}"></script>
+{% endif %}

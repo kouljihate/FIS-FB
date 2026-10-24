@@ -309,6 +309,7 @@ const FILTER_CATEGORIES = [
     { key: 'main_pipe', letter: 'MP', label: 'Main Pipes / الأنابيب الرئيسية', types: ['main_pipe'] },
     { key: 'second_pipe', letter: 'SP', label: 'Second Pipes / الأنابيب الثانوية', types: ['second_pipe'] },
     { key: 'zone_pipe', letter: 'ZP', label: 'Zone Pipes / أنابيب المناطق', types: ['sub_pipe'] },
+    { key: 'dripline', letter: 'DL', label: 'Drip Lines / خطوط التنقيط', types: ['dripline'] },
     { key: 'pipe', letter: 'P', label: 'Pipes / الأنابيب', types: ['main_pipe', 'second_pipe', 'sub_pipe', 'dripline'] },
     { key: 'master_valve', letter: 'VM', label: 'Main Valves / الصمامات الرئيسية', types: ['master_valve'] },
     { key: 'sector_valve', letter: 'VS', label: 'Sector Valves / صمامات القطاعات', types: ['sector_valve'] },

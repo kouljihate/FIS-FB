@@ -123,7 +123,7 @@
                 <li class="nav-item">
                     {{ workflow_tab('Pipes / الأنابيب', 'bi-droplet-fill',
                                     url_for('hydrology.main_pipe', project_id=workflow_project_id) if workflow_project_id else none,
-                                    workflow_endpoint in ['hydrology.main_pipe', 'hydrology.second_pipe', 'hydrology.sub_pipe']) }}
+                                    workflow_endpoint in ['hydrology.main_pipe', 'hydrology.second_pipe', 'hydrology.sub_pipe', 'hydrology.dripline']) }}
                 </li>
                 <li class="nav-item">
                     {{ workflow_tab('Trees / الأشجار', 'bi-tree',
@@ -171,11 +171,12 @@
                 ('geometry.sectors_view', url_for('geometry.sectors_view', project_id=workflow_project_id), 'Sectors / القطاعات', 'bi-bounding-box', False),
                 ('geometry.zones_view', url_for('geometry.zones_view', project_id=workflow_project_id), 'Zones / المناطق', 'bi-grid', False)
             ] %}
-        {% elif workflow_endpoint in ['hydrology.main_pipe', 'hydrology.second_pipe', 'hydrology.sub_pipe'] %}
+        {% elif workflow_endpoint in ['hydrology.main_pipe', 'hydrology.second_pipe', 'hydrology.sub_pipe', 'hydrology.dripline'] %}
             {% set workflow_subnav = [
                 ('hydrology.main_pipe', url_for('hydrology.main_pipe', project_id=workflow_project_id), 'Main Pipe (MP) / الأنبوب الرئيسي', 'bi-water', False),
                 ('hydrology.second_pipe', url_for('hydrology.second_pipe', project_id=workflow_project_id), 'Second Pipe (SP) / الأنبوب الثانوي', 'bi-signpost-split', False),
-                ('hydrology.sub_pipe', url_for('hydrology.sub_pipe', project_id=workflow_project_id), 'Zone Pipe (ZP) / أنابيب المناطق', 'bi-droplet', False)
+                ('hydrology.sub_pipe', url_for('hydrology.sub_pipe', project_id=workflow_project_id), 'Zone Pipe (ZP) / أنابيب المناطق', 'bi-droplet', False),
+                ('hydrology.dripline', url_for('hydrology.dripline', project_id=workflow_project_id), 'DripLine (DL) / خطوط التنقيط', 'bi-droplet-half', False)
             ] %}
         {% elif workflow_endpoint in ['trees.rows_view', 'trees.trees_view'] %}
             {% set workflow_subnav = [
@@ -520,6 +521,10 @@
 
     <!-- App JS -->
     <script src="{{ url_for('static', filename='js/map.js') }}"></script>
+
+    {# Voice assistant: floats over every project page and answers from the
+       project it belongs to. Pages without a project render nothing. #}
+    {% include "shared/_voice_assistant.html" %}
 
     {% block extra_js %}{% endblock %}
     <script>

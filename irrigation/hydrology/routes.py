@@ -95,6 +95,10 @@ def _attach_pipe_locations(project_id, pipes):
     """
     sectors = {s['id']: s for s in mongo.db.sectors.find({'project_id': project_id})}
     zones = {z['id']: z for z in mongo.db.zones.find({'project_id': project_id})}
+    # Drip lines are built per tree row, not per zone, so their zone is read
+    # back through the row they serve.
+    rows = {r['id']: r for r in mongo.db.tree_rows.find({'project_id': project_id})}
+
 
     sector_shapes = {}
     for sector in sectors.values():
@@ -113,7 +117,10 @@ def _attach_pipe_locations(project_id, pipes):
         zone_docs = []
         sector_docs = []
 
-        zone = zones.get(props.get('zone_id'))
+        zone_id = props.get('zone_id')
+        if zone_id is None and props.get('row_id') is not None:
+            zone_id = (rows.get(props.get('row_id')) or {}).get('zone_id')
+        zone = zones.get(zone_id)
         if zone:
             zone_docs.append(zone)
         sector = sectors.get(props.get('sector_id')) or sectors.get((zone or {}).get('sector_id'))
@@ -418,7 +425,7 @@ def sub_pipe_validate(project_id):
 
 # === SHARED PIPE ACTIONS (MAIN PIPE & ZONE PIPE) ===
 
-PIPE_TYPES = ('main_pipe', 'second_pipe', 'sub_pipe')
+PIPE_TYPES = ('main_pipe', 'second_pipe', 'sub_pipe', 'dripline')
 
 
 def _pipe_page_endpoint(pipe_type):
@@ -426,6 +433,7 @@ def _pipe_page_endpoint(pipe_type):
         'main_pipe': 'hydrology.main_pipe',
         'second_pipe': 'hydrology.second_pipe',
         'sub_pipe': 'hydrology.sub_pipe',
+        'dripline': 'hydrology.dripline',
     }.get(pipe_type, 'hydrology.main_pipe')
 
 
@@ -539,23 +547,39 @@ def dripline(project_id):
     if not project:
         return redirect(url_for('project.index'))
 
+    zones = list(mongo.db.zones.find({'project_id': project_id}))
+    for z in zones:
+        z['_id'] = str(z['_id'])
+
     tree_rows = list(mongo.db.tree_rows.find({'project_id': project_id}))
     for r in tree_rows:
         r['_id'] = str(r['_id'])
+    rows = {r['id']: r for r in tree_rows}
 
     driplines = list(mongo.db.network_elements.find({'project_id': project_id, 'type': 'dripline'}))
     for d in driplines:
         d['_id'] = str(d['_id'])
+        d['row'] = rows.get((d.get('properties') or {}).get('row_id'))
+    _attach_pipe_locations(project_id, driplines)
 
-    return render_template('hydrology2/dripline.html', project=project, tree_rows=tree_rows, driplines=driplines)
+    piping_report = mongo.db.piping_reports.find_one({'project_id': project_id})
+
+    return render_template('hydrology/dripline.html', project=project, zones=zones,
+                           tree_rows=tree_rows, driplines=driplines,
+                           piping_report=piping_report)
 
 
 @hydrology_bp.route('/<int:project_id>/dripline/add', methods=['POST'])
 @login_required
 def dripline_add(project_id):
+    project = get_project_or_redirect(project_id)
+    if not project:
+        return redirect(url_for('project.index'))
+
     coords = request.form.get('coordinates', '').strip()
     diameter = request.form.get('diameter', default=16, type=int)
     row_id = request.form.get('row_id', type=int)
+    zone_id = request.form.get('zone_id', type=int)
 
     if not coords:
         flash('Dripline path required / مسار خط التنقيط مطلوب', 'danger')
@@ -570,7 +594,7 @@ def dripline_add(project_id):
     geometry = {'type': 'LineString', 'coordinates': coords_list}
     count = mongo.db.network_elements.count_documents({'project_id': project_id, 'type': 'dripline'})
 
-    props = {'diameter': diameter, 'row_id': row_id}
+    props = {'diameter': diameter, 'row_id': row_id, 'zone_id': zone_id}
     props.update(_pipe_length_props(geometry, project))
     add_network_element(project_id, 'dripline',
                         f'Drip Line {count+1}', f'خط التنقيط {count+1}',
@@ -587,8 +611,8 @@ def dripline_validate(project_id):
         {'project_id': project_id, 'type': 'dripline'},
         {'$set': {'validated': True}}
     )
-    flash('Dripline validated / تم التحقق من خط التنقيط', 'success')
-    return redirect(url_for('hydrology.network_elements', project_id=project_id))
+    flash('Driplines validated / تم التحقق من خطوط التنقيط', 'success')
+    return redirect(url_for('trees.rows_view', project_id=project_id))
 
 
 # === NETWORK ELEMENTS ===

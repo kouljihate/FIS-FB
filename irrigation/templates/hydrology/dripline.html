@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+{% block title %}DripLine (DL) / خطوط التنقيط{% endblock %}
+
+{% block content %}
+<div class="wf-page-header mb-3">
+    <h2 class="wf-title-en">DripLine (DL)</h2>
+    <i class="bi bi-droplet-half wf-icon" aria-hidden="true"></i>
+    <h2 class="wf-title-ar" lang="ar">خطوط التنقيط</h2>
+</div>
+
+<div class="mb-3">
+    <span class="badge bg-primary"><i class="bi bi-folder"></i> {{ project.name }}</span>
+    {% if project.water_source and project.water_source.coordinates %}
+    <span class="badge bg-info"><i class="bi bi-water"></i> Water Source: [{{ project.water_source.coordinates[1] }}, {{ project.water_source.coordinates[0] }}]</span>
+    {% endif %}
+</div>
+
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i>
+    <div class="row">
+        <div class="col-12 col-md-6">
+            Drip Lines (DL) are the laterals that run along every tree row and carry the emitters (16 mm).
+            Each row is fed from its zone pipe.
+        </div>
+        <div class="col-12 col-md-6 ar-text fs-5" lang="ar">
+            خطوط التنقيط (DL) هي الخطوط الفرعية التي تمتد على طول كل صف أشجار وتحمل القطارات (16 مم)،
+            ويتغذى كل صف من أنبوب منطقته.
+        </div>
+    </div>
+</div>
+
+<!-- Drip Lines Table -->
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" id="pipeTable">
+                <thead>
+                    <tr class="table-light">
+                        <th colspan="11" class="text-center">
+                            <button class="btn btn-circle btn-success" id="pipeHeaderAdd" type="button"
+                                    onclick="openPipeAdd()" title="Add / إضافة">
+                                <i class="bi bi-plus-circle"></i>
+                            </button>
+                            <button class="btn btn-circle btn-outline-primary" id="pipeHeaderEdit" type="button"
+                                    onclick="openPipeEdit()" title="Edit / تعديل">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-circle btn-outline-info" id="pipeHeaderRename" type="button"
+                                    onclick="pipeEditorRenameSelected()" title="Rename / إعادة تسمية">
+                                <i class="bi bi-input-cursor-text"></i>
+                            </button>
+                            <button class="btn btn-circle btn-outline-danger" id="pipeHeaderRemove" type="button"
+                                    onclick="pipeEditorRemoveSelected()" title="Remove / إزالة">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                            <form method="POST" action="{{ url_for('hydrology.dripline_validate', project_id=project.id) }}" class="d-inline">
+                                <button type="submit" class="btn btn-circle btn-primary" title="Validate / التحقق">
+                                    <i class="bi bi-check-circle"></i>
+                                </button>
+                            </form>
+                        </th>
+                    </tr>
+                    <tr>
+                        <th width="40" style="vertical-align: middle;"><input type="checkbox" id="selectAllPipes" onclick="toggleAllPipes(this)"></th>
+                        <th style="text-align: center; vertical-align: middle;">ID</th>
+                        <th style="text-align: center; vertical-align: middle;" aria-label="Short Name"><span class="ar-text">الاسم المختصر</span><br>Short Name</th>
+                        <th style="text-align: center; vertical-align: middle;" aria-label="Sector"><span class="ar-text">القطاع</span><br>Sector</th>
+                        <th style="text-align: center; vertical-align: middle;" aria-label="Zone"><span class="ar-text">المنطقة</span><br>Zone</th>
+                        <th style="text-align: center; vertical-align: middle;" aria-label="Name ar top / Name en bottom"><span class="ar-text">الاسم</span><br>Name</th>
+                        <th style="text-align: center; vertical-align: middle;" aria-label="Entry pipe of the row / أنبوب تغذية الصف"><span class="ar-text">الصف</span><br>Row</th>
+                        <th style="text-align: center; vertical-align: middle;" aria-label="Diameter ar top / Diameter en bottom"><span class="ar-text">قُطْر</span><br>Diameter</th>
+                        <th style="text-align: center; vertical-align: middle;" aria-label="Length ar top / Length en bottom"><span class="ar-text">طول</span><br>Length (m)</th>
+                        <th style="text-align: center; vertical-align: middle;" aria-label="Status ar top / Status en bottom"><span class="ar-text">حالة</span><br>Status</th>
+                        <th style="text-align: center; vertical-align: middle;" aria-label="Action ar top / Action en bottom"><span class="ar-text">إجراءات</span><br>Action</th>
+                    </tr>
+                </thead>
+                <tbody class="align-middle text-center">
+                    {% for d in driplines %}
+                    <tr>
+                        <td>
+                            <input type="checkbox" class="pipe-checkbox" value="{{ d.id }}"
+                                   data-name-en="{{ d.name_en }}"
+                                   data-name-ar="{{ d.name_ar }}"
+                                   data-diameter="{{ d.properties.get('diameter', '') }}"
+                                   data-coords="{{ d.geometry.coordinates | tojson }}">
+                        </td>
+                        <td>{{ d.id }}</td>
+                        <td class="text-center"><code>{{ 'DL' ~ loop.index }}</code></td>
+                        {% set loc = d.location or {} %}
+                        <td>
+                            {% if loc.sector_en %}
+                            <div>{{ loc.sector_en }}</div>
+                            <div class="ar-text">{{ loc.sector_ar }}</div>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td>
+                            {% if loc.zone_en %}
+                            <div>{{ loc.zone_en }}</div>
+                            <div class="ar-text">{{ loc.zone_ar }}</div>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td>
+                            <div>{{ d.name_en }}</div>
+                            <div class="ar-text">{{ d.name_ar }}</div>
+                        </td>
+                        <td>
+                            {% if d.row %}
+                            <div>{{ d.row.name_en }}</div>
+                            <div class="ar-text">{{ d.row.name_ar }}</div>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td>{{ d.properties.get('diameter', '—') }}</td>
+                        <td>{{ d.properties.get('length_m', '—') }}</td>
+                        <td>
+                            {% if d.validated %}
+                            <span class="badge bg-success"><i class="bi bi-check"></i></span>
+                            {% else %}
+                            <span class="badge bg-warning"><i class="bi bi-clock"></i></span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <button type="button" class="btn btn-circle btn-info" onclick="openPipeRename({{ d.id }})" title="Rename / إعادة تسمية">
+                                <i class="bi bi-input-cursor-text"></i>
+                            </button>
+                            <button type="button" class="btn btn-circle btn-danger" onclick="removePipeById({{ d.id }})" title="Remove / إزالة">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="11" class="text-center text-muted py-3">No drip lines yet / لا توجد خطوط تنقيط بعد</td></tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot class="table-light fw-bold">
+                    {% set length_ns = namespace(total=0) %}
+                    {% for d in driplines %}{% set length_ns.total = length_ns.total + (d.properties.get('length_m') or 0) %}{% endfor %}
+                    <tr>
+                        <td></td>
+                        <td colspan="7" class="text-center">Total / المجموع</td>
+                        <td class="text-center">{{ '%.2f' | format(length_ns.total) }}</td>
+                        <td colspan="2"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Map -->
+<div class="card shadow-sm mt-4 geometry-map-card">
+    {% set map_title_en = "Map - Drip Lines" %}{% set map_title_ar = "الخريطة - خطوط التنقيط" %}
+    {% include "_map_header.html" %}
+    <div class="card-body">
+        <div id="map"></div>
+    </div>
+</div>
+
+<!-- Edit / Rename / Remove modals and the in-map trace dialog.
+     `zones` feeds the zone picker of the trace dialog, as on the Zone Pipe tab. -->
+{% include "hydrology/_pipe_editor_modals.html" %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/pipe_editor.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const geojsonUrl = '{{ url_for("api.get_geometry", project_id=project.id) }}';
+    initMap('map', geojsonUrl, {
+        center: [34.0, -6.0],
+        zoom: 14,
+        selectable: { type: 'dripline', checkboxSelector: '.pipe-checkbox', toggleOnClick: true },
+        // Drip lines are filtered on their own here; sectors and zones stay
+        // next to them so the row a lateral serves can be traced back.
+        mapFilters: ['sector', 'zone', 'dripline'],
+        // Rows and trees belong to the planting tabs; on this map they would
+        // bury the laterals under thousands of markers.
+        hiddenTypes: ['tree_row', 'tree'],
+        elevationHeatmap: {
+            url: '{{ url_for("engineering.elevation_heatmap", project_id=project.id) }}',
+            ramp: 'blue-red'
+        }
+    });
+
+    initPipeEditor({
+        type: 'dripline',
+        checkboxSelector: '.pipe-checkbox',
+        item: { en: 'drip line', ar: 'خط تنقيط' },
+        emptyLabel: 'No drip lines yet / لا توجد خطوط تنقيط بعد',
+        traceButtons: false,
+        traceAdd: {
+            title: '<i class="bi bi-droplet-half"></i> Add DripLine (DL) / إضافة خط تنقيط',
+            diameter: 16,
+            zone: true
+        },
+        selectors: {
+            add: '#pipeHeaderAdd',
+            edit: '#pipeHeaderEdit',
+            rename: '#pipeHeaderRename',
+            remove: '#pipeHeaderRemove'
+        },
+        urls: {
+            add: '{{ url_for("hydrology.dripline_add", project_id=project.id) }}',
+            update: '{{ url_for("hydrology.pipe_update", project_id=project.id, pipe_type="dripline") }}',
+            rename: '{{ url_for("hydrology.pipe_rename", project_id=project.id, pipe_type="dripline") }}',
+            remove: '{{ url_for("hydrology.pipe_remove", project_id=project.id, pipe_type="dripline") }}'
+        }
+    });
+});
+
+// Toolbar "+" opens the same in-map dialog as the map button.
+function openPipeAdd() {
+    const modalEl = document.getElementById('pipeTraceAddModal');
+    if (modalEl && window.bootstrap) {
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+}
+</script>
+{% endblock %}

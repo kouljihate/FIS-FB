@@ -373,3 +373,76 @@ def _get_elem_color(elem_type):
         'other': '#6c757d',
     }
     return colors.get(elem_type, '#6c757d')
+
+
+# === VOICE ASSISTANT SUMMARY ===
+
+PIPE_ELEMENT_TYPES = ('main_pipe', 'second_pipe', 'sub_pipe', 'dripline')
+
+COMPONENT_ELEMENT_TYPES = (
+    'master_valve', 'sector_valve', 'zone_valve', 'check_valve', 'connector',
+    'reduction', 'air_release', 'pressure_reduction', 'terminator',
+)
+
+
+@api_bp.route('/project/<int:project_id>/assistant/summary')
+@login_required
+def assistant_summary(project_id):
+    """Counts and pipe lengths the voice assistant answers questions from.
+
+    Scoped to the projects the signed-in user may open, so a Project Owner
+    only ever reads its own orchard.
+    """
+    from irrigation.access import find_project
+
+    project = find_project(project_id)
+    if not project:
+        return jsonify({'error': 'Project not found'}), 404
+
+    def count(collection, extra=None):
+        query = {'project_id': project_id}
+        query.update(extra or {})
+        return mongo.db[collection].count_documents(query)
+
+    counts = {
+        'sectors': count('sectors'),
+        'zones': count('zones'),
+        'rows': count('tree_rows'),
+        'trees': count('trees'),
+    }
+
+    lengths = {pipe_type: 0.0 for pipe_type in PIPE_ELEMENT_TYPES}
+    for pipe_type in PIPE_ELEMENT_TYPES:
+        counts[pipe_type] = 0
+    for element in mongo.db.network_elements.find({'project_id': project_id}):
+        elem_type = element.get('type')
+        if elem_type in lengths:
+            counts[elem_type] += 1
+            try:
+                lengths[elem_type] += float((element.get('properties') or {}).get('length_m') or 0)
+            except (TypeError, ValueError):
+                pass
+        elif elem_type in COMPONENT_ELEMENT_TYPES:
+            counts[elem_type] = counts.get(elem_type, 0) + 1
+
+    for pipe_type, value in lengths.items():
+        lengths[pipe_type] = round(value, 2)
+
+    for component in COMPONENT_ELEMENT_TYPES:
+        counts.setdefault(component, 0)
+
+    pipes = sum(counts[pipe_type] for pipe_type in PIPE_ELEMENT_TYPES)
+    valves = sum(counts[t] for t in ('master_valve', 'sector_valve', 'zone_valve', 'check_valve'))
+    components = sum(counts[t] for t in COMPONENT_ELEMENT_TYPES)
+
+    return jsonify({
+        'project': {'id': project.get('id'), 'name': project.get('name')},
+        'counts': counts,
+        'lengths_m': lengths,
+        'totals': {
+            'pipes': pipes,
+            'pipe_length_m': round(sum(lengths.values()), 2),
+            'valves': valves,
+            'components': components,
+        },
+    })

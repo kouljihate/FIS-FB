@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.4.34 - 2026-10-24
+
+### Changed
+- `CHANGELOG.md` (M)
+- `irrigation/__init__.py` (M)
+- `irrigation/api/routes.py` (M)
+- `irrigation/hydrology/routes.py` (M)
+- `irrigation/static/css/app.css` (M)
+- `irrigation/static/js/map.js` (M)
+- `irrigation/templates/base.html` (M)
+- `irrigation/templates/hydrology2/dripline.html` (D)
+- `irrigation/static/img/trianglify6.png` (??)
+- `irrigation/static/img/trianglify7.png` (??)
+- `irrigation/static/img/trianglify8.png` (??)
+- `irrigation/static/img/trianglify9.png` (??)
+- `irrigation/static/js/voice_assistant.js` (??)
+- `irrigation/templates/hydrology/dripline.html` (??)
+- `irrigation/templates/shared/` (??)
+
+## 0.4.33 - 2026-10-24
+
+### Added
+- DripLine (DL) sub-tab under Pipes, after Zone Pipe, listing every drip line of the project with the same toolbar as the other pipe tabs: add by tracing on the map, edit, rename, remove and validate
+- Sector and Zone columns on the drip line table; when a drip line carries no zone of its own it is read back through the tree row it serves, and otherwise from the outlines the line crosses
+- A Drip Lines category in the map filter widget
+- Voice assistant on every project page: a floating mic opens a command bar that understands English and Arabic, by voice (browser speech recognition) or by typing
+- Commands open a workflow tab (“open drip line”, “go to valves”, “افتح الصمامات”) and answer questions from the project (“how many zones”, “how many trees”, “total pipe length”, “drip line length”) with a spoken reply
+- A project summary endpoint the assistant reads its answers from, limited to the projects the signed-in user may open
+
+### Changed
+- The drip line form records the zone it was drawn in, and Validate now continues to the Rows tab
+- The old Drip Line page (manual JSON coordinates, no sector/zone columns) is replaced by the new tab
+
 ## 0.4.32 - 2026-10-24
 
 ### Changed
