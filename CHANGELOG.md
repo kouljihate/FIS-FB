@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.4.32 - 2026-10-24
+
+### Changed
+- `CHANGELOG.md` (M)
+- `OPENCODE.md` (M)
+- `README.md` (M)
+- `app.py` (M)
+- `irrigation/__init__.py` (M)
+- `irrigation/auth/routes.py` (M)
+- `irrigation/components/routes.py` (M)
+- `irrigation/engineering/hydraulics.py` (M)
+- `irrigation/schema.py` (M)
+- `irrigation/static/css/app.css` (M)
+- `irrigation/templates/auth/users.html` (M)
+- `irrigation/templates/base.html` (M)
+- `irrigation/templates/components/component_tab.html` (M)
+- `irrigation/templates/engineering/validation.html` (M)
+- `irrigation/templates/hydrology/_pipe_rules.html` (M)
+- `irrigation/components/component_generator.py` (??)
+
+## 0.4.31 - 2026-10-23
+
+### Added
+- The icon between the two Users page titles is now a New User button that opens a modal form
+- Profile choices in that modal: Local Admin (stored as Project Admin), Customer (stored as Project Owner) and Admin, which keeps all privileges
+- A company agreement section for a Local Admin, shown only for that profile: company, agreement number, signature date and the signed document, saved with the user and linked under their name in the users table
+
+### Changed
+- Agreement documents are stored under uploads/agreements; a document that is not a PDF or an image is refused before the user is created
+
+## 0.4.30 - 2026-10-23
+
+### Added
+- Auto Generate circle button on the Connectors, Reductors, Air Removal, Reduce Pressure and Terminators toolbars, opening the same bilingual rules modal as Valves with a replace / add-missing choice
+- Connectors are placed from the pipes: a coupling where two pipes of the same diameter meet end to end, a tee where a same-diameter pipe starts on the run of another, and an elbow at every bend of 60° or more
+- Reductors are placed at every joint that brings a narrower pipe onto a wider one, recording the wider pipe as the upstream side
+- Air release valves are placed at the high end of the main pipe and of each second pipe from the terrain model; without a model the valve goes at the far junction of the main pipe
+- Pressure reducers are placed at the head of each zone pipe, sized to that pipe and set to 1.5 bar, the drippers' working pressure
+- Terminators cap every free pipe end with the diameter of the pipe they close, leaving the water source end open
+
+### Changed
+- Regeneration replaces only the items it generated: hand-placed fittings and elements from the network generator are kept, and a planned item is skipped when one already sits on its point
+
 ## 0.4.29 - 2026-10-23
 
 ### Added

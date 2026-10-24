@@ -52,6 +52,11 @@
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </form>
+                            <button class="btn btn-circle btn-warning" id="componentGenerateBtn" type="button"
+                                    data-bs-toggle="modal" data-bs-target="#generateComponentModal"
+                                    title="Generate / إنشاء">
+                                <i class="bi bi-magic"></i>
+                            </button>
                             <form method="POST" action="{{ url_for('components.component_validate', project_id=project.id, slug=tab.slug) }}" class="d-inline">
                                 <button type="submit" class="btn btn-circle btn-primary" title="Validate / التحقق">
                                     <i class="bi bi-check-circle"></i>
@@ -285,6 +290,46 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel / إلغاء</button>
                     <button type="submit" class="btn btn-primary"><i class="bi bi-check"></i> Add / إضافة</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Generate {{ tab.title_en }} modal -->
+<div class="modal fade" id="generateComponentModal" tabindex="-1" aria-labelledby="generateComponentTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content modal-green">
+            <form method="POST" action="{{ url_for('components.component_generate', project_id=project.id, slug=tab.slug) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="generateComponentTitle"><i class="bi bi-magic"></i> Generate {{ tab.title_en }} / إنشاء {{ tab.title_ar }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <ul class="small mb-3">
+                        {% for step in tab.generate_steps %}
+                        <li>
+                            {{ step.en }}
+                            <br>
+                            <span class="ar-text">{{ step.ar }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" name="replace" id="generateComponentsReplace" value="1" checked>
+                        <label class="form-check-label" for="generateComponentsReplace">
+                            Replace the generated items / استبدال العناصر المُنشأة
+                        </label>
+                    </div>
+                    <div class="alert alert-info py-2 small mb-0">
+                        Untick to only add the items that are still missing. Hand-placed items are never removed.
+                        <br>
+                        <span class="ar-text">أزل التحديد لإضافة العناصر الناقصة فقط. العناصر اليدوية لا تُحذف.</span>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel / إلغاء</button>
+                    <button type="submit" class="btn btn-warning"><i class="bi bi-magic"></i> Generate / إنشاء</button>
                 </div>
             </form>
         </div>

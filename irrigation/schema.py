@@ -38,6 +38,16 @@ USER_SCHEMA = {
         "photo": {"bsonType": ["string", "null"]},
         "is_active": {"bsonType": "bool"},
         "created_at": {"bsonType": "date"},
+        # Company agreement of a local admin (Project Admin profile).
+        "company": {
+            "bsonType": ["object", "null"],
+            "properties": {
+                "name": {"bsonType": "string"},
+                "agreement_number": {"bsonType": "string"},
+                "agreement_date": {"bsonType": "string"},
+                "agreement_file": {"bsonType": ["string", "null"]},
+            },
+        },
     },
 }
 

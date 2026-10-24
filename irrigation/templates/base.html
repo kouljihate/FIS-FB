@@ -54,16 +54,16 @@
                         <ul class="dropdown-menu">
                             <li><span class="dropdown-item-text small text-muted">{{ current_user.profile }}</span></li>
                             <li><a class="dropdown-item" href="{{ url_for('auth.profile') }}">
-                                <i class="bi bi-person-gear"></i> Profile / الملف الشخصي
+                                <i class="bi bi-person-gear"></i> Profile - الملف الشخصي
                             </a></li>
                             {% if current_user.is_admin %}
                             <li><a class="dropdown-item" href="{{ url_for('auth.users') }}">
-                                <i class="bi bi-people"></i> Users / المستخدمون
+                                <i class="bi bi-people"></i> Users  -  المستخدمون
                             </a></li>
                             {% endif %}
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">
-                                <i class="bi bi-box-arrow-right"></i> Logout / تسجيل الخروج
+                                <i class="bi bi-box-arrow-right"></i> Logout  -  تسجيل الخروج
                             </a></li>
                         </ul>
                     </li>
@@ -89,9 +89,10 @@
         <span class="nav-link disabled" aria-disabled="true" title="{{ locked_title }}">
         {% endif %}
             <i class="bi {{ icon }} workflow-tab-icon" aria-hidden="true"></i>
-            <span class="workflow-tab-en">{{ label_parts[0] }}</span>
-            {% if label_parts|length > 1 %}
             <span class="workflow-tab-ar" lang="ar" dir="rtl">{{ label_parts[1] }}</span>
+            {% if label_parts|length > 1 %}
+            
+            <span class="workflow-tab-en">{{ label_parts[0] }}</span>
             {% endif %}
         {% if href %}</a>{% else %}</span>{% endif %}
     {% endmacro %}
@@ -100,7 +101,7 @@
             <ul class="nav nav-tabs{% if current_user.is_admin %} nav-tabs-admin{% endif %}">
                 {% if current_user.is_admin %}
                 <li class="nav-item">
-                    {{ workflow_tab('Users / المستخدمون', 'bi-people',
+                    {{ workflow_tab('Users / المستخدمون ', 'bi-people',
                                     url_for('auth.users'), workflow_endpoint == 'auth.users') }}
                 </li>
                 {% endif %}
@@ -120,7 +121,7 @@
                                     workflow_endpoint in ['geometry.sectors_view', 'geometry.zones_view']) }}
                 </li>
                 <li class="nav-item">
-                    {{ workflow_tab('Pipes / الأنابيب', 'bi-pipe',
+                    {{ workflow_tab('Pipes / الأنابيب', 'bi-droplet-fill',
                                     url_for('hydrology.main_pipe', project_id=workflow_project_id) if workflow_project_id else none,
                                     workflow_endpoint in ['hydrology.main_pipe', 'hydrology.second_pipe', 'hydrology.sub_pipe']) }}
                 </li>

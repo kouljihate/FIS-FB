@@ -16,6 +16,7 @@ import re
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
+from irrigation.components.component_generator import generate_components
 from irrigation.components.valve_generator import VALVE_SHORT_PREFIXES, generate_valves
 from irrigation.extensions import mongo
 
@@ -134,6 +135,16 @@ COMPONENT_TABS = {
         "help_en": "Couplings, tees, elbows, reducers and adapters that join pipe ends. "
                    "Each connector is placed where it is fitted on the network.",
         "help_ar": "الكبسولات والتي والأكواع والمختزلات والمحولات التي تصل أطراف الأنابيب.",
+        "generate_steps": [
+            {"en": "A coupling where two pipes of the same diameter meet end to end.",
+             "ar": "كبسولة حيث يلتقي أنبوبان بنفس القطر وجهاً لوجه."},
+            {"en": "A tee wherever a pipe starts on the run of another pipe of the same diameter.",
+             "ar": "تي عند بداية أنبوب على مسار أنبوب آخر بنفس القطر."},
+            {"en": "An elbow at every bend of 60° or more along a pipe.",
+             "ar": "كوع عند كل انحناء بزاوية ٦٠ درجة أو أكثر."},
+            {"en": "Joints that change diameter belong to the Reductors tab.",
+             "ar": "الوصلات التي يتغير فيها القطر تخص تبويب المخفضات."},
+        ],
         "fields": [
             {"name": "connector_type", "label_en": "Connector Type", "label_ar": "نوع الوصلة",
              "kind": "select", "required": True,
@@ -161,6 +172,14 @@ COMPONENT_TABS = {
                    "feeds the larger side, the downstream pipe leaves the smaller one.",
         "help_ar": "مخفضات الأقطار بين أحجام الأنابيب: الأنبوب المغذي على الجهة الكبرى "
                    "والأنبوب التالي على الجهة الصغرى.",
+        "generate_steps": [
+            {"en": "A reduction at every joint that brings a narrower pipe onto a wider one.",
+             "ar": "مخفض عند كل وصلة يلتقي فيها أنبوب أضيق بأنبوب أعرض."},
+            {"en": "The wider pipe is stored as the upstream side, the narrower one downstream.",
+             "ar": "يُسجَّل الأنبوب الأعرض كجهة عليا والأضيق كجهة سفلى."},
+            {"en": "The reduction takes the two diameters of the pipes it joins.",
+             "ar": "يأخذ المخفض قطري الأنبوبين اللذين يصل بينهما."},
+        ],
         "fields": [
             {"name": "from_diameter", "label_en": "From Diameter (mm)", "label_ar": "من قطر (مم)",
              "kind": "number", "min": 16, "step": 1, "required": True, "placeholder": "90"},
@@ -184,6 +203,16 @@ COMPONENT_TABS = {
         "help_en": "Air release valves at the high points of the network, where air "
                    "pockets would otherwise block the flow.",
         "help_ar": "صمامات تنفيس الهواء عند أعلى نقاط الشبكة حيث تتجمع جيوب الهواء.",
+        "generate_steps": [
+            {"en": "An air valve at the high end of the main pipe and of every second pipe, "
+                   "read from the project's terrain model.",
+             "ar": "صمام تنفيس عند الطرف الأعلى للأنبوب الرئيسي ولكل أنبوب ثانوي، "
+                   "بقراءة نموذج تضاريس المشروع."},
+            {"en": "At least 1 m of rise is needed, because a flat line has no air pocket.",
+             "ar": "يلزم ارتفاع ١ متر على الأقل، لأن الخط المستوي بلا جيب هواء."},
+            {"en": "Without a terrain model the valve goes at the far end of the main pipe.",
+             "ar": "بدون نموذج تضاريس يوضع الصمام في نهاية الأنبوب الرئيسي."},
+        ],
         "fields": [
             {"name": "diameter", "label_en": "Diameter (mm)", "label_ar": "القطر (مم)",
              "kind": "number", "min": 16, "step": 1, "placeholder": "25"},
@@ -205,6 +234,12 @@ COMPONENT_TABS = {
         "help_en": "Pressure reducing valves that keep the downstream pressure at the "
                    "set value, protecting the drippers on long runs.",
         "help_ar": "صمامات خفض الضغط التي تحافظ على الضغط في الجزء التالي من الشبكة.",
+        "generate_steps": [
+            {"en": "One regulator at the head of each zone pipe, where it leaves its feeding pipe.",
+             "ar": "منظم واحد عند رأس كل أنبوب منطقة، حيث ينفصل عن الأنبوب المغذي."},
+            {"en": "Sized to the zone pipe and set to 1.5 bar, the pressure the drippers need.",
+             "ar": "بقطر أنبوب المنطقة ومضبوط على ١٫٥ بار، وهو ضغط عمل النقاطات."},
+        ],
         "fields": [
             {"name": "diameter", "label_en": "Diameter (mm)", "label_ar": "القطر (مم)",
              "kind": "number", "min": 16, "step": 1, "placeholder": "50"},
@@ -229,6 +264,14 @@ COMPONENT_TABS = {
         "icon": "bi-stop-circle",
         "help_en": "End caps and flush valves that close the end of a line.",
         "help_ar": "سدادات الصفوف وصمامات الغسيل التي تُغلق نهاية الخط.",
+        "generate_steps": [
+            {"en": "An end cap on every free pipe end, i.e. an end that reaches no other pipe.",
+             "ar": "سدادة عند كل طرف أنبوب حر لا يصل إلى أنبوب آخر."},
+            {"en": "The water source end of the main pipe is not capped.",
+             "ar": "طرف الأنبوب الرئيسي عند مصدر المياه لا يُسد."},
+            {"en": "Each cap takes the diameter of the pipe it closes.",
+             "ar": "تأخذ كل سدادة قطر الأنبوب الذي تُغلقه."},
+        ],
         "fields": [
             {"name": "diameter", "label_en": "Diameter (mm)", "label_ar": "القطر (مم)",
              "kind": "number", "min": 16, "step": 1, "placeholder": "16"},
@@ -862,6 +905,36 @@ def component_validate(project_id, slug):
         "%s validated / تم التحقق من %s" % (tab["title_en"], tab["title_ar"]),
         "success",
     )
+    return redirect(url_for("components.%s" % slug, project_id=project_id))
+
+
+@components_bp.route("/<int:project_id>/<slug>/generate", methods=["POST"])
+@login_required
+def component_generate(project_id, slug):
+    """Place the tab's fittings on the drawn pipe network."""
+    project = get_project_or_redirect(project_id)
+    if not project:
+        return redirect(url_for("project.index"))
+    tab = _tab_or_404(slug)
+
+    replace = request.form.get("replace") in ("1", "on", "true")
+    result = generate_components(project_id, tab, replace=replace)
+    created = result.get("created") or 0
+
+    if created:
+        flash(
+            "%d %s generated from the pipes / تم إنشاء %d %s"
+            % (created, tab["title_en"], created, tab["title_ar"]),
+            "success",
+        )
+    else:
+        flash(
+            "Nothing generated — the items already exist or the pipes are missing / "
+            "لم يتم إنشاء عناصر — العناصر موجودة أو الأنابيب ناقصة",
+            "warning",
+        )
+    for warning in (result.get("warnings") or [])[:4]:
+        flash(warning, "warning")
     return redirect(url_for("components.%s" % slug, project_id=project_id))
 
 

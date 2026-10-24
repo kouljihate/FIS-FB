@@ -34,8 +34,8 @@ from typing import List, Dict, Optional
 # explicit Well -> Basin link.
 
 MAIN_PIPE_RULES = {
-    'MP-1a': {
-        'id': 'MP-1a',
+    'MP-1': {
+        'id': 'MP-1',
         'name_en': 'Well -> Basin',
         'name_ar': 'البئر -> الحوض',
         'from': 'well',
@@ -46,8 +46,8 @@ MAIN_PIPE_RULES = {
         'description_en': 'Connect the well to the basin with a main-pipe segment.',
         'description_ar': 'ربط البئر بالحوض بقطعة من الأنبوب الرئيسي.',
     },
-    'MP-1b': {
-        'id': 'MP-1b',
+    'MP-2': {
+        'id': 'MP-2',
         'name_en': 'Well -> Main Pipe (MP1)',
         'name_ar': 'البئر -> الأنبوب الرئيسي (MP1)',
         'from': 'well',
@@ -58,8 +58,8 @@ MAIN_PIPE_RULES = {
         'description_en': 'Feed MP1 from the well when the well is the primary source.',
         'description_ar': 'تغذية MP1 من البئر عندما يكون البئر هو المصدر الرئيسي.',
     },
-    'MP-1c': {
-        'id': 'MP-1c',
+    'MP-3': {
+        'id': 'MP-3',
         'name_en': 'Basin -> Main Pipe (MP1) [same as Well]',
         'name_ar': 'الحوض -> الأنبوب الرئيسي (MP1) [كما البئر]',
         'from': 'basin',
@@ -73,8 +73,8 @@ MAIN_PIPE_RULES = {
         'description_ar': ('تغذية MP1 من الحوض؛ قاعدة مطابقة للبئر -> MP1، '
                            'بنفس الشكل والقطر.'),
     },
-    'MP-1d': {
-        'id': 'MP-1d',
+    'MP-4': {
+        'id': 'MP-4',
         'name_en': 'MP1 covers highest-elevation entry sectors ONLY',
         'name_ar': 'MP1 يغطي قطاعات الدخول الأعلى ارتفاعاً فقط',
         'from': 'source',
@@ -91,7 +91,7 @@ MAIN_PIPE_RULES = {
     },
 }
 
-MAIN_PIPE_RULE_ORDER = ['MP-1a', 'MP-1b', 'MP-1c', 'MP-1d']
+MAIN_PIPE_RULE_ORDER = ['MP-1', 'MP-2', 'MP-3', 'MP-4']
 
 
 def main_pipe_rules():

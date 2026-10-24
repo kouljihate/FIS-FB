@@ -4,7 +4,11 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h2 class="wf-title-en">Users</h2>
-    <i class="bi bi-people fs-1" aria-hidden="true"></i>
+    <button type="button" class="btn btn-link p-0 border-0 text-body" id="newUserBtn"
+            data-bs-toggle="modal" data-bs-target="#newUserModal"
+            title="New user / مستخدم جديد" aria-label="New user / مستخدم جديد">
+        <i class="bi bi-people fs-1" aria-hidden="true"></i>
+    </button>
     <h2 class="wf-title-ar ar-text" lang="ar">المستخدمون</h2>
 </div>
 
@@ -15,18 +19,45 @@
                 <thead>
                     <tr>
                         <th>ID</th>
-                        <th>Name / الاسم</th>
-                        <th>Username / المستخدم</th>
-                        <th>Email</th>
-                        <th>Phone / الهاتف</th>
-                        <th>CIN</th>
-                        <th>Profile / الدور</th>
-                        <th>Active / نشط</th>
+                        <!-- <th style="text-align: center; vertical-align: middle;" aria-label="Name ar top / Name en bottom"><span class="ar-text">الاسم</span><br>Name</th> -->
+                        <th>
+                            <span class="header-ar">الاسم</span>
+                            <span class="header-en">Name</span>
+                        </th>
+                        <th>
+                            <span class="header-ar">اسم المستخدم</span>
+                            <span class="header-en">Username</span>
+                        </th>
+                        <th>
+                            <span class="header-ar">البريد الإلكتروني</span>
+                            <span class="header-en">Email</span>
+                        </th>
+                        <th>
+                            <span class="header-ar">الهاتف</span>
+                            <span class="header-en">Phone</span>
+                        </th>
+                        <th>
+                            <span class="header-ar">CIN</span>
+                            <span class="header-en">CIN</span>
+                        </th> 
+                        <th>
+                            <span class="header-ar">الدور</span>
+                            <span class="header-en">Profile</span>
+                        </th>
+                        <th>
+                            <span class="header-ar">الحالة</span>
+                            <span class="header-en">Status</span>
+                        </th>
+                        <th>
+                            <span class="header-ar">إجراءات</span>
+                            <span class="header-en">Action</span>
+                        </th>
                     </tr>
+                        
                 </thead>
                 <tbody>
                     {% for u in users %}
-                    <tr>
+                    <tr class="text-center">
                         <td>{{ u.id }}</td>
                         <td>
                             {% if u.photo %}
@@ -34,6 +65,24 @@
                                  class="rounded-circle me-1" width="24" height="24" style="object-fit: cover;">
                             {% endif %}
                             {{ u.full_name or '-' }}
+                            {% if u.company %}
+                            <div class="small text-muted mt-1">
+                                <i class="bi bi-building"></i> {{ u.company.get('name') or '—' }}
+                                {% if u.company.get('agreement_number') %}
+                                · {{ u.company.get('agreement_number') }}
+                                {% endif %}
+                                {% if u.company.get('agreement_date') %}
+                                · {{ u.company.get('agreement_date') }}
+                                {% endif %}
+                                {% if u.company.get('agreement_file') %}
+                                <a href="{{ url_for('auth.uploaded_file', filename=u.company.get('agreement_file')) }}"
+                                   target="_blank" rel="noopener"
+                                   title="Agreement document / وثيقة الاتفاقية">
+                                    <i class="bi bi-file-earmark-text"></i>
+                                </a>
+                                {% endif %}
+                            </div>
+                            {% endif %}
                         </td>
                         <td>{{ u.username }}</td>
                         <td>{{ u.email }}</td>
@@ -46,18 +95,22 @@
                                     <option value="{{ role }}" {% if u.profile == role %}selected{% endif %}>{{ role }}</option>
                                     {% endfor %}
                                 </select>
-                                <button type="submit" class="btn btn-sm btn-outline-primary" title="Save / حفظ">
+                                <button type="submit" class="btn btn-sm btn-circle btn-primary" title="Save / حفظ">
                                     <i class="bi bi-check"></i>
                                 </button>
                             </form>
                         </td>
                         <td>
-                            <form method="POST" action="{{ url_for('auth.set_active', user_id=u.id) }}">
-                                <input type="hidden" name="is_active" value="{{ 0 if u.is_active else 1 }}">
-                                <button type="submit" class="btn btn-sm {{ 'btn-success' if u.is_active else 'btn-outline-secondary' }}">
-                                    {{ 'Active' if u.is_active else 'Disabled' }}
-                                </button>
-                            </form>
+                            {% if u.is_active %}
+                            <span class="badge bg-success">Active / نشط</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Disabled / معطل</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="" class="btn btn-sm btn-circle btn-outline-primary" title="Edit / تعديل">
+                                <i class="bi bi-pencil"></i>
+                            </a>
                         </td>
                     </tr>
                     {% endfor %}
@@ -66,4 +119,119 @@
         </div>
     </div>
 </div>
+
+<!-- New User Modal -->
+<div class="modal fade" id="newUserModal" tabindex="-1" aria-labelledby="newUserTitle" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content modal-green">
+            <form method="POST" action="{{ url_for('auth.create_user') }}" enctype="multipart/form-data">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="newUserTitle">
+                        <i class="bi bi-person-plus"></i> New User / مستخدم جديد
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-2">
+                        <label class="form-label" for="newUserFullName">Full Name / الاسم الكامل</label>
+                        <input type="text" name="full_name" id="newUserFullName" class="form-control">
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <label class="form-label" for="newUserUsername">Username / اسم المستخدم</label>
+                            <input type="text" name="username" id="newUserUsername" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="newUserEmail">E-mail / البريد</label>
+                            <input type="email" name="email" id="newUserEmail" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="row g-2 mt-1">
+                        <div class="col-md-4">
+                            <label class="form-label" for="newUserPhone">Phone / الهاتف</label>
+                            <input type="text" name="phone" id="newUserPhone" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="newUserCin">CIN / البطاقة الوطنية</label>
+                            <input type="text" name="cin" id="newUserCin" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="newUserPassword">Password / كلمة المرور</label>
+                            <input type="password" name="password" id="newUserPassword" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <label class="form-label" for="newUserProfile">Profile / الدور</label>
+                        <select name="profile" id="newUserProfile" class="form-select">
+                            <option value="Project Admin">Local Admin / مسؤول محلي</option>
+                            <option value="Project Owner">Customer / زبون</option>
+                            <option value="Admin">Admin / مسؤول النظام</option>
+                        </select>
+                        <div class="form-text">
+                            Local Admin keeps every project and the company agreement; the Customer only sees their
+                            own projects; Admin keeps all privileges.
+                            <br>
+                            <span class="ar-text">المسؤول المحلي يدير كل المشاريع واتفاقية الشركة، والزبون يرى مشاريعه فقط،
+                                ومسؤول النظام يحتفظ بكل الصلاحيات.</span>
+                        </div>
+                    </div>
+
+                    <div class="border rounded p-3 mt-3" id="newUserCompany">
+                        <h6 class="mb-2">
+                            <i class="bi bi-building"></i> Company agreement / اتفاقية الشركة
+                            <span class="small text-muted fw-normal">(local admin only / للمسؤول المحلي)</span>
+                        </h6>
+                        <div class="mb-2">
+                            <label class="form-label" for="newUserCompanyName">Company / الشركة</label>
+                            <input type="text" name="company_name" id="newUserCompanyName" class="form-control">
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <label class="form-label" for="newUserAgreementNumber">Agreement No. / رقم الاتفاقية</label>
+                                <input type="text" name="agreement_number" id="newUserAgreementNumber" class="form-control">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="newUserAgreementDate">Signed on / تاريخ التوقيع</label>
+                                <input type="date" name="agreement_date" id="newUserAgreementDate" class="form-control">
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <label class="form-label" for="newUserAgreementFile">Signed document (PDF or image) / الوثيقة الموقعة</label>
+                            <input type="file" name="agreement_file" id="newUserAgreementFile"
+                                   class="form-control" accept=".pdf,.png,.jpg,.jpeg">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel / إلغاء</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i> Create / إنشاء
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// The company agreement belongs to the local admin (stored as Project Admin).
+document.addEventListener('DOMContentLoaded', function () {
+    var profile = document.getElementById('newUserProfile');
+    var block = document.getElementById('newUserCompany');
+    if (!profile || !block) return;
+
+    function syncCompanyBlock() {
+        var localAdmin = profile.value === 'Project Admin';
+        block.classList.toggle('d-none', !localAdmin);
+        block.querySelectorAll('input').forEach(function (field) {
+            field.disabled = !localAdmin;
+        });
+    }
+
+    profile.addEventListener('change', syncCompanyBlock);
+    syncCompanyBlock();
+});
+</script>
 {% endblock %}

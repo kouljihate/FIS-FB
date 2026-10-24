@@ -4,138 +4,13 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h2><i class="bi bi-clipboard-check"></i> Engineering Validation / التحقق الهندسي</h2>
-    <a href="{{ url_for('project.detail', project_id=project.id) }}" class="btn btn-outline-secondary">
-        <i class="bi bi-arrow-left"></i> Back / رجوع
-    </a>
+    
 </div>
 
 <div class="mb-3">
     <span class="badge bg-primary"><i class="bi bi-folder"></i> {{ project.name }}</span>
 </div>
 
-<!-- AI Regeneration Panel -->
-<div class="card shadow-sm mb-4">
-    <div class="card-header bg-warning text-dark">
-        <h5 class="mb-0"><i class="bi bi-magic"></i> AI Regeneration / إعادة الإنشاء بالذكاء الاصطناعي
-            {% if regen_report.elevation_aware %}
-            <span class="badge bg-success float-end"><i class="bi bi-triangle"></i> Elevation-Aware / مدرك للارتفاع</span>
-            {% endif %}
-        </h5>
-    </div>
-    <div class="card-body">
-        {% if regen_report.sectors_count > 0 %}
-        <div class="row mb-3">
-            <div class="col-md-3">
-                <div class="text-center p-3 bg-light rounded">
-                    <h3 class="text-primary">{{ regen_report.sectors_count }}</h3>
-                    <small>Sectors / القطاعات</small><br>
-                    <small class="text-muted">Avg Score: {{ '%.2f' % regen_report.avg_sector_score }}</small>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="text-center p-3 bg-light rounded">
-                    <h3 class="text-success">{{ regen_report.zones_count }}</h3>
-                    <small>Zones / المناطق</small><br>
-                    <small class="text-muted">Avg Score: {{ '%.2f' % regen_report.avg_zone_score }}</small>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="text-center p-3 bg-light rounded">
-                    <h3 class="text-info">{{ '%.0f' % regen_report.total_area_m2 }} m²</h3>
-                    <small>Total Area / المساحة الكلية</small>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="text-center p-3 bg-light rounded">
-                    {% if regen_report.elevation_aware %}
-                    <h3 class="text-warning">{{ '%.1f' % regen_report.elevation_stats.range_m }}m</h3>
-                    <small>Elevation Range / نطاق الارتفاع</small><br>
-                    <small class="text-muted">{{ '%.1f' % regen_report.elevation_stats.min_elevation_m }}-{{ '%.1f' % regen_report.elevation_stats.max_elevation_m }}m</small>
-                    {% if regen_report.water_source_elevation_m is not none %}
-                    <br><small class="text-info">Source: {{ '%.1f' % regen_report.water_source_elevation_m }}m</small>
-                    {% endif %}
-                    {% else %}
-                    <h3 class="text-secondary">-</h3>
-                    <small>No Elevation Data / لا توجد بيانات ارتفاع</small>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-        {% endif %}
-
-        <div class="row">
-            <div class="col-md-6">
-                <div class="card border-warning">
-                    <div class="card-body">
-                        <h6><i class="bi bi-bounding-box"></i> Regenerate Sectors / إعادة إنشاء القطاعات</h6>
-                        <form method="POST" action="{{ url_for('engineering.ai_regenerate_sectors', project_id=project.id) }}">
-                            <div class="mb-2">
-                                <label class="form-label">Number of sectors / عدد القطاعات</label>
-                                <select name="n_sectors" class="form-select form-select-sm">
-                                    <option value="2">2</option>
-                                    <option value="3">3</option>
-                                    <option value="4" selected>4</option>
-                                    <option value="6">6</option>
-                                    <option value="8">8</option>
-                                </select>
-                            </div>
-                                <button type="submit" class="btn btn-warning btn-sm"
-                                    data-confirm="AI will rebuild all sectors and zones with optimal partitioning. This replaces existing data. Continue? / سيعيد الذكاء الاصطناعي بناء القطاعات والمناطق بتقسيم أمثل. سيستبدل البيانات الحالية. متابعة؟">
-                                <i class="bi bi-magic"></i> AI Regenerate Sectors / إعادة إنشاء القطاعات
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="card border-info">
-                    <div class="card-body">
-                        <h6><i class="bi bi-grid"></i> Regenerate Zones / إعادة إنشاء المناطق</h6>
-                        <form method="POST" action="{{ url_for('engineering.ai_regenerate_zones', project_id=project.id) }}">
-                            <div class="row mb-2">
-                                <div class="col-6">
-                                    <label class="form-label">Zones per sector / مناطق لكل قطاع</label>
-                                    <select name="zones_per_sector" class="form-select form-select-sm">
-                                        <option value="2" selected>2</option>
-                                        <option value="3">3</option>
-                                        <option value="4">4</option>
-                                    </select>
-                                </div>
-                                <div class="col-6">
-                                    <label class="form-label">Sector (optional) / قطاع</label>
-                                    <select name="sector_id" class="form-select form-select-sm">
-                                        <option value="">All / الكل</option>
-                                    </select>
-                                </div>
-                            </div>
-                                <button type="submit" class="btn btn-info btn-sm text-white"
-                                    data-confirm="AI will rebuild all zones with optimal partitioning. This replaces existing zones. Continue? / سيعيد الذكاء الاصطناعي بناء المناطق بتقسيم أمثل. سيستبدل المناطق الحالية. متابعة؟">
-                                <i class="bi bi-magic"></i> AI Regenerate Zones / إعادة إنشاء المناطق
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="alert alert-secondary mt-3 small">
-            <i class="bi bi-info-circle"></i>
-            <strong>AI Algorithm:</strong> Optimizes partition by trying 36 split angles (0-175° at 5° intervals),
-            scoring each candidate on area balance, compactness, water-source proximity, shape regularity,
-            and terrain elevation uniformity + gravity flow potential.
-            <br>
-            <strong>With elevation data:</strong> Area balance (20%), Compactness (15%), Water access (12%),
-            Shape regularity (10%), Elevation uniformity (25%), Gravity pressure (18%).
-            <br>
-            <strong>Without elevation data:</strong> Area balance (35%), Compactness (25%), Water access (20%),
-            Shape regularity (20%).
-            <br>
-            <strong>خوارزمية الذكاء الاصطناعي:</strong> تحسين التقسيم بتجربة 36 زاوية تقسيم (0-175° بفاصل 5°)،
-            وتقييم كل مرشح بناءً على توازن المساحة، الاكتناز، القرب من مصدر المياه، انتظام الشكل،
-            وتجانس الارتفاع + إمكانية الجاذبية.
-        </div>
-    </div>
-</div>
 
 <!-- Terrain Elevation Panel -->
 <div class="card shadow-sm mb-4">
@@ -310,17 +185,27 @@
         {% elif validation.summary.status == 'warning' %}bg-warning
         {% else %}bg-danger text-white{% endif %}">
         <h5 class="mb-0">
-            <i class="bi
-            {% if validation.summary.status == 'pass' %}bi-check-circle
-            {% elif validation.summary.status == 'warning' %}bi-exclamation-triangle
-            {% else %}bi-x-circle{% endif %}">
-            </i>
-            Validation Results / نتائج التحقق
-            <span class="float-end">
-                {{ validation.summary.passes }} <i class="bi bi-check-circle-fill text-success"></i>
-                {{ validation.summary.warnings }} <i class="bi bi-exclamation-triangle-fill text-warning"></i>
-                {{ validation.summary.failures }} <i class="bi bi-x-circle-fill text-danger"></i>
-            </span>
+            
+            <div class="row">
+                <div class="col-md-2">
+                        Validation Results 
+                </div>
+                <div class="col-md-8 text-center">
+                    <small>
+                         <span class="text-center">
+                            {{ validation.summary.passes }} <i class="bi bi-check-circle-fill text-success"></i> - 
+                            {{ validation.summary.warnings }} <i class="bi bi-exclamation-triangle-fill text-warning"></i> -
+                            {{ validation.summary.failures }} <i class="bi bi-x-circle-fill text-danger bg-dark"></i>
+                           
+                        </span>
+                    </small>
+                </div>
+                <div class="col-md-2 text-end">
+                     نتائج التحقق
+                </div>
+            </div>
+            
+           
         </h5>
     </div>
     <div class="card-body p-0">
@@ -328,15 +213,40 @@
             <table class="table table-hover mb-0" id="validationResultsTable">
                 <thead>
                     <tr>
-                        <th width="80">Status / الحالة</th>
-                        <th>Check / الفحص</th>
-                        <th>Object / العنصر</th>
-                        <th>Message / الرسالة</th>
-                        <th>Metrics / القياسات</th>
-                        <th>Recommendation / التوصية</th>
-                        <th width="70" class="text-center">Action / الإجراء</th>
-                    </tr>
+                        <th>
+                            <span class="header-ar">الحالة</span>
+                            <span class="header-en">Status</span>
+                        </th>
+                        <th>
+                            <span class="header-ar">الفحص</span>
+                            <span class="header-en">Check</span>
+                        </th>
+                        <th>
+                            <span class="header-ar">العنصر</span>
+                            <span class="header-en">Object</span>
+                        </th>
+                        
+                        
+                        
+                        <th>
+                            <span class="header-ar">الرسالة</span>
+                            <span class="header-en">Message</span>
+                        </th>
+                        <th>
+                            <span class="header-ar">القياسات</span>
+                            <span class="header-en">Metrics</span>
+                        </th>
 
+                        <th>
+                            <span class="header-ar">التوصية</span>
+                            <span class="header-en">Recommendation</span>
+                        </th>
+
+                        <th width="70" class="text-center">
+                            <span class="header-ar">الإجراء</span>
+                            <span class="header-en">Action</span>
+                        </th>
+                    </tr>
                     <tr class="table-light validation-filter-row">
                         <th colspan="7" class="text-center align-middle">
                             <div class="input-group input-group-sm search-zone">

@@ -115,6 +115,106 @@ def create_project_admin():
     return redirect(url_for('project.create', admin_user_id=user_id))
 
 
+#: Document kinds accepted for the signed company agreement.
+AGREEMENT_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg'}
+
+
+def _agreement_upload(file_storage, user_id):
+    """Store the signed company agreement; returns ``(path, error)``."""
+    if not file_storage or not file_storage.filename:
+        return None, None
+
+    original = secure_filename(file_storage.filename)
+    suffix = original.rsplit('.', 1)[-1].lower() if '.' in original else ''
+    if suffix not in AGREEMENT_EXTENSIONS:
+        return None, ('The agreement document must be a PDF or an image / '
+                      'وثيقة الاتفاقية يجب أن تكون PDF أو صورة')
+
+    folder = os.path.join(current_app.config.get('UPLOAD_FOLDER', 'uploads'), 'agreements')
+    os.makedirs(folder, exist_ok=True)
+    stored = 'user_%s_%s_%s' % (user_id, int(datetime.utcnow().timestamp()), original)
+    file_storage.save(os.path.join(folder, stored))
+    return 'agreements/' + stored, None
+
+
+@auth_bp.route('/users/create', methods=['POST'])
+@login_required
+@admin_required
+def create_user():
+    """Create a user from the Users page modal.
+
+    Profiles: Local Admin is stored as Project Admin (and carries the company
+    agreement), Customer as Project Owner; Admin keeps every privilege.
+    """
+    full_name = request.form.get('full_name', '').strip()
+    username = request.form.get('username', '').strip()
+    email = request.form.get('email', '').strip().lower()
+    phone = request.form.get('phone', '').strip()
+    cin = request.form.get('cin', '').strip()
+    password = request.form.get('password', '')
+    profile = request.form.get('profile', '').strip()
+
+    if not username or not email or not password:
+        flash('Username, email and password are required / اسم المستخدم والبريد وكلمة المرور مطلوبة', 'danger')
+        return redirect(url_for('auth.users'))
+    if profile not in ROLES:
+        flash('Unknown role / دور غير معروف', 'danger')
+        return redirect(url_for('auth.users'))
+
+    duplicate_checks = [{'username': username}, {'email': email}]
+    if cin:
+        duplicate_checks.append({'cin': cin})
+    if mongo.db.users.find_one({'$or': duplicate_checks}):
+        flash('User already exists / المستخدم موجود بالفعل', 'danger')
+        return redirect(url_for('auth.users'))
+
+    user_id = get_next_id('users')
+
+    # Only the local admin (Project Admin) signs a company agreement.
+    company = None
+    if profile == ROLE_PROJECT_ADMIN:
+        company_name = request.form.get('company_name', '').strip()
+        agreement_number = request.form.get('agreement_number', '').strip()
+        agreement_date = request.form.get('agreement_date', '').strip()
+        try:
+            agreement_date = datetime.strptime(agreement_date, '%Y-%m-%d').date().isoformat()
+        except (TypeError, ValueError):
+            agreement_date = ''
+
+        document, error = _agreement_upload(request.files.get('agreement_file'), user_id)
+        if error:
+            flash(error, 'danger')
+            return redirect(url_for('auth.users'))
+
+        if company_name or agreement_number or agreement_date or document:
+            company = {
+                'name': company_name,
+                'agreement_number': agreement_number,
+                'agreement_date': agreement_date,
+                'agreement_file': document,
+            }
+
+    user_doc = {
+        'id': user_id,
+        'full_name': full_name or username,
+        'username': username,
+        'email': email,
+        'phone': phone,
+        'password_hash': User.set_password(password),
+        'profile': profile,
+        'cin': cin,
+        'photo': None,
+        'is_active': True,
+        'created_at': datetime.utcnow(),
+    }
+    if company:
+        user_doc['company'] = company
+
+    mongo.db.users.insert_one(user_doc)
+    flash('User created / تم إنشاء المستخدم', 'success')
+    return redirect(url_for('auth.users'))
+
+
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
