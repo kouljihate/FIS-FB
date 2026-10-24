@@ -2,9 +2,11 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 from flask_login import login_required, current_user
 from irrigation.extensions import mongo
 from irrigation.models import get_next_id
-from irrigation.engineering.piping import generate_piping_structure
+from irrigation.engineering.piping import (
+    generate_driplines, generate_piping_structure)
 from irrigation.engineering.hydraulics import (
-    calculate_pipe_length_m, main_pipe_rules, second_pipe_rules, zone_pipe_rules)
+    calculate_pipe_length_m, dripline_rules, main_pipe_rules, second_pipe_rules,
+    zone_pipe_rules)
 from irrigation.engineering.projection import get_project_centroid
 from shapely.geometry import shape as geo_shape
 import json
@@ -540,12 +542,29 @@ def pipe_remove(project_id, pipe_type):
 
 # === DRIP LINE ===
 
+# Rule DL-1: every tree row is served by its own drip line. The stage therefore
+# opens only once the rows have been validated — the tab stays disabled until
+# then, and a direct link bounces back to the Rows tab.
+
+def _dripline_rows_guard(project_id):
+    from irrigation.access import rows_validated
+
+    if rows_validated(project_id):
+        return None
+    flash('Validate the tree rows first to open the drip line stage / '
+          'يجب التحقق من صفوف الأشجار أولا لفتح خطوط التنقيط', 'warning')
+    return redirect(url_for('trees.rows_view', project_id=project_id))
+
+
 @hydrology_bp.route('/<int:project_id>/dripline')
 @login_required
 def dripline(project_id):
     project = get_project_or_redirect(project_id)
     if not project:
         return redirect(url_for('project.index'))
+    blocked = _dripline_rows_guard(project_id)
+    if blocked:
+        return blocked
 
     zones = list(mongo.db.zones.find({'project_id': project_id}))
     for z in zones:
@@ -566,7 +585,8 @@ def dripline(project_id):
 
     return render_template('hydrology/dripline.html', project=project, zones=zones,
                            tree_rows=tree_rows, driplines=driplines,
-                           piping_report=piping_report)
+                           piping_report=piping_report,
+                           pipe_rules=dripline_rules())
 
 
 @hydrology_bp.route('/<int:project_id>/dripline/add', methods=['POST'])
@@ -575,6 +595,9 @@ def dripline_add(project_id):
     project = get_project_or_redirect(project_id)
     if not project:
         return redirect(url_for('project.index'))
+    blocked = _dripline_rows_guard(project_id)
+    if blocked:
+        return blocked
 
     coords = request.form.get('coordinates', '').strip()
     diameter = request.form.get('diameter', default=16, type=int)
@@ -604,9 +627,44 @@ def dripline_add(project_id):
     return redirect(url_for('hydrology.dripline', project_id=project_id))
 
 
+@hydrology_bp.route('/<int:project_id>/dripline/generate', methods=['POST'])
+@login_required
+def dripline_generate(project_id):
+    """Auto Generate: one drip line per tree row (Rule DL-1)."""
+    project = get_project_or_redirect(project_id)
+    if not project:
+        return redirect(url_for('project.index'))
+    blocked = _dripline_rows_guard(project_id)
+    if blocked:
+        return blocked
+
+    try:
+        report = generate_driplines(project_id, project,
+                                    {'replace': _truthy(request.form.get('replace'))})
+    except ValueError as exc:
+        flash(str(exc), 'danger')
+        return redirect(url_for('hydrology.dripline', project_id=project_id))
+    except Exception as exc:
+        flash('Drip line generation failed: %s / فشل إنشاء خطوط التنقيط' % exc, 'danger')
+        return redirect(url_for('hydrology.dripline', project_id=project_id))
+
+    counts = report.get('counts', {})
+    message = ('Drip lines generated: %d, one per row / تم إنشاء خطوط التنقيط: %d، خط لكل صف'
+               % (counts.get('dripline', 0), counts.get('dripline', 0)))
+    if counts.get('skipped'):
+        message += (' — %d row(s) skipped (they already have their own drip line '
+                    'or no path) / %d صف تم تجاوزه (لديه خط تنقيط أو لا مسار له)'
+                    % (counts['skipped'], counts['skipped']))
+    flash(message, 'success')
+    return redirect(url_for('hydrology.dripline', project_id=project_id))
+
+
 @hydrology_bp.route('/<int:project_id>/dripline/validate', methods=['POST'])
 @login_required
 def dripline_validate(project_id):
+    blocked = _dripline_rows_guard(project_id)
+    if blocked:
+        return blocked
     mongo.db.network_elements.update_many(
         {'project_id': project_id, 'type': 'dripline'},
         {'$set': {'validated': True}}

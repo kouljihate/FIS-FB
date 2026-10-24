@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.4.37 - 2026-10-24
+
+### Changed
+- `CHANGELOG.md` (M)
+- `irrigation/__init__.py` (M)
+- `irrigation/access.py` (M)
+- `irrigation/auth/routes.py` (M)
+- `irrigation/engineering/hydraulics.py` (M)
+- `irrigation/engineering/piping.py` (M)
+- `irrigation/hydrology/routes.py` (M)
+- `irrigation/templates/auth/users.html` (M)
+- `irrigation/templates/base.html` (M)
+- `irrigation/templates/hydrology/dripline.html` (M)
+
+## 0.4.36 - 2026-10-24
+
+### Added
+- Circle delete button in the Action column of the Users table, asking for confirmation in the shared delete modal before the account is removed
+
+### Changed
+- An admin cannot delete its own account, and the last remaining Admin is always kept
+
+## 0.4.35 - 2026-10-24
+
+### Added
+- The DripLine sub-tab is now gated on the tree rows: it stays disabled in the Pipes sub-nav until the Rows tab has been validated, and a direct link returns to Rows with a message
+- Auto Generate button on DripLine, building one drip line per tree row (Rule DL-1) with an option to replace generated lines
+- A Drip Line Rules card (DL-1) documenting that each row is served by its own lateral
+
+### Changed
+- Generated drip lines follow the row path, record their row and zone, and count their emitters from the trees planted on the row
+- A row that already carries a hand-drawn drip line keeps it; generation never adds a second lateral to that row
+
 ## 0.4.34 - 2026-10-24
 
 ### Changed

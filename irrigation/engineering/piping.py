@@ -741,6 +741,115 @@ def generate_piping_structure(project_id, project=None, options=None):
     return report
 
 
+def generate_driplines(project_id, project=None, options=None):
+    """Build one drip line per tree row (Rule DL-1).
+
+    The DripLine stage has a single rule: every row is fed by its own lateral,
+    so nothing has to be routed — the row itself is the drip line. The zone is
+    read from the row, the emitters from the trees planted on it. Rows must be
+    validated first, and a row that already carries a hand-drawn drip line is
+    left alone instead of gaining a second one.
+
+    Returns ``{'counts': {...}, 'lengths_m': {...}}``; raises ``ValueError``
+    when the rows are missing or not validated yet.
+    """
+    options = dict(options or {})
+    replace = options.get('replace', True)
+
+    if project is None:
+        project = mongo.db.projects.find_one({'id': project_id})
+    if not project:
+        raise ValueError('Project not found / المشروع غير موجود')
+
+    config = ENGINEERING_DEFAULTS.copy()
+    drip_mm = int(config['drip_diameter_mm'])
+    emitters_per_tree = int(config['emitters_per_tree'])
+
+    rows = list(mongo.db.tree_rows.find({'project_id': project_id}))
+    if not rows:
+        raise ValueError(
+            'No tree rows — draw the rows first / '
+            'لا توجد صفوف أشجار — ارسم الصفوف أولا')
+    if any(not row.get('validated') for row in rows):
+        raise ValueError(
+            'Validate the tree rows first / يجب التحقق من صفوف الأشجار أولا')
+
+    lng, lat = get_project_centroid(project)
+    utm_crs = get_utm_crs(lng, lat)
+    transformer = pyproj.Transformer.from_crs(wgs84, utm_crs, always_xy=True)
+
+    trees_per_row = defaultdict(int)
+    for tree in mongo.db.trees.find({'project_id': project_id}):
+        trees_per_row[tree.get('row_id')] += 1
+
+    existing = list(mongo.db.network_elements.find(
+        {'project_id': project_id, 'type': 'dripline'}))
+    # A drip line drawn by hand owns its row: generation never adds a second
+    # lateral to that row, whether or not generated lines are replaced.
+    manual_rows = {
+        (elem.get('properties') or {}).get('row_id') for elem in existing
+        if (elem.get('properties') or {}).get('generated') != 'ai'
+    }
+
+    if replace:
+        mongo.db.network_elements.delete_many({
+            'project_id': project_id,
+            'type': 'dripline',
+            'properties.generated': 'ai',
+        })
+    else:
+        manual_rows.update(
+            (elem.get('properties') or {}).get('row_id') for elem in existing)
+
+    created = 0
+    skipped = 0
+    total_length = 0.0
+    for row in sorted(rows, key=lambda r: (r.get('zone_id') or 0, r.get('id') or 0)):
+        coords = (row.get('geometry') or {}).get('coordinates') or []
+        if len(coords) < 2 or row.get('id') in manual_rows:
+            skipped += 1
+            continue
+
+        utm = [transformer.transform(c[0], c[1]) for c in coords]
+        length_m = _polyline_length(utm)
+        tree_count = trees_per_row.get(row.get('id'), 0)
+        if tree_count:
+            emitter_count = max(2, tree_count * emitters_per_tree)
+        else:
+            spacing = row.get('spacing_m') or config.get('row_spacing_m') or 3.0
+            tree_count = max(1, int(length_m / spacing) + 1) if spacing else 1
+            emitter_count = max(2, tree_count * emitters_per_tree)
+
+        created += 1
+        total_length += length_m
+        mongo.db.network_elements.insert_one({
+            'id': get_next_id('network_elements'),
+            'project_id': project_id,
+            'type': 'dripline',
+            'name_en': 'Drip Line %d' % created,
+            'name_ar': 'خط التنقيط %d' % created,
+            'geometry': {'type': 'LineString',
+                         'coordinates': [list(c) for c in coords]},
+            'properties': {
+                'generated': 'ai',
+                'diameter': drip_mm,
+                'length_m': round(length_m, 2),
+                'row_id': row.get('id'),
+                'zone_id': row.get('zone_id'),
+                'tree_count': tree_count,
+                'emitter_count': emitter_count,
+                'flow_lps': round(emitter_count
+                                  * config['emitter_flow_lph'] / 3600.0, 4),
+            },
+            'validated': False,
+        })
+
+    return {
+        'counts': {'dripline': created, 'rows': len(rows), 'skipped': skipped},
+        'lengths_m': {'dripline': round(total_length, 2)},
+    }
+
+
 # --------------------------------------------------------------------------
 # helpers
 # --------------------------------------------------------------------------

@@ -348,6 +348,33 @@ def set_active(user_id):
     return redirect(url_for('auth.users'))
 
 
+@auth_bp.route('/users/<int:user_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_user(user_id):
+    """Remove a user account from the Users table.
+
+    An admin cannot delete its own account, and the last remaining Admin is
+    kept so the application always has someone who can administer it.
+    """
+    target = mongo.db.users.find_one({'id': user_id})
+    if not target:
+        flash('User not found / المستخدم غير موجود', 'danger')
+        return redirect(url_for('auth.users'))
+    if user_id == int(current_user.id):
+        flash('You cannot delete your own account / لا يمكنك حذف حسابك', 'danger')
+        return redirect(url_for('auth.users'))
+    if target.get('profile') == ROLE_ADMIN:
+        admins = mongo.db.users.count_documents({'profile': ROLE_ADMIN})
+        if admins <= 1:
+            flash('At least one Admin is required / يجب الإبقاء على مسؤول واحد على الأقل', 'danger')
+            return redirect(url_for('auth.users'))
+
+    mongo.db.users.delete_one({'id': user_id})
+    flash('User deleted / تم حذف المستخدم', 'success')
+    return redirect(url_for('auth.users'))
+
+
 @auth_bp.route('/uploads/<path:filename>')
 @login_required
 def uploaded_file(filename):

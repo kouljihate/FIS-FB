@@ -1,9 +1,9 @@
 import os
-from flask import Flask, render_template
+from flask import Flask, render_template, request
 from irrigation.extensions import mongo, login_manager
 from irrigation.utils.logger import setup_logging
 
-__version__ = '0.4.34'
+__version__ = '0.4.37'
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -124,7 +124,15 @@ def create_app():
 
     @app.context_processor
     def inject_version():
-        return {'app_version': __version__, 'app_repo': repo}
+        # The Pipes sub-nav needs to know whether the drip line stage is open:
+        # it is built row by row, so it waits for validated tree rows.
+        from irrigation.access import rows_validated
+        view_args = request.view_args or {}
+        return {
+            'app_version': __version__,
+            'app_repo': repo,
+            'workflow_rows_validated': rows_validated(view_args.get('project_id')),
+        }
 
     @app.errorhandler(404)
     def not_found(e):

@@ -111,6 +111,17 @@
                             <a href="" class="btn btn-sm btn-circle btn-outline-primary" title="Edit / تعديل">
                                 <i class="bi bi-pencil"></i>
                             </a>
+                            {# current_user.id is a string, the row id an int. #}
+                            {% if u.id != current_user.id|int %}
+                            <form method="POST" action="{{ url_for('auth.delete_user', user_id=u.id) }}" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-circle btn-outline-danger"
+                                        data-confirm-delete="{{ u.full_name or u.username }}"
+                                        data-confirm-delete-ar="{{ u.username }}"
+                                        title="Delete / حذف">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}

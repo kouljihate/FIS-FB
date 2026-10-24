@@ -66,6 +66,27 @@ def require_project(project_id, user=None):
     return project
 
 
+def rows_validated(project_id):
+    """True when the project has tree rows and every one is validated.
+
+    The DripLine stage is built row by row, so it stays locked until the Rows
+    tab has been validated for the whole project.
+    """
+    if not project_id:
+        return False
+    try:
+        project_id = int(project_id)
+    except (TypeError, ValueError):
+        return False
+    rows = mongo.db.tree_rows
+    if not rows.count_documents({"project_id": project_id}):
+        return False
+    return rows.count_documents({
+        "project_id": project_id,
+        "validated": {"$ne": True},
+    }) == 0
+
+
 def admin_required(view):
     @wraps(view)
     def wrapped(*args, **kwargs):

@@ -29,6 +29,11 @@
     </div>
 </div>
 
+{% set rules_id = 'dlRulesCollapse' %}
+{% set rules_title_en = 'Drip Line Rules' %}
+{% set rules_title_ar = 'قواعد خطوط التنقيط' %}
+{% include "hydrology/_pipe_rules.html" %}
+
 <!-- Drip Lines Table -->
 <div class="card shadow-sm">
     <div class="card-body p-0">
@@ -52,6 +57,10 @@
                             <button class="btn btn-circle btn-outline-danger" id="pipeHeaderRemove" type="button"
                                     onclick="pipeEditorRemoveSelected()" title="Remove / إزالة">
                                 <i class="bi bi-trash"></i>
+                            </button>
+                            <button class="btn btn-circle btn-warning" type="button" data-bs-toggle="modal"
+                                    data-bs-target="#aiDriplineModal" title="Auto Generate / إنشاء تلقائي">
+                                <i class="bi bi-magic"></i>
                             </button>
                             <form method="POST" action="{{ url_for('hydrology.dripline_validate', project_id=project.id) }}" class="d-inline">
                                 <button type="submit" class="btn btn-circle btn-primary" title="Validate / التحقق">
@@ -152,6 +161,44 @@
     {% include "_map_header.html" %}
     <div class="card-body">
         <div id="map"></div>
+    </div>
+</div>
+
+<!-- Auto Generate Drip Lines (Rule DL-1: one lateral per tree row) -->
+<div class="modal fade" id="aiDriplineModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('hydrology.dripline_generate', project_id=project.id) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-magic"></i> Auto Generate Drip Lines / إنشاء خطوط التنقيط تلقائيا
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info py-2 small mb-3">
+                        Each of the {{ tree_rows | length }} tree row(s) gets its own drip line: the row path
+                        becomes the lateral (16 mm), the zone is read from the row and the emitters from the
+                        trees planted on it. A row that already carries a hand-drawn drip line is left as it is.
+                        <br>
+                        كل صف من صفوف الأشجار ({{ tree_rows | length }}) يحصل على خط تنقيط خاص به: يُستعمل مسار الصف
+                        كخط تنقيط (16 مم)، وتُقرأ المنطقة من الصف والقطارات من أشجاره. الصف الذي فيه خط مرسوم يدويا لا يُعدّل.
+                    </div>
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" name="replace" value="1" id="replaceDriplines" checked>
+                        <label class="form-check-label" for="replaceDriplines">
+                            Replace generated drip lines / استبدال خطوط التنقيط المولدة
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel / إلغاء</button>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="bi bi-magic"></i> Generate / إنشاء
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 

@@ -299,6 +299,40 @@ def second_pipe_rules():
     return [SECOND_PIPE_RULES[k] for k in SECOND_PIPE_RULE_ORDER]
 
 
+# === DRIP LINE RULES ===
+#
+# Declarative, bilingual description of the DripLine stage (Pipes -> DripLine),
+# mirroring MAIN_PIPE_RULES / SECOND_PIPE_RULES / ZONE_PIPE_RULES so the
+# generator and the UI read one source of truth.
+
+DRIPLINE_RULES = {
+    'DL-1': {
+        'id': 'DL-1',
+        'name_en': 'Each tree row has its own drip line',
+        'name_ar': 'لكل صف أشجار خط التنقيط الخاص به',
+        'from': 'zone_pipe',
+        'to': 'dripline',
+        'element': 'dripline',
+        'condition': 'the tree rows are validated',
+        'required': True,
+        'description_en': ('One lateral per row: the row path becomes the drip line '
+                           '(16 mm), its zone is read from the row and its emitters '
+                           'from the trees planted on it. A row that already carries '
+                           'a hand-drawn drip line keeps it.'),
+        'description_ar': ('خط واحد لكل صف: يُستعمل مسار الصف كخط تنقيط (16 مم)، '
+                           'وتُقرأ المنطقة من الصف والقطارات من أشجاره. الصف الذي فيه '
+                           'خط مرسوم يدويا يحتفظ به ولا يُضاف له خط ثانٍ.'),
+    },
+}
+
+DRIPLINE_RULE_ORDER = ['DL-1']
+
+
+def dripline_rules():
+    """Return the drip line rules in declaration order (list of dicts)."""
+    return [DRIPLINE_RULES[k] for k in DRIPLINE_RULE_ORDER]
+
+
 # === ENGINEERING DEFAULTS ===
 
 ENGINEERING_DEFAULTS = {
@@ -344,6 +378,11 @@ ENGINEERING_DEFAULTS = {
     # between MP and ZP). Declarative and bilingual. See SECOND_PIPE_RULES.
     'second_pipe_rules': SECOND_PIPE_RULES,
     'second_pipe_rule_order': SECOND_PIPE_RULE_ORDER,
+
+    # Drip line construction rules (Pipes -> DripLine). One rule for now:
+    # every tree row is served by its own lateral. See DRIPLINE_RULES.
+    'dripline_rules': DRIPLINE_RULES,
+    'dripline_rule_order': DRIPLINE_RULE_ORDER,
 }
 
 
