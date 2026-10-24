@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.4.39 - 2026-10-24
+
+### Changed
+- `CHANGELOG.md` (M)
+- `README.md` (M)
+- `config.py` (M)
+- `irrigation/__init__.py` (M)
+- `irrigation/auth/routes.py` (M)
+- `irrigation/auth/user.py` (M)
+- `irrigation/templates/auth/login.html` (M)
+- `irrigation/templates/auth/users.html` (M)
+- `irrigation/templates/project/detail.html` (M)
+- `irrigation/utils/logger.py` (M)
+- `irrigation/templates/auth/set_password.html` (??)
+- `irrigation/utils/mailer.py` (??)
+
+## 0.4.38 - 2026-10-24
+
+### Added
+- Forget Password tab on the login page, replacing Register: it e-mails a single-use temporary password over SMTP
+- Set Password page: signing in with a temporary password forces a new password before any other page opens
+- If a temporary password was issued and not used, asking for another one disables the account until an administrator re-enables it
+- SMTP settings in config.py (SMTP_HOST/PORT/USER/PASSWORD/FROM/USE_TLS); without them the e-mail is written to the server log so the flow works locally
+- Enable / Disable button in the Users Status column, so an administrator can re-enable an account disabled by the temporary-password rule
+
+### Changed
+- The temporary password is consumed at the first sign-in and cannot be reused
+- Public registration is closed; /register redirects to the login page with a message
+- The log file is written as UTF-8 so the bilingual e-mail copy (temporary password included) is readable
+
 ## 0.4.37 - 2026-10-24
 
 ### Changed

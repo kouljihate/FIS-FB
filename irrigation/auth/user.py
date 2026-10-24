@@ -18,6 +18,9 @@ class User(UserMixin):
         self.photo = user_doc.get('photo') or None
         profile = user_doc.get('profile')
         self.profile = profile if profile in ROLES else ROLE_PROJECT_OWNER
+        # Set after a temporary password has been used: the user must choose a
+        # new password before reaching any other page.
+        self.must_change_password = bool(user_doc.get('must_change_password'))
 
     def get_id(self):
         return self.id

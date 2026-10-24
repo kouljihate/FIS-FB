@@ -1,4 +1,5 @@
 import os
+import secrets
 from datetime import datetime
 
 from flask import (Blueprint, current_app, flash, redirect, render_template,
@@ -11,8 +12,54 @@ from irrigation.access import (ROLES, ROLE_ADMIN, ROLE_PROJECT_ADMIN,
 from irrigation.auth.user import User
 from irrigation.extensions import mongo
 from irrigation.models import get_next_id
+from irrigation.utils.mailer import send_email
 
 auth_bp = Blueprint('auth', __name__)
+
+#: Endpoints a user may still reach while a new password is required.
+PASSWORD_CHANGE_ENDPOINTS = ('auth.set_password', 'auth.logout', 'auth.login',
+                             'auth.forgot_password', 'static')
+
+
+def _temporary_password(length=12):
+    """Readable one-time password, without look-alike characters."""
+    alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
+    return ''.join(secrets.choice(alphabet) for _ in range(length))
+
+
+def _temporary_password_email(user_doc, password):
+    """Bilingual message carrying the temporary password."""
+    name = user_doc.get('full_name') or user_doc.get('username') or ''
+    username = user_doc.get('username') or ''
+    return (
+        'Hello %s,\n\n'
+        'A temporary password was requested for your Irrigation Planner '
+        'account (%s).\n\n'
+        '    %s\n\n'
+        'This password can be used only once: after signing in you will be asked '
+        'to choose a new password.\n'
+        'If you did not ask for it, ignore this e-mail.\n\n'
+        '---\n\n'
+        'مرحبا %s،\n\n'
+        'تم طلب كلمة مرور مؤقتة لحسابك في نظام تخطيط الري (%s).\n\n'
+        '    %s\n\n'
+        'تُستعمل كلمة المرور هذه مرة واحدة فقط: بعد الدخول سيُطلب منك اختيار '
+        'كلمة مرور جديدة.\n'
+        'إذا لم تطلب ذلك، تجاهل هذه الرسالة.\n'
+        % (name, username, password, name, username, password)
+    )
+
+
+@auth_bp.before_app_request
+def _require_new_password():
+    """Keep a user who signed in with a temporary password on Set Password."""
+    if not current_user.is_authenticated:
+        return None
+    if not getattr(current_user, 'must_change_password', False):
+        return None
+    if request.endpoint in PASSWORD_CHANGE_ENDPOINTS:
+        return None
+    return redirect(url_for('auth.set_password'))
 
 
 def _photo_upload(file_storage, user_id):
@@ -31,47 +78,14 @@ def _photo_upload(file_storage, user_id):
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
-    if request.method == 'POST':
-        full_name = request.form.get('full_name', '').strip()
-        username = request.form.get('username', '').strip()
-        email = request.form.get('email', '').strip().lower()
-        phone = request.form.get('phone', '').strip()
-        cin = request.form.get('cin', '').strip()
-        password = request.form.get('password', '')
+    """Public registration is closed: an administrator creates the accounts.
 
-        if not username or not email or not password:
-            flash('Full name, email, username and password are required / الاسم والبريد واسم المستخدم وكلمة المرور مطلوبة', 'danger')
-            return redirect(url_for('auth.register'))
-
-        duplicate_checks = [{'username': username}, {'email': email}]
-        if cin:
-            duplicate_checks.append({'cin': cin})
-        existing = mongo.db.users.find_one({'$or': duplicate_checks})
-        if existing:
-            flash('User already exists / المستخدم موجود بالفعل', 'danger')
-            return redirect(url_for('auth.register'))
-
-        first_user = mongo.db.users.count_documents({}) == 0
-        user_id = get_next_id('users')
-        photo = _photo_upload(request.files.get('photo'), user_id)
-        user_doc = {
-            'id': user_id,
-            'full_name': full_name or username,
-            'username': username,
-            'email': email,
-            'phone': phone,
-            'password_hash': User.set_password(password),
-            'profile': ROLE_ADMIN if first_user else ROLE_PROJECT_OWNER,
-            'cin': cin,
-            'photo': photo,
-            'is_active': True,
-            'created_at': datetime.utcnow(),
-        }
-        mongo.db.users.insert_one(user_doc)
-        flash('Registration successful / تم التسجيل بنجاح', 'success')
-        return redirect(url_for('auth.login'))
-
-    return render_template('auth/login.html', active_tab='register')
+    The route is kept so an old bookmark lands on the login page, where a
+    forgotten password can be requested, instead of a dead 404.
+    """
+    flash('Accounts are created by the administrator / '
+          'يُنشئ المسؤول الحسابات', 'info')
+    return redirect(url_for('auth.login'))
 
 
 @auth_bp.route('/users/project-admin', methods=['POST'])
@@ -224,19 +238,139 @@ def login():
         user_doc = mongo.db.users.find_one({
             '$or': [{'username': login_name}, {'email': login_name.lower()}]
         })
-        if user_doc and User.check_password(user_doc['password_hash'], password):
-            user = User(user_doc)
-            if not user.is_active:
+        if user_doc:
+            if not user_doc.get('is_active', True):
                 flash('Account disabled / الحساب معطل', 'danger')
                 return redirect(url_for('auth.login'))
-            login_user(user)
-            flash('Welcome back / مرحبا بعودتك', 'success')
-            return redirect(url_for('project.index'))
+
+            if User.check_password(user_doc.get('password_hash', ''), password):
+                # The remembered password cancels any reset that was still pending.
+                if user_doc.get('temp_password_hash') or user_doc.get('must_change_password'):
+                    mongo.db.users.update_one(
+                        {'id': user_doc['id']},
+                        {'$set': {'must_change_password': False},
+                         '$unset': {'temp_password_hash': '',
+                                    'temp_password_created_at': ''}})
+                    user_doc['must_change_password'] = False
+                login_user(User(user_doc))
+                flash('Welcome back / مرحبا بعودتك', 'success')
+                return redirect(url_for('project.index'))
+
+            temp_hash = user_doc.get('temp_password_hash')
+            if temp_hash and User.check_password(temp_hash, password):
+                # Rule: the temporary password works once. It is consumed here,
+                # and the user cannot leave the Set Password page until a new
+                # password has been chosen.
+                mongo.db.users.update_one(
+                    {'id': user_doc['id']},
+                    {'$set': {'must_change_password': True},
+                     '$unset': {'temp_password_hash': '',
+                                'temp_password_created_at': ''}})
+                user_doc.pop('temp_password_hash', None)
+                user_doc['must_change_password'] = True
+                login_user(User(user_doc))
+                flash('Temporary password accepted — choose a new password / '
+                      'تم قبول كلمة المرور المؤقتة — اختر كلمة مرور جديدة', 'info')
+                return redirect(url_for('auth.set_password'))
 
         flash('Invalid credentials / بيانات اعتماد غير صالحة', 'danger')
         return redirect(url_for('auth.login'))
 
-    return render_template('auth/login.html', active_tab='login')
+    active_tab = 'forgot' if request.args.get('tab') == 'forgot' else 'login'
+    return render_template('auth/login.html', active_tab=active_tab)
+
+
+@auth_bp.route('/forgot-password', methods=['POST'])
+def forgot_password():
+    """E-mail a one-time password, or disable the account when it was lost.
+
+    Rule: if a temporary password was already issued and never used, the user
+    is presumed to have forgotten it. No second e-mail is sent; the account is
+    switched to Disabled so an administrator has to step in.
+    """
+    email = request.form.get('email', '').strip().lower()
+    if not email:
+        flash('Enter your e-mail address / أدخل بريدك الإلكتروني', 'warning')
+        return redirect(url_for('auth.login', tab='forgot'))
+
+    user_doc = mongo.db.users.find_one({'email': email})
+    if not user_doc:
+        # Neither confirm nor deny that the address has an account.
+        flash('If this address has an account, a temporary password has been '
+              'sent to it / إذا كان لهذا البريد حساب، فقد أُرسلت إليه كلمة مرور مؤقتة',
+              'info')
+        return redirect(url_for('auth.login', tab='forgot'))
+
+    if not user_doc.get('is_active', True):
+        flash('This account is disabled. Contact the administrator / '
+              'هذا الحساب معطل. اتصل بالمسؤول', 'warning')
+        return redirect(url_for('auth.login', tab='forgot'))
+
+    if user_doc.get('temp_password_hash') or user_doc.get('must_change_password'):
+        mongo.db.users.update_one(
+            {'id': user_doc['id']},
+            {'$set': {'is_active': False},
+             '$unset': {'temp_password_hash': '', 'temp_password_created_at': '',
+                        'must_change_password': ''}})
+        flash('A temporary password was already issued and not used, so the '
+              'account is now Disabled. Contact the administrator / '
+              'سبق إرسال كلمة مرور مؤقتة ولم تُستعمل، لذا تم تعطيل الحساب. '
+              'اتصل بالمسؤول', 'danger')
+        return redirect(url_for('auth.login', tab='forgot'))
+
+    temporary = _temporary_password()
+    mongo.db.users.update_one(
+        {'id': user_doc['id']},
+        {'$set': {'temp_password_hash': User.set_password(temporary),
+                  'temp_password_created_at': datetime.utcnow(),
+                  'must_change_password': False}})
+
+    status = send_email(email, 'Temporary password / كلمة مرور مؤقتة',
+                        _temporary_password_email(user_doc, temporary))
+    if status == 'sent':
+        flash('A temporary password has been sent to %s / تم إرسال كلمة مرور '
+              'مؤقتة إلى %s' % (email, email), 'success')
+    elif status == 'logged':
+        flash('SMTP is not configured, so the temporary password was written to '
+              'the server log / لم يُعد البريد، لذا كُتبت كلمة المرور المؤقتة في '
+              'سجل الخادم', 'info')
+    else:
+        flash('The e-mail could not be sent; the temporary password was written '
+              'to the server log / تعذر إرسال البريد، وكُتبت كلمة المرور المؤقتة '
+              'في سجل الخادم', 'warning')
+    return redirect(url_for('auth.login', tab='forgot'))
+
+
+@auth_bp.route('/set-password', methods=['GET', 'POST'])
+@login_required
+def set_password():
+    """Choose a new password after signing in with a temporary one."""
+    user_doc = mongo.db.users.find_one({'id': int(current_user.id)})
+    if not user_doc:
+        return redirect(url_for('auth.logout'))
+    if not user_doc.get('must_change_password'):
+        return redirect(url_for('project.index'))
+
+    if request.method == 'POST':
+        password = request.form.get('password', '')
+        confirm = request.form.get('confirm_password', '')
+        if len(password) < 8:
+            flash('The new password must be at least 8 characters / '
+                  'كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل', 'danger')
+        elif password != confirm:
+            flash('The two passwords do not match / كلمتا المرور غير متطابقتين',
+                  'danger')
+        else:
+            mongo.db.users.update_one(
+                {'id': int(current_user.id)},
+                {'$set': {'password_hash': User.set_password(password),
+                          'must_change_password': False},
+                 '$unset': {'temp_password_hash': '',
+                            'temp_password_created_at': ''}})
+            flash('New password saved / تم حفظ كلمة المرور الجديدة', 'success')
+            return redirect(url_for('project.index'))
+
+    return render_template('auth/set_password.html', user=user_doc)
 
 
 @auth_bp.route('/logout')

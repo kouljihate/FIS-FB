@@ -1,6 +1,6 @@
 # FIS (Farming Irrigation System)
 
-Version: **0.4.37**
+Version: **0.4.39**
 
 FIS is a Flask irrigation-planning application for organizing farm projects, field geometry, irrigation networks, trees, and engineering validation.
 
@@ -23,6 +23,7 @@ FIS is a Flask irrigation-planning application for organizing farm projects, fie
 - Auto-compute a whole-project cost estimate with editable unit prices, then review the 5-year return on investment (ROI %, payback, yearly cash flow) with assumptions saved per project.
 - Attach land/owner/other documents to a project.
 - Run engineering validation and review elevation-aware reports.
+- Forgotten-password flow on the login page: a single-use temporary password is e-mailed, a new password is forced at first sign-in, and an unused temporary password that is requested again disables the account until an administrator re-enables it.
 - Use the bilingual English/Arabic interface.
 
 ## Requirements
@@ -42,6 +43,21 @@ python app.py
 ```
 
 The application is served at `http://127.0.0.1:5000`. If `SECRET_KEY` is unset, a random key is generated for local development and sessions reset when the process restarts. Set a unique, persistent `SECRET_KEY` and configure MongoDB appropriately before deployment.
+
+### E-mail (temporary passwords)
+
+The Forget Password tab sends a one-time password over SMTP. Use any mail account; set these before starting the app:
+
+```powershell
+$env:SMTP_HOST = 'smtp.gmail.com'
+$env:SMTP_PORT = '587'
+$env:SMTP_USER = 'you@example.com'
+$env:SMTP_PASSWORD = 'app-password'
+$env:SMTP_FROM = 'you@example.com'   # defaults to SMTP_USER
+$env:SMTP_USE_TLS = '0'              # only for a relay without STARTTLS
+```
+
+Without SMTP settings the message, temporary password included, is written to `logs/irrigation.log`, which is enough to exercise the flow locally.
 
 ## Database
 

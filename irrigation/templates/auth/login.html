@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ 'Login / دخول' if active_tab == 'login' else 'Register / تسجيل' }}{% endblock %}
+{% block title %}{{ 'Forgotten password / نسيت كلمة المرور' if active_tab == 'forgot' else 'Login / دخول' }}{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
@@ -8,16 +8,16 @@
             <div class="card-header p-0">
                 <ul class="nav nav-tabs nav-fill auth-tabs" role="tablist">
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link {{ 'active' if active_tab == 'login' else '' }}" id="login-tab" data-bs-toggle="tab" data-bs-target="#login-pane" type="button" role="tab" aria-controls="login-pane" aria-selected="{{ 'true' if active_tab == 'login' else 'false' }}">Login / دخول</button>
+                        <button class="nav-link {{ 'active' if active_tab != 'forgot' else '' }}" id="login-tab" data-bs-toggle="tab" data-bs-target="#login-pane" type="button" role="tab" aria-controls="login-pane" aria-selected="{{ 'true' if active_tab != 'forgot' else 'false' }}">Login / دخول</button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link {{ 'active' if active_tab == 'register' else '' }}" id="register-tab" data-bs-toggle="tab" data-bs-target="#register-pane" type="button" role="tab" aria-controls="register-pane" aria-selected="{{ 'true' if active_tab == 'register' else 'false' }}">Register / تسجيل</button>
+                        <button class="nav-link {{ 'active' if active_tab == 'forgot' else '' }}" id="forgot-tab" data-bs-toggle="tab" data-bs-target="#forgot-pane" type="button" role="tab" aria-controls="forgot-pane" aria-selected="{{ 'true' if active_tab == 'forgot' else 'false' }}">Forget Password / نسيت كلمة المرور</button>
                     </li>
                 </ul>
             </div>
             <div class="card-body">
                 <div class="tab-content">
-                    <div class="tab-pane fade {{ 'show active' if active_tab == 'login' else '' }}" id="login-pane" role="tabpanel" aria-labelledby="login-tab" tabindex="0">
+                    <div class="tab-pane fade {{ 'show active' if active_tab != 'forgot' else '' }}" id="login-pane" role="tabpanel" aria-labelledby="login-tab" tabindex="0">
                         <form method="POST" action="{{ url_for('auth.login') }}">
                             <div class="mb-3">
                                 <label class="form-label">Username or Email / اسم المستخدم أو البريد</label>
@@ -34,43 +34,37 @@
                             </div>
                         </form>
                     </div>
-                    <div class="tab-pane fade {{ 'show active' if active_tab == 'register' else '' }}" id="register-pane" role="tabpanel" aria-labelledby="register-tab" tabindex="0">
-                        <form method="POST" action="{{ url_for('auth.register') }}" enctype="multipart/form-data">
+                    <div class="tab-pane fade {{ 'show active' if active_tab == 'forgot' else '' }}" id="forgot-pane" role="tabpanel" aria-labelledby="forgot-tab" tabindex="0">
+                        <form method="POST" action="{{ url_for('auth.forgot_password') }}">
+                            <p class="small text-muted">
+                                Enter the e-mail address of your account: a temporary password will be sent to it.
+                                It can be used only once — after signing in you choose a new password.
+                                <br>
+                                <span class="ar-text" lang="ar">
+                                    أدخل بريد حسابك: ستُرسل إليه كلمة مرور مؤقتة. تُستعمل مرة واحدة فقط —
+                                    بعد الدخول تختار كلمة مرور جديدة.
+                                </span>
+                            </p>
                             <div class="mb-3">
-                                <label class="form-label">Full Name / الاسم الكامل</label>
-                                <input type="text" name="full_name" class="form-control" required>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Username / اسم المستخدم</label>
-                                <input type="text" name="username" class="form-control" required>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Email / البريد الإلكتروني</label>
-                                <input type="email" name="email" class="form-control" required>
-                            </div>
-                            <div class="row g-2 mb-3">
-                                <div class="col-6">
-                                    <label class="form-label">Phone / الهاتف</label>
-                                    <input type="text" name="phone" class="form-control">
-                                </div>
-                                <div class="col-6">
-                                    <label class="form-label">CIN / البطاقة الوطنية</label>
-                                    <input type="text" name="cin" class="form-control">
-                                </div>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Photo / الصورة</label>
-                                <input type="file" name="photo" class="form-control" accept="image/*">
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Password / كلمة المرور</label>
-                                <input type="password" name="password" class="form-control" required>
+                                <label class="form-label">E-mail / البريد الإلكتروني</label>
+                                <input type="email" name="email" class="form-control" required
+                                       value="{{ request.form.get('email', '') }}"
+                                       {{ 'autofocus' if active_tab == 'forgot' else '' }}>
                             </div>
                             <div class="d-grid">
-                                <button type="submit" class="btn btn-success">
-                                    <i class="bi bi-check-circle"></i> Register / تسجيل
+                                <button type="submit" class="btn btn-warning">
+                                    <i class="bi bi-key"></i> Send temporary password / إرسال كلمة مرور مؤقتة
                                 </button>
                             </div>
+                            <p class="small text-muted mt-3 mb-0">
+                                If a temporary password was already sent and not used, requesting another one
+                                disables the account; contact the administrator to re-enable it.
+                                <br>
+                                <span class="ar-text" lang="ar">
+                                    إذا سبق إرسال كلمة مرور مؤقتة ولم تُستعمل، فإن طلب كلمة أخرى يعطّل الحساب؛
+                                    اتصل بالمسؤول لإعادة تفعيله.
+                                </span>
+                            </p>
                         </form>
                     </div>
                 </div>

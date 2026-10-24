@@ -106,6 +106,17 @@
                             {% else %}
                             <span class="badge bg-secondary">Disabled / معطل</span>
                             {% endif %}
+                            {# A disabled account (e.g. after a lost temporary password) is
+                               re-enabled here by the administrator. #}
+                            {% if u.id != current_user.id|int %}
+                            <form method="POST" action="{{ url_for('auth.set_active', user_id=u.id) }}" class="d-inline">
+                                <input type="hidden" name="is_active" value="{{ '0' if u.is_active else '1' }}">
+                                <button type="submit" class="btn btn-sm btn-circle {{ 'btn-outline-secondary' if u.is_active else 'btn-outline-success' }}"
+                                        title="{{ 'Disable' if u.is_active else 'Enable' }} / {{ 'تعطيل' if u.is_active else 'تفعيل' }}">
+                                    <i class="bi {{ 'bi-pause-circle' if u.is_active else 'bi-play-circle' }}"></i>
+                                </button>
+                            </form>
+                            {% endif %}
                         </td>
                         <td>
                             <a href="" class="btn btn-sm btn-circle btn-outline-primary" title="Edit / تعديل">

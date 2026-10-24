@@ -863,10 +863,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // tabs; drawing them all here buried the layout under the network.
     const projectMap = initMap('projectMap', geojsonUrl, {
         center: [34.0, -6.0],
-        zoom: 14,
+        zoom: 16,
         labelTypes: ['sector'],
-        mapFilters: ['sector', 'water_source'],
-        mapFiltersOn: ['sector', 'water_source'],
+        mapFilters: ['sector', 'water_source', 'elevation'],
+        mapFiltersOn: ['sector', 'water_source', 'elevation'],
         lazyFilters: true
     });
 
@@ -879,7 +879,7 @@ document.addEventListener('DOMContentLoaded', function() {
     addLegend([
         {color: '#007bff', label: 'Sectors / القطاعات'},
         {color: '#17a2b8', label: 'Water Sources / مصادر المياه'}
-    ], {position: 'bottomleft'});
+    ], {position: 'bottomright'});
 
     // Add a new tree plan row
     document.getElementById('addTreePlanRow').addEventListener('click', function() {
