@@ -1,6 +1,6 @@
 # FIS (Farming Irrigation System)
 
-Version: **0.4.52**
+Version: **0.4.53**
 
 FIS is a Flask irrigation-planning application for organizing farm projects, field geometry, irrigation networks, trees, and engineering validation.
 

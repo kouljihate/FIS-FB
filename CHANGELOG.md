@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.53 - 2026-10-25
+
+### Added
+- tests/ Playwright suite — 9 ordered test files (22 tests) covering land maps, water resources, geometry, pipes, trees, components, map overview, validation and report
+- tests/seed.py seeds 1 admin, 3 local admins with company agreements and 9 customers/projects; tests/run_tests.py runner and tests/README.md
+- pytest-html report written to tests/report (screenshots, server log, dataset dump)
+
+### Changed
+- .gitignore ignores test artefacts and report output
+
 ## 0.4.52 - 2026-10-25
 
 ### Changed

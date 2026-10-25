@@ -4,10 +4,9 @@
     <name>Dhar1</name>
     <Style id="icon-1703-C2185B-nodesc-normal">
       <IconStyle>
-        <color>ff5b18c2</color>
         <scale>1</scale>
         <Icon>
-          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+          <href>images/icon-1.png</href>
         </Icon>
       </IconStyle>
       <LabelStyle>
@@ -19,10 +18,9 @@
     </Style>
     <Style id="icon-1703-C2185B-nodesc-highlight">
       <IconStyle>
-        <color>ff5b18c2</color>
         <scale>1</scale>
         <Icon>
-          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+          <href>images/icon-1.png</href>
         </Icon>
       </IconStyle>
       <LabelStyle>
