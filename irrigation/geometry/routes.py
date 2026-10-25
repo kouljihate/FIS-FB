@@ -8,6 +8,8 @@ from irrigation.engineering.elevation import (
     get_or_build_elevation_model, aspect_for_polygon, compass_from_bearing,
     ORIENTATION_DEGREES, ORIENTATION_OPTIONS, COMPASS_POINTS, ORIENTATION_ALIASES)
 from shapely.geometry import shape, mapping
+from shapely.ops import unary_union
+from shapely import force_2d
 import json
 import math
 
@@ -67,6 +69,26 @@ def _valid_polygon(polygon_geojson):
     return _largest_polygon(geom)
 
 
+def _valid_geometry(polygon_geojson):
+    """The valid Polygon / MultiPolygon of a GeoJSON polygon.
+
+    Unlike ``_valid_polygon`` this keeps every part, so the caller can decide
+    what to do with a shape that clipping split in two.
+    """
+    if hasattr(polygon_geojson, 'geom_type'):
+        geom = polygon_geojson
+    else:
+        try:
+            geom = shape(polygon_geojson)
+        except Exception:
+            return None
+    if not geom.is_valid:
+        geom = geom.buffer(0)
+    if geom.is_empty or geom.geom_type not in ('Polygon', 'MultiPolygon'):
+        return None
+    return geom
+
+
 def _largest_polygon(geom):
     """Largest polygon part of any Shapely geometry (None if it holds none)."""
     if geom is None or geom.is_empty:
@@ -85,6 +107,246 @@ def _largest_polygon(geom):
     if not parts:
         return None
     return max(parts, key=lambda part: part.area)
+
+
+def _same_shape(a, b, tolerance=1e-9):
+    """True when two polygons describe the same sector, ignoring float noise.
+
+    Arrange runs on its own output whenever the user presses it again; a
+    micron-wide difference left by clipping must not rewrite the polygon.
+    """
+    if a is None or b is None:
+        return a is b
+    if a.equals(b):
+        return True
+    scale = max(a.area, b.area, 1e-18)
+    return a.symmetric_difference(b).area <= scale * tolerance
+
+
+def _polygonal(geom):
+    """The polygonal part of a geometry (buffering can leave lines behind)."""
+    if geom is None or geom.is_empty:
+        return None
+    if geom.geom_type in ('Polygon', 'MultiPolygon'):
+        return geom
+    if geom.geom_type != 'GeometryCollection':
+        return None
+    parts = []
+    for part in geom.geoms:
+        if part.geom_type == 'Polygon':
+            parts.append(part)
+        elif part.geom_type == 'MultiPolygon':
+            parts.extend(part.geoms)
+    if not parts:
+        return None
+    merged = unary_union(parts)
+    return merged if merged.geom_type in ('Polygon', 'MultiPolygon') else None
+
+
+def _attached_band(body, piece, tolerance):
+    """The parts of ``piece`` that share an edge with ``body``.
+
+    A band grown around a sector can also reach land past a neighbouring
+    sector.  Keeping only the parts that share an edge with the sector stops
+    it from collecting an island on the other side of its neighbour: that land
+    is left for the sector bordering it.
+    """
+    piece = _polygonal(piece)
+    if piece is None:
+        return None
+    parts = [part for part in getattr(piece, 'geoms', [piece])
+             if part.geom_type == 'Polygon' and body.intersection(part).length > tolerance]
+    if not parts:
+        return None
+    merged = unary_union(parts)
+    return merged if merged.geom_type == 'Polygon' else _polygonal(merged)
+
+
+def _split_main_part(geom):
+    """A MultiPolygon split into its main body and the parts lying apart.
+
+    Returns ``(main_polygon, leftover_or_None)``.
+    """
+    if geom is None or geom.geom_type == 'Polygon':
+        return geom, None
+    if geom.geom_type != 'MultiPolygon':
+        return _largest_polygon(geom), None
+    parts = sorted(geom.geoms, key=lambda part: part.area, reverse=True)
+    leftover = unary_union(parts[1:]) if len(parts) > 1 else None
+    return parts[0], leftover
+
+
+def _attach_piece(body, piece, eps, others, limit=None):
+    """Join ``piece`` to ``body`` as one polygon.
+
+    Land at the very corner of the boundary can meet a sector at a single point;
+    grown without help that corner would stay a separate lobe.  Buffering the
+    piece by a few centimetres makes it overlap the sector, the union is then one
+    valid plot, and the land around the touch point is taken back from the other
+    sectors (and clipped to ``limit``) so the partition does not overlap itself
+    nor spill outside the land.
+    """
+    bridge = piece.buffer(eps, join_style='mitre')
+    if limit is not None:
+        # Trim the bridge to the land first: clipping the sector afterwards would
+        # shave the piece off again and reopen the gap this is meant to close.
+        bridge = _polygonal(bridge.intersection(limit)) or bridge
+    merged = _polygonal(unary_union([body, bridge]))
+    if merged is None:
+        return body
+    if others is not None and not others.is_empty:
+        cleaned = _polygonal(merged.difference(others))
+        if cleaned is not None and not cleaned.is_empty:
+            merged = cleaned
+    return _largest_polygon(merged)
+
+
+def _owner_for_pocket(pocket, grown, probe=0.0):
+    """Sector that should absorb an unclaimed pocket.
+
+    The longest shared edge wins.  A pocket that only touches the sectors at its
+    corners has no shared edge, so the sector whose land lies closest around it
+    is picked next: that is the one the pocket really sits beside, and the only
+    one the pocket can be joined to without crossing a neighbour.
+    """
+    best, best_length = None, 0.0
+    for sector_id, geom in grown.items():
+        shared = geom.intersection(pocket).length
+        if shared > best_length:
+            best, best_length = sector_id, shared
+    if best is not None:
+        return best
+    if probe > 0:
+        near = pocket.buffer(probe)
+        best, best_area = None, 0.0
+        for sector_id, geom in grown.items():
+            area = geom.intersection(near).area
+            if area > best_area:
+                best, best_area = sector_id, area
+        if best is not None:
+            return best
+    return min(grown, key=lambda sector_id: grown[sector_id].distance(pocket))
+
+
+def _fill_sector_gaps(boundary_geom, sector_geoms, fixed_ids=()):
+    """Expand the sectors until they cover the land side by side.
+
+    ``sector_geoms`` maps sector id -> valid Shapely polygon already clipped to
+    the boundary.  The unclaimed land is handed out by growing every sector
+    outward in small steps: a sector keeps what it reaches first, so two
+    neighbouring sectors meet halfway and a sector at the edge grows up to the
+    land boundary.  Growing (rather than carving the gaps with a Voronoi
+    diagram) hands every piece of land to a sector that already borders it, so
+    each sector stays a single plot and the result reads as plots placed side by
+    side, not shapes patched together.
+
+    Sectors listed in ``fixed_ids`` keep their shape and count as claimed: their
+    land must not be handed to a neighbour, or a sector that was kept as-is
+    would come back as a detached piece of another one.
+
+    Returns a dict of only the sectors that actually grew.
+    """
+    if boundary_geom is None or not sector_geoms:
+        return {}
+
+    grown = {sector_id: geom for sector_id, geom in sector_geoms.items()
+             if sector_id not in fixed_ids}
+    if not grown:
+        return {}
+
+    claimed = unary_union(list(sector_geoms.values()))
+    remaining = _polygonal(boundary_geom.difference(claimed))
+    # A sliver left by float arithmetic is not a gap: filling it would rewrite
+    # the sectors on every press of Arrange.
+    if remaining is None or remaining.area <= boundary_geom.area * 1e-6:
+        return {}
+    minx, miny, maxx, maxy = boundary_geom.bounds
+    diagonal = math.hypot(maxx - minx, maxy - miny)
+    # About 200 steps across the land: the frontier between two sectors lands
+    # within half a step of the middle, and the loop always terminates.
+    step = (diagonal / 200.0) or 1e-12
+    for _ in range(240):
+        if remaining is None:
+            break
+        moved = False
+        for sector_id in list(grown):
+            band = _attached_band(grown[sector_id],
+                                  grown[sector_id]
+                                  .buffer(step, join_style='mitre')
+                                  .intersection(remaining),
+                                  step * 1e-6)
+            if band is None:
+                continue
+            merged = _polygonal(unary_union([grown[sector_id], band]))
+            if merged is None:
+                continue
+            grown[sector_id] = merged
+            remaining = _polygonal(remaining.difference(band))
+            moved = True
+        if not moved:
+            break
+
+    eps = step / 10.0
+    # Land no sector could reach (a pocket enclosed by other sectors, touching
+    # them only at a corner) joins the sector it borders the most, so nothing
+    # stays unclaimed.
+    if remaining is not None and remaining.area > boundary_geom.area * 1e-9:
+        for pocket in getattr(remaining, 'geoms', [remaining]):
+            if pocket.geom_type != 'Polygon' or pocket.area <= boundary_geom.area * 1e-9:
+                continue
+            owner = _owner_for_pocket(pocket, grown, eps)
+            others = unary_union([geom for sid, geom in grown.items() if sid != owner])
+            grown[owner] = _attach_piece(grown[owner], pocket, eps, others, boundary_geom)
+
+    # The repairs can shave a sliver off a sector where the boundary is jagged
+    # (the land a sector took is clipped back to the border).  Hand those slivers
+    # over too, so the sectors really are side by side along the whole border.
+    fixed_geoms = [geom for sid, geom in sector_geoms.items() if sid in fixed_ids]
+    uncovered = _polygonal(boundary_geom.difference(unary_union(list(grown.values()) + fixed_geoms)))
+    if uncovered is not None:
+        for pocket in getattr(uncovered, 'geoms', [uncovered]):
+            if pocket.geom_type != 'Polygon' or pocket.area <= boundary_geom.area * 1e-12:
+                continue
+            owner = _owner_for_pocket(pocket, grown, eps)
+            others = unary_union(fixed_geoms + [geom for sid, geom in grown.items() if sid != owner])
+            grown[owner] = _attach_piece(grown[owner], pocket, eps, others, boundary_geom)
+
+    # Each sector is one plot: a part that stays apart from its body is handed to
+    # the sector it borders.
+    for _ in range(4):
+        leftovers = {}
+        for sector_id, geom in list(grown.items()):
+            main, extra = _split_main_part(geom)
+            grown[sector_id] = main
+            if extra is not None and not extra.is_empty:
+                leftovers[sector_id] = extra
+        if not leftovers:
+            break
+        for sector_id, extra in leftovers.items():
+            others = {k: v for k, v in grown.items() if k != sector_id}
+            if not others:
+                grown[sector_id] = _attach_piece(grown[sector_id], extra, eps, None, boundary_geom)
+                continue
+            owner = _owner_for_pocket(extra, others, eps)
+            others_union = unary_union([geom for sid, geom in grown.items() if sid != owner])
+            grown[owner] = _attach_piece(grown[owner], extra, eps, others_union, boundary_geom)
+
+    return {sector_id: geom for sector_id, geom in grown.items()
+            if not _same_shape(geom, sector_geoms[sector_id], tolerance=1e-6)}
+
+
+def _sector_geojson(geom):
+    """GeoJSON to store for a repaired sector: one valid polygon, [lng, lat] only.
+
+    The sectors page and the map read a sector as a plain GeoJSON Polygon with
+    two values per position, so a repaired shape is written flat (Z dropped) and
+    never as a MultiPolygon or a self-intersecting ring.
+    """
+    geom = _largest_polygon(geom)
+    if geom is not None and not geom.is_valid:
+        repaired = _polygonal(geom.buffer(0))
+        geom = _largest_polygon(repaired) if repaired is not None else geom
+    return mapping(force_2d(geom))
 
 
 def _polygon_area_m2(polygon):
@@ -491,12 +753,14 @@ def sector_ai_regenerate(project_id):
 @geometry_bp.route('/<int:project_id>/sectors/arrange', methods=['POST'])
 @login_required
 def sector_arrange(project_id):
-    """Repair every sector polygon: clip it to the land boundary and remove overlaps.
+    """Repair every sector polygon so the sectors tile the land side by side.
 
-    Sectors are repaired in id order, so a contested strip stays with the lower
-    id and the later sector gives it up. None of this is destructive on purpose:
-    a sector the repair would erase (it sits almost entirely outside the land
-    boundary) keeps its old shape and is reported in the flash message instead.
+    Three steps, run in this order: clip every sector to the land boundary, take
+    the overlaps away (in id order, so a contested strip stays with the lower
+    id), then grow the sectors into the land nobody claimed until they meet each
+    other and the border.  None of this is destructive on purpose: a sector the
+    repair would erase (it sits almost entirely outside the land boundary) keeps
+    its old shape and is reported in the flash message instead.
     """
     project = get_project_or_redirect(project_id)
     if not project:
@@ -509,7 +773,9 @@ def sector_arrange(project_id):
 
     boundary_geom = _land_boundary_geometry(project)
     claimed = None
-    arranged = 0
+    changed_ids = set()
+    arrange_geoms = {}
+    kept_ids = set()
     clipped = 0
     deoverlapped = 0
     skipped = []
@@ -518,59 +784,87 @@ def sector_arrange(project_id):
         polygon = sector.get('polygon')
         if not polygon:
             continue
-        original = _valid_polygon(polygon)
+        original = _valid_geometry(polygon)
         if original is None:
             skipped.append(sector.get('name_en') or str(sector.get('id')))
             continue
 
         geom = original
         was_clipped = False
-        if boundary_geom is not None and not boundary_geom.covers(geom):
-            geom = _largest_polygon(geom.intersection(boundary_geom))
-            was_clipped = geom is not None
+        if boundary_geom is not None:
+            outside = geom.difference(boundary_geom)
+            if outside.area > original.area * 1e-9:
+                geom = _valid_geometry(geom.intersection(boundary_geom))
+                was_clipped = geom is not None
 
+        # A sector is one plot: if clipping split it, keep its main body and let
+        # the growth pass hand the stray pieces to the sector that borders them.
+        geom = _largest_polygon(geom) if geom is not None else None
         was_deoverlapped = False
         if geom is not None and claimed is not None:
-            before_area = geom.area
-            geom = _largest_polygon(geom.difference(claimed))
-            if geom is not None:
-                was_deoverlapped = geom.area < before_area - 1e-6
+            covered = geom.intersection(claimed)
+            if covered.area > geom.area * 1e-9:
+                before_area = geom.area
+                geom = _largest_polygon(_polygonal(geom.difference(claimed)))
+                if geom is not None:
+                    was_deoverlapped = geom.area < before_area * (1 - 1e-9)
 
         # Too little left to be a sector: keep the original rather than leaving
         # a sliver (or nothing) behind without the user noticing.  The areas are
         # compared in the polygon's own units, so the ratio holds in degrees as
         # well as in metres.
+        kept_original = False
         if geom is None or geom.is_empty or geom.area < original.area * 0.01:
             skipped.append(sector.get('name_en') or str(sector.get('id')))
             geom = original
+            kept_original = True
 
         # Keep the whole claim build-up: sectors are often disjoint, and the
         # union of two of them is a MultiPolygon that must not be reduced to its
         # biggest part or the other sector's area would look unclaimed again.
         claimed = geom if claimed is None else claimed.union(geom)
+        arrange_geoms[sector['id']] = geom
+        if kept_original:
+            kept_ids.add(sector['id'])
 
-        if geom.equals(original):
+        if _same_shape(geom, original):
             continue
 
-        new_geojson = mapping(geom)
+        new_geojson = _sector_geojson(geom)
         mongo.db.sectors.update_one(
             {'id': sector['id'], 'project_id': project_id},
             {'$set': {'polygon': new_geojson, 'area_m2': _polygon_area_m2(new_geojson)}}
         )
-        arranged += 1
+        changed_ids.add(sector['id'])
         clipped += 1 if was_clipped else 0
         deoverlapped += 1 if was_deoverlapped else 0
+
+    # Second pass: the sectors no longer overlap, but the land between them (and
+    # between them and the boundary) is still unclaimed.  Grow them into it so
+    # every sector ends up side by side, against another sector or against the
+    # land boundary, with no strip of empty land left between them.
+    filled = 0
+    for sector_id, geom in _fill_sector_gaps(boundary_geom, arrange_geoms, kept_ids).items():
+        new_geojson = _sector_geojson(geom)
+        mongo.db.sectors.update_one(
+            {'id': sector_id, 'project_id': project_id},
+            {'$set': {'polygon': new_geojson, 'area_m2': _polygon_area_m2(new_geojson)}}
+        )
+        changed_ids.add(sector_id)
+        filled += 1
+    arranged = len(changed_ids)
 
     if arranged:
         flash(
             f'Arranged {arranged} sector(s): {clipped} clipped to the land boundary, '
-            f'{deoverlapped} overlap(s) removed / '
-            f'تم ترتيب {arranged} قطاع: {clipped} مقصوص على حدود الأرض و{deoverlapped} تداخل تمت إزالته',
+            f'{deoverlapped} overlap(s) removed, {filled} extended to the border / '
+            f'تم ترتيب {arranged} قطاع: {clipped} مقصوص على حدود الأرض، '
+            f'{deoverlapped} تداخل تمت إزالته، {filled} موسع إلى الحدود',
             'success'
         )
     elif not skipped:
-        flash('Every sector already sits inside the land boundary without overlap / '
-              'كل القطاعات داخل حدود الأرض دون تداخل', 'info')
+        flash('Every sector already sits inside the land boundary without overlap or gap / '
+              'كل القطاعات داخل حدود الأرض دون تداخل أو فراغ', 'info')
 
     if skipped:
         flash(

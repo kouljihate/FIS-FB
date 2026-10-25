@@ -346,7 +346,11 @@ document.addEventListener('DOMContentLoaded', function() {
         center: [34.0, -6.0], zoom: 14,
         selectable: { type: 'tree_row', checkboxSelector: '.row-checkbox', toggleOnClick: true },
         labelTypes: ['sector', 'zone', 'tree_row', 'tree'],
-        mapDelete: { onClick: rowsRemoveSelected }
+        mapDelete: { onClick: rowsRemoveSelected },
+        elevationHeatmap: {
+            url: '{{ url_for("engineering.elevation_heatmap", project_id=project.id) }}',
+            ramp: 'blue-red'
+        }
     });
 
     document.addEventListener('change', function(event) {

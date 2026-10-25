@@ -258,6 +258,8 @@ function applyLabelVisibility(type) {
 }
 
 // Map widget with one circle button per label category (Sector/Zone/Row/Tree).
+// It is a display toggle like the funnel, so it lives in the right-hand column
+// (under the layer switcher); the bottom-right corner is kept for the legends.
 function setupLabelToggleWidget(targetMap, labelTypes) {
     if (!labelLayers) return;
     const categories = LABEL_CATEGORIES.filter(function(category) {
@@ -265,7 +267,7 @@ function setupLabelToggleWidget(targetMap, labelTypes) {
     });
     if (!categories.length) return;
 
-    const control = L.control({ position: 'bottomright' });
+    const control = L.control({ position: 'topright' });
     control.onAdd = function() {
         const group = L.DomUtil.create('div', 'leaflet-bar map-label-toggle');
         L.DomEvent.disableClickPropagation(group);
@@ -518,14 +520,22 @@ function filterHiddenFeatures(data) {
     });
 }
 
-// One left-hand widget (under the zoom buttons): fitting kinds first, a divider,
-// then the geometry categories. Either group may be empty.
+// One right-hand widget, right below the layer switcher: the land border (B)
+// first, then the fitting kinds, a divider, the page's geometry categories and
+// finally the elevation heatmap toggle.
 function setupMapFilterWidget(targetMap, filterKeys, componentCategories, listener, enabledKeys) {
     const geometryCategories = FILTER_CATEGORIES.filter(function(category) {
         return (filterKeys || []).indexOf(category.key) !== -1;
     });
     const fittingCategories = componentCategories || [];
-    if (!geometryCategories.length && !fittingCategories.length && !elevationHeatmapConfig) return;
+    // B (border land) is offered by every map, even when the page does not list
+    // it, and it is always the first icon in the widget.
+    const borderCategory = geometryCategories.find(function(category) {
+        return category.key === 'boundary';
+    }) || filterCategoryFor('boundary');
+    const otherGeometryCategories = geometryCategories.filter(function(category) {
+        return category.key !== 'boundary';
+    });
 
     componentFilterListener = listener || null;
     fittingCategories.forEach(function(category) {
@@ -543,9 +553,15 @@ function setupMapFilterWidget(targetMap, filterKeys, componentCategories, listen
         fittingCategories.forEach(function(category) {
             componentFilterState[category.key] = startingKeys.indexOf(category.key) !== -1;
         });
+        // The land border is offered even when the page does not list it: a lazy
+        // map that did not ask for it must start with B switched off, or the
+        // first press would switch it off instead of loading it.
+        filterState['boundary'] = startingKeys.indexOf('boundary') !== -1;
     }
 
-    const control = L.control({ position: 'topleft' });
+    // Right side, under the layer icon: the two display toggles share a column
+    // and the left column belongs to the action buttons.
+    const control = L.control({ position: 'topright' });
     control.onAdd = function() {
         const group = L.DomUtil.create('div', 'leaflet-bar map-filter-widget');
         L.DomEvent.disableClickPropagation(group);
@@ -554,6 +570,37 @@ function setupMapFilterWidget(targetMap, filterKeys, componentCategories, listen
         const head = L.DomUtil.create('div', 'map-filter-head', group);
         head.innerHTML = '<i class="bi bi-funnel"></i>';
         head.title = 'Map filters / عوامل تصفية الخريطة';
+
+        function addGeometryButton(category) {
+            const button = L.DomUtil.create('button', 'geometry-map-select-button map-filter-button', group);
+            const visible = filterState[category.key] !== false;
+            button.type = 'button';
+            button.textContent = category.letter;
+            button.title = (visible ? 'Hide ' : 'Show ') + category.label;
+            button.setAttribute('aria-label', 'Toggle ' + category.label);
+            button.setAttribute('aria-pressed', String(visible));
+            button.dataset.filterKey = category.key;
+            button.classList.toggle('active', visible);
+            L.DomEvent.on(button, 'click', function(event) {
+                L.DomEvent.stop(event);
+                filterState[category.key] = !filterState[category.key];
+                const visible = filterState[category.key];
+                button.classList.toggle('active', visible);
+                button.setAttribute('aria-pressed', String(visible));
+                button.title = (visible ? 'Hide ' : 'Show ') + category.label;
+                if (visible && lazyGeometry) {
+                    loadFilterCategory(category, button).then(function() {
+                        // The user may have switched it off again while loading.
+                        applyGeometryFilter(category.key, filterState[category.key] !== false);
+                    });
+                } else {
+                    applyGeometryFilter(category.key, visible);
+                }
+            });
+        }
+
+        // First icon of the group on every map.
+        if (borderCategory) addGeometryButton(borderCategory);
 
         fittingCategories.forEach(function(category) {
             const button = L.DomUtil.create('button', 'geometry-map-select-button map-filter-button', group);
@@ -583,48 +630,18 @@ function setupMapFilterWidget(targetMap, filterKeys, componentCategories, listen
             });
         });
 
-        if (fittingCategories.length && geometryCategories.length) {
+        if (fittingCategories.length && otherGeometryCategories.length) {
             L.DomUtil.create('div', 'map-filter-divider', group);
         }
 
-        geometryCategories.forEach(function(category) {
-            const button = L.DomUtil.create('button', 'geometry-map-select-button map-filter-button', group);
-            const visible = filterState[category.key] !== false;
-            button.type = 'button';
-            button.textContent = category.letter;
-            button.title = (visible ? 'Hide ' : 'Show ') + category.label;
-            button.setAttribute('aria-label', 'Toggle ' + category.label);
-            button.setAttribute('aria-pressed', String(visible));
-            button.dataset.filterKey = category.key;
-            button.classList.toggle('active', visible);
-            L.DomEvent.on(button, 'click', function(event) {
-                L.DomEvent.stop(event);
-                filterState[category.key] = !filterState[category.key];
-                const visible = filterState[category.key];
-                button.classList.toggle('active', visible);
-                button.setAttribute('aria-pressed', String(visible));
-                button.title = (visible ? 'Hide ' : 'Show ') + category.label;
-                if (visible && lazyGeometry) {
-                    loadFilterCategory(category, button).then(function() {
-                        // The user may have switched it off again while loading.
-                        applyGeometryFilter(category.key, filterState[category.key] !== false);
-                    });
-                } else {
-                    applyGeometryFilter(category.key, visible);
-                }
-            });
-        });
+        otherGeometryCategories.forEach(addGeometryButton);
 
         if (elevationHeatmapConfig) {
-            // The toggle sits in the widget's header, next to the funnel: as a
-            // grid cell it would add a row and push the last category buttons
-            // under the scale bar on a short map.
-            head.style.display = 'flex';
-            head.style.alignItems = 'center';
-            head.style.justifyContent = 'center';
-            head.style.gap = '4px';
+            // The elevation heatmap is one more icon in the filter group, after
+            // the categories, so every display toggle lives in the same widget.
             const label = 'Elevation Heatmap / خريطة الارتفاع';
-            const button = L.DomUtil.create('button', 'map-filter-elevation-button', head);
+            const button = L.DomUtil.create('button',
+                'geometry-map-select-button map-filter-button map-filter-elevation-button', group);
             button.type = 'button';
             button.innerHTML = '<i class="bi bi-thermometer-half"></i>';
             button.title = (elevationHeatmapVisible ? 'Hide ' : 'Show ') + label;
@@ -683,6 +700,29 @@ function setupMapFilterWidget(targetMap, filterKeys, componentCategories, listen
     };
     control.addTo(targetMap);
 
+    // One button per row makes a long strip: cap it to the map height so the
+    // last toggles never run past the bottom edge (the widget scrolls instead).
+    const widget = control.getContainer();
+    if (widget) {
+        const fitWidgetHeight = function() {
+            const container = targetMap.getContainer();
+            const mapTop = container.getBoundingClientRect().top;
+            const widgetTop = widget.getBoundingClientRect().top - mapTop;
+            widget.style.maxHeight = Math.max(120, container.clientHeight - widgetTop - 12) + 'px';
+            widget.style.overflowY = 'auto';
+        };
+        fitWidgetHeight();
+        targetMap.on('resize', fitWidgetHeight);
+        window.addEventListener('resize', fitWidgetHeight);
+        // The map box itself can change without a Leaflet resize (a full-page
+        // map under a wrapping nav), so watch its real size too.  The observer
+        // is kept on the widget so it is never collected while observing.
+        if (typeof ResizeObserver === 'function') {
+            widget._fitResizeObserver = new ResizeObserver(fitWidgetHeight);
+            widget._fitResizeObserver.observe(targetMap.getContainer());
+        }
+    }
+
     applyAllGeometryFilters();
     applyAllComponentFilters(fittingCategories);
 }
@@ -734,6 +774,9 @@ function syncFilterButtons() {
     const buttons = document.querySelectorAll('.map-filter-button[data-filter-key]');
     Array.prototype.forEach.call(buttons, function(button) {
         const key = button.dataset.filterKey;
+        // The elevation toggle owns its own state (it is a heatmap layer, not a
+        // geometry category), so a scope change must not repaint it.
+        if (key === 'elevation') return;
         // Fitting kinds own their buttons even when a geometry category shares
         // the key (connector, reduction, air_release, ...).
         const ownedByFitting = (currentComponentFilters || [])
@@ -1151,7 +1194,8 @@ function initMap(elementId, geojsonUrl, options = {}) {
     // trees carry one.
     map.on('zoomend moveend', syncTreeLabels);
 
-    // Optional left-hand filter widget (valve kinds and/or geometry categories).
+    // Optional filter widget (valve kinds and/or geometry categories), placed
+    // under the layer switcher on the right.
     const geometryFilters = Array.isArray(options.mapFilters) ? options.mapFilters : [];
     const componentFilters = Array.isArray(options.componentFilters) ? options.componentFilters : [];
     currentComponentFilters = componentFilters;
@@ -1164,13 +1208,13 @@ function initMap(elementId, geojsonUrl, options = {}) {
     }
 
     // The label widget would repeat the geometry buttons, so a page that filters
-    // geometry on the left gets no second set on the right.
+    // geometry gets no second set of toggles in the same column.
     if (!geometryFilters.length) {
         setupLabelToggleWidget(map, labelTypes);
     }
 
     if (options.selectable) {
-        const selectionControl = L.control({ position: 'topright' });
+        const selectionControl = L.control({ position: 'topleft' });
         selectionControl.onAdd = function() {
             const container = L.DomUtil.create('div', 'leaflet-bar geometry-map-select');
             const button = L.DomUtil.create('button', 'geometry-map-select-button', container);
@@ -1194,7 +1238,7 @@ function initMap(elementId, geojsonUrl, options = {}) {
         // Action buttons (Split / Merge / Swap) live in their own group below Select
         const actions = buildMapActionButtons(options);
         if (actions.length) {
-            const actionsControl = L.control({ position: 'topright' });
+            const actionsControl = L.control({ position: 'topleft' });
             actionsControl.onAdd = function() {
                 const group = L.DomUtil.create('div', 'leaflet-bar geometry-map-select geometry-map-actions');
                 L.DomEvent.disableClickPropagation(group);
@@ -1452,7 +1496,7 @@ function createMapActionPanel(options) {
     mapActionConfig.checkboxSelector = options.selectable.checkboxSelector;
     const splitOptions = mapActionConfig.splitOptions || [2, 3, 4];
 
-    const control = L.control({ position: 'topright' });
+    const control = L.control({ position: 'topleft' });
     control.onAdd = function() {
         const panel = L.DomUtil.create('div', 'geometry-map-split-panel');
         panel.hidden = true;
@@ -1477,6 +1521,11 @@ function createMapActionPanel(options) {
         return panel;
     };
     control.addTo(map);
+    // Float the panel beside the toolbar instead of stacking it in the column:
+    // on a 500px map card the stack would otherwise push the last buttons off
+    // the bottom edge.
+    const panelControl = control.getContainer();
+    if (panelControl) panelControl.classList.add('map-action-panel-control');
 }
 
 function closeMapActionPanel() {

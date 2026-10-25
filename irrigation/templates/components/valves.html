@@ -408,7 +408,11 @@ document.addEventListener('DOMContentLoaded', function() {
             { key: 'zone_valve', letter: 'VZ', label: 'Zone Valve / صمام المنطقة', types: ['zone_valve'] }
         ],
         onComponentFilterChange: function (type, show) { setValveTypeVisible(type, show); },
-        mapDelete: { onClick: valvesRemoveSelected }
+        mapDelete: { onClick: valvesRemoveSelected },
+        elevationHeatmap: {
+            url: '{{ url_for("engineering.elevation_heatmap", project_id=project.id) }}',
+            ramp: 'blue-red'
+        }
     });
 
     document.addEventListener('change', function(event) {

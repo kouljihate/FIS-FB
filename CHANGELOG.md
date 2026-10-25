@@ -1,5 +1,101 @@
 # Changelog
 
+## 0.4.49 - 2026-10-25
+
+### Changed
+- `CHANGELOG.md` (M)
+- `OPENCODE.md` (M)
+- `README.md` (M)
+- `config.py` (M)
+- `irrigation/__init__.py` (M)
+- `irrigation/auth/routes.py` (M)
+- `irrigation/geometry/routes.py` (M)
+- `irrigation/hydrology/routes.py` (M)
+- `irrigation/project/routes.py` (M)
+- `irrigation/static/css/app.css` (M)
+- `irrigation/static/js/map.js` (M)
+- `irrigation/static/js/pipe_editor.js` (M)
+- `irrigation/templates/auth/login.html` (M)
+- `irrigation/templates/components/component_tab.html` (M)
+- `irrigation/templates/components/valves.html` (M)
+- `irrigation/templates/engineering/validation.html` (M)
+- `irrigation/templates/geometry/sectors.html` (M)
+- `irrigation/templates/geometry/zones.html` (M)
+- `irrigation/templates/hydrology/_pipe_rules.html` (M)
+- `irrigation/templates/hydrology/main_pipe.html` (M)
+- `irrigation/templates/hydrology/second_pipe.html` (M)
+- `irrigation/templates/hydrology/sub_pipe.html` (M)
+- `irrigation/templates/hydrology2/network.html` (M)
+- `irrigation/templates/hydrology2/valves.html` (M)
+- `irrigation/templates/overview/index.html` (M)
+- `irrigation/templates/project/detail.html` (M)
+- `irrigation/templates/project/index.html` (M)
+- `irrigation/templates/trees/rows.html` (M)
+- `irrigation/templates/trees/trees.html` (M)
+- `irrigation/engineering/boundaries.py` (??)
+- `irrigation/static/img/trianglify10.png` (??)
+- `irrigation/utils/whatsapp.py` (??)
+
+## 0.4.48 - 2026-10-24
+
+### Added
+- A circular Adjust button on the Main Pipe, Second Pipe and Zone Pipe pages (Pipes -> MP / SP / ZP) re-routes every pipe of that page along the boundary lines: the Main and Second Pipes follow the land and sector borders, the Zone Pipes also follow the zone borders
+- Each pipe keeps the two ends it had, so the connection to the water source, to the Main Pipe or to the zone it feeds does not move; only the path between those ends is rebuilt on the borders
+- The new route stays as close as possible to the pipe it replaces, so a pipe already on a border keeps its shape, and pressing Adjust again changes nothing (the page reports that every pipe already follows the boundaries)
+- The page reports how many pipes were adjusted and the total length before and after, and the cached AI piping report is dropped because the lengths changed
+
+## 0.4.47 - 2026-10-24
+
+### Changed
+- The Rules card on every Pipes page (Main Pipe, Sub Pipe, Second Pipe and DripLine) starts collapsed; the caret still expands and collapses it, and its chevron now points down until it is opened
+
+## 0.4.46 - 2026-10-24
+
+### Changed
+- The fixed header uses the trianglify10 background image, with a light veil so the dark navigation text stays readable
+
+## 0.4.45 - 2026-10-24
+
+### Fixed
+- The Projects table Owner column showed the account that created the project instead of the owner recorded in the project settings, so a project created by a Project Admin displayed the admin's name
+
+## 0.4.44 - 2026-10-24
+
+### Added
+- WhatsApp delivery through Blueticks (https://blueticks.co): the Forget Password flow now sends the single-use temporary password to the phone number saved on the account, in addition to the e-mail
+- A WhatsApp composer on the project page sends a direct message to the Project Admin or to the Owner, using the phone numbers already saved for them
+- Local numbers are completed with `WHATSAPP_DEFAULT_COUNTRY_CODE` (216 by default), and international numbers written with `+` or `00` are accepted
+- The API key is read from `BLUETICKS_API_KEY`; `.env` at the project root is now loaded on startup (git ignores it), and without a key the message is written to the server log like the SMTP fallback
+
+## 0.4.43 - 2026-10-24
+
+### Fixed
+- Sectors → Arrange now fills the land instead of leaving empty strips: every sector grows into the land nobody claimed until it meets its neighbours and the land border, so the sectors really sit side by side
+- A sector stays one plot: land that only touches a sector at a corner is joined to the sector it actually borders instead of becoming a detached island of that sector
+- Arrange repairs sectors into single valid polygons (never a MultiPolygon or a self-intersecting ring), and running it twice changes nothing
+
+## 0.4.42 - 2026-10-24
+
+### Changed
+- The map filter group is one column now: one circle button per row, B first and the elevation heatmap last
+- The filter column is capped to the map height and scrolls when the map is short, so every toggle stays reachable; the cap follows map resizes and fullscreen
+
+## 0.4.41 - 2026-10-24
+
+### Changed
+- The land border (B) is the first icon of the map filter group on every map, including the maps that did not offer it before
+- The elevation heatmap toggle is part of the filter group on every map; the separate elevation button and the filter-header button are gone
+- Maps that ask the API for sectors and zones now also load the land border, so the B toggle has a border to show
+- The Map Overview and Project maps start with B switched off (their geometry loads on demand) and fetch the border on its first press
+
+## 0.4.40 - 2026-10-24
+
+### Changed
+- The map filter funnel now sits on the right side, directly below the layer switcher, on every map
+- Map action widgets (Select, Add, Edit, Rename, Remove, Split, Merge, Swap, the pipe editor buttons and the overview object toolbar) are grouped on the left side
+- Legends keep the bottom-right corner alone, including the elevation gradient and the sector / water source key
+- The Map Overview object toolbar sits above the sector list, so the long list never pushes Edit / Rename / Delete out of reach
+
 ## 0.4.39 - 2026-10-24
 
 ### Changed

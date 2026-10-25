@@ -204,7 +204,11 @@ document.addEventListener('DOMContentLoaded', function() {
     initMap('map', geojsonUrl, {
         center: [34.0, -6.0], zoom: 14,
         selectable: { type: ['master_valve', 'sector_valve', 'zone_valve'], checkboxSelector: '.valve-checkbox', toggleOnClick: true },
-        mapDelete: { onClick: valvesRemoveSelected }
+        mapDelete: { onClick: valvesRemoveSelected },
+        elevationHeatmap: {
+            url: '{{ url_for("engineering.elevation_heatmap", project_id=project.id) }}',
+            ramp: 'blue-red'
+        }
     });
 
     document.addEventListener('change', function(event) {

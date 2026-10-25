@@ -153,7 +153,11 @@ document.addEventListener('DOMContentLoaded', function() {
     initMap('map', geojsonUrl, {
         center: [34.0, -6.0], zoom: 14,
         selectable: { type: ['check_valve', 'air_release', 'pressure_reducer', 'reduction', 'other'], checkboxSelector: '.net-checkbox', toggleOnClick: true },
-        mapDelete: { onClick: networkRemoveSelected }
+        mapDelete: { onClick: networkRemoveSelected },
+        elevationHeatmap: {
+            url: '{{ url_for("engineering.elevation_heatmap", project_id=project.id) }}',
+            ramp: 'blue-red'
+        }
     });
 
     document.addEventListener('change', function(event) {

@@ -13,6 +13,7 @@ from irrigation.auth.user import User
 from irrigation.extensions import mongo
 from irrigation.models import get_next_id
 from irrigation.utils.mailer import send_email
+from irrigation.utils.whatsapp import send_whatsapp
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -46,6 +47,27 @@ def _temporary_password_email(user_doc, password):
         'تُستعمل كلمة المرور هذه مرة واحدة فقط: بعد الدخول سيُطلب منك اختيار '
         'كلمة مرور جديدة.\n'
         'إذا لم تطلب ذلك، تجاهل هذه الرسالة.\n'
+        % (name, username, password, name, username, password)
+    )
+
+
+def _temporary_password_whatsapp(user_doc, password):
+    """Short bilingual WhatsApp copy carrying the temporary password."""
+    name = user_doc.get('full_name') or user_doc.get('username') or ''
+    username = user_doc.get('username') or ''
+    return (
+        'Hello %s,\n\n'
+        'Your one-time password for the Irrigation Planner account (%s) is:\n\n'
+        '    %s\n\n'
+        'Use it once: after signing in you will be asked to choose a new '
+        'password.\n'
+        'If you did not ask for it, ignore this message.\n\n'
+        '---\n\n'
+        'مرحبا %s،\n\n'
+        'كلمة المرور المؤقتة لحسابك في نظام تخطيط الري (%s):\n\n'
+        '    %s\n\n'
+        'تُستعمل مرة واحدة فقط: بعد الدخول سيُطلب منك اختيار كلمة مرور جديدة.\n'
+        'إذا لم تطلب ذلك، تجاهل هذه الرسالة.'
         % (name, username, password, name, username, password)
     )
 
@@ -327,17 +349,33 @@ def forgot_password():
 
     status = send_email(email, 'Temporary password / كلمة مرور مؤقتة',
                         _temporary_password_email(user_doc, temporary))
+    whatsapp_status = None
+    if user_doc.get('phone'):
+        # The same one-time password also goes to the saved WhatsApp number.
+        whatsapp_status, _ = send_whatsapp(
+            user_doc['phone'], _temporary_password_whatsapp(user_doc, temporary))
+
+    delivered = []
     if status == 'sent':
-        flash('A temporary password has been sent to %s / تم إرسال كلمة مرور '
-              'مؤقتة إلى %s' % (email, email), 'success')
-    elif status == 'logged':
-        flash('SMTP is not configured, so the temporary password was written to '
-              'the server log / لم يُعد البريد، لذا كُتبت كلمة المرور المؤقتة في '
-              'سجل الخادم', 'info')
+        delivered.append('email')
+    if whatsapp_status == 'sent':
+        delivered.append('whatsapp')
+
+    if delivered:
+        labels_en = {'email': 'e-mail', 'whatsapp': 'WhatsApp'}
+        labels_ar = {'email': 'البريد الإلكتروني', 'whatsapp': 'واتساب'}
+        flash('A temporary password has been sent by %s / تم إرسال كلمة مرور '
+              'مؤقتة عبر %s'
+              % (', '.join(labels_en[c] for c in delivered),
+                 '، '.join(labels_ar[c] for c in delivered)), 'success')
+    elif status == 'logged' or whatsapp_status == 'logged':
+        flash('Delivery is not configured, so the temporary password was '
+              'written to the server log / لم تُضبط وسيلة الإرسال، لذا كُتبت '
+              'كلمة المرور المؤقتة في سجل الخادم', 'info')
     else:
-        flash('The e-mail could not be sent; the temporary password was written '
-              'to the server log / تعذر إرسال البريد، وكُتبت كلمة المرور المؤقتة '
-              'في سجل الخادم', 'warning')
+        flash('The temporary password could not be sent; it was written to the '
+              'server log / تعذر إرسال كلمة المرور المؤقتة، وكُتبت في سجل '
+              'الخادم', 'warning')
     return redirect(url_for('auth.login', tab='forgot'))
 
 

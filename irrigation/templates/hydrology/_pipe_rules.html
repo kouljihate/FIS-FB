@@ -7,12 +7,12 @@
         <span class="ar-text" lang="ar">/ {{ rules_title_ar | default('قواعد') }}</span>
         <button class="btn btn-sm btn-light py-0 px-1 rules-toggle" type="button"
                 data-bs-toggle="collapse" data-bs-target="#{{ rid }}"
-                aria-expanded="true" aria-controls="{{ rid }}"
-                title="Collapse / Expand / طي">
+                aria-expanded="false" aria-controls="{{ rid }}"
+                title="Expand / Collapse / طي">
             <i class="bi bi-chevron-up"></i>
         </button>
     </div>
-    <div class="collapse show" id="{{ rid }}">
+    <div class="collapse" id="{{ rid }}">
         <div class="card-body bg-light">
             <ol class="mb-0 ps-3 small">
                 {% for rule in pipe_rules %}

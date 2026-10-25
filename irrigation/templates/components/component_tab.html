@@ -371,7 +371,11 @@ document.addEventListener('DOMContentLoaded', function() {
               label: '{{ tab.title_en }} / {{ tab.title_ar }}', types: [elementType] }
         ],
         onComponentFilterChange: function (type, show) { setComponentTypeVisible(type, show); },
-        mapDelete: { onClick: componentRemoveSelected, title: 'Remove / إزالة' }
+        mapDelete: { onClick: componentRemoveSelected, title: 'Remove / إزالة' },
+        elevationHeatmap: {
+            url: '{{ url_for("engineering.elevation_heatmap", project_id=project.id) }}',
+            ramp: 'blue-red'
+        }
     });
 
     document.addEventListener('change', function(event) {

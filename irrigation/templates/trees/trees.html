@@ -480,7 +480,11 @@ document.addEventListener('DOMContentLoaded', function() {
     initMap('map', geojsonUrl, {
         center: [34.0, -6.0], zoom: 14,
         selectable: { type: 'tree', checkboxSelector: '.tree-checkbox', toggleOnClick: true },
-        mapDelete: { onClick: treesRemoveSelected }
+        mapDelete: { onClick: treesRemoveSelected },
+        elevationHeatmap: {
+            url: '{{ url_for("engineering.elevation_heatmap", project_id=project.id) }}',
+            ramp: 'blue-red'
+        }
     });
 
     // Initialize tree pagination

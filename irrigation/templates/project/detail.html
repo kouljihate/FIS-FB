@@ -202,6 +202,61 @@
                     </div>
             </div>
         </div>
+        <!-- WhatsApp direct message: project admin or owner -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-success text-white">
+                <div class="row">
+                    <div class="col text-start" style="flex: 0 0 25%; max-width: 25%;">
+                        <i class="bi bi-whatsapp"></i> WhatsApp
+                    </div>
+                    <div class="col text-center" style="flex: 0 0 50%; max-width: 50%;"></div>
+                    <div class="col text-end ar-text" style="flex: 0 0 25%; max-width: 25%;">واتساب</div>
+                </div>
+            </div>
+            <div class="card-body">
+                <form method="POST"
+                      action="{{ url_for('project.whatsapp_message', project_id=project.id) }}"
+                      class="row g-2 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label" for="whatsapp-target">Send to / إرسال إلى</label>
+                        <select name="target" id="whatsapp-target" class="form-select">
+                            <option value="admin"{% if not project_admin or not project_admin.phone %} disabled{% endif %}>
+                                Project Admin / مسؤول المشروع{% if project_admin %} — {{ project_admin.full_name or project_admin.username }}{% if project_admin.phone %} ({{ project_admin.phone }}){% endif %}{% endif %}
+                            </option>
+                            <option value="owner"{% if not spec.owner.phone %} disabled{% endif %}>
+                                Owner / المالك{% if spec.owner.name %} — {{ spec.owner.name }}{% endif %}{% if spec.owner.phone %} ({{ spec.owner.phone }}){% endif %}
+                            </option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="whatsapp-message">Message / الرسالة</label>
+                        <textarea name="message" id="whatsapp-message" class="form-control"
+                                  rows="2" maxlength="1000" required
+                                  placeholder="Write a direct message / اكتب رسالة مباشرة"></textarea>
+                    </div>
+                    <div class="col-md-2 d-grid">
+                        <button type="submit" class="btn btn-success"{% if not whatsapp_ready %} disabled{% endif %}>
+                            <i class="bi bi-send"></i> Send / إرسال
+                        </button>
+                    </div>
+                </form>
+                {% if not whatsapp_ready %}
+                <p class="small text-muted mb-0 mt-2">
+                    WhatsApp is not configured: set BLUETICKS_API_KEY and restart the application.
+                    <span class="ar-text" lang="ar">
+                        واتساب غير مُعدّ: اضبط BLUETICKS_API_KEY ثم أعد تشغيل التطبيق.
+                    </span>
+                </p>
+                {% elif not (project_admin and project_admin.phone) and not spec.owner.phone %}
+                <p class="small text-muted mb-0 mt-2">
+                    Add a phone number to the Project Admin or to the Owner before sending.
+                    <span class="ar-text" lang="ar">
+                        أضف رقم هاتف لمسؤول المشروع أو للمالك قبل الإرسال.
+                    </span>
+                </p>
+                {% endif %}
+            </div>
+        </div>
         <div class="row mb-2">
             <div class="col-md-6">
                 <div class="card shadow-sm h-100">
@@ -861,18 +916,20 @@ document.addEventListener('DOMContentLoaded', function() {
     // The Project tab shows the drawing itself: sector outlines, water sources
     // and the terrain.  Zones, rows, trees, pipes and fittings have their own
     // tabs; drawing them all here buried the layout under the network.
-    const projectMap = initMap('projectMap', geojsonUrl, {
+    initMap('projectMap', geojsonUrl, {
         center: [34.0, -6.0],
         zoom: 16,
         labelTypes: ['sector'],
-        mapFilters: ['sector', 'water_source', 'elevation'],
-        mapFiltersOn: ['sector', 'water_source', 'elevation'],
-        lazyFilters: true
+        mapFilters: ['sector', 'water_source'],
+        mapFiltersOn: ['sector', 'water_source'],
+        lazyFilters: true,
+        // Terrain surface from the cached elevation model: its toggle sits in
+        // the map filter group, and it stays inert until the model is fetched.
+        elevationHeatmap: {
+            url: '{{ url_for("engineering.elevation_heatmap", project_id=project.id) }}',
+            ramp: 'blue-red'
+        }
     });
-
-    // Terrain surface from the cached elevation model (Engineering → Fetch
-    // Elevation fills it; until then the toggle stays inert).
-    addElevationHeatmap(projectMap, '{{ url_for("engineering.elevation_heatmap", project_id=project.id) }}');
 
     // Elevation has its own gradient legend (bottom right), so this one only
     // names the two drawn layers.

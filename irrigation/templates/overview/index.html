@@ -48,33 +48,6 @@
         padding: 0.3rem;
     }
 
-    /* Elevation heatmap toggle, in the filter widget header (see map.js). */
-    .map-filter-head .map-filter-elevation-button {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 20px;
-        height: 20px;
-        padding: 0;
-        border: 1px solid rgba(0, 0, 0, 0.2);
-        border-radius: 50%;
-        background: #f8f9fa;
-        color: #adb5bd;
-        font-size: 11px;
-        line-height: 1;
-    }
-
-    .map-filter-head .map-filter-elevation-button.active {
-        background: #0d6efd;
-        border-color: #0d6efd;
-        color: #fff;
-    }
-
-    .map-filter-head .map-filter-elevation-button.map-filter-loading {
-        animation: map-filter-pulse 1s ease-in-out infinite;
-        cursor: progress;
-    }
-
     .map-overview-panel .panel-title {
         display: block;
         padding: 0.1rem 0.25rem 0.25rem;
@@ -90,8 +63,8 @@
         display: flex;
         flex-direction: column;
         gap: 0.2rem;
-        /* The filter widget sits above this panel in the same corner: keep the
-           list short enough that both stay inside the map. */
+        /* The Select and object buttons sit above this panel in the same corner:
+           keep the list short enough that they stay inside the map. */
         max-height: min(56vh, calc(100vh - 600px));
         min-height: 3.5rem;
         overflow-y: auto;
@@ -413,8 +386,10 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    buildSectorControl();
+    // Action widgets first on the left column (Select, then Edit / Rename /
+    // Delete), so the long sector list never pushes them out of reach.
     buildObjectControl();
+    buildSectorControl();
     buildStatisticsControl();
     setupObjectToolbar();
     document.body.classList.add('map-overview-ready');
@@ -560,7 +535,10 @@ function describeObject(properties) {
 }
 
 function buildObjectControl() {
-    const control = L.control({ position: 'topright' });
+    // Action buttons (Edit / Rename / Delete): left side, with the map's Select
+    // button.  The right column keeps the filters and the bottom right the
+    // legends.
+    const control = L.control({ position: 'topleft' });
     control.onAdd = function () {
         const panel = L.DomUtil.create('div', 'map-overview-panel');
         L.DomEvent.disableClickPropagation(panel);

@@ -8,6 +8,7 @@ from irrigation.access import (ROLE_PROJECT_ADMIN, find_project,
 from irrigation.extensions import mongo
 from irrigation.models import get_next_id, serialize_doc
 from irrigation.utils.kml import parse_kml_content, parse_kmz_file, export_project_to_kml
+from irrigation.utils.whatsapp import send_whatsapp, whatsapp_configured
 from bson import ObjectId
 
 project_bp = Blueprint('project', __name__)
@@ -266,9 +267,12 @@ def index():
     }
     for p in projects:
         spec_owner = (p.get('spec') or {}).get('owner') or {}
+        # The owner is the person recorded in the project settings.  The account
+        # that created the project is only a fallback: a Project Admin often
+        # creates the project on behalf of the landowner.
         p['owner_name'] = (
-            owners.get(int(p.get('user_id') or 0))
-            or spec_owner.get('name')
+            spec_owner.get('name')
+            or owners.get(int(p.get('user_id') or 0))
             or ''
         )
         p['_id'] = str(p['_id'])
@@ -386,6 +390,7 @@ def detail(project_id):
                            project=project,
                            project_admin=project_admin,
                            project_admins=_project_admins(),
+                           whatsapp_ready=whatsapp_configured(),
                            spec=spec,
                            sectors=sectors,
                            zones=zones,
@@ -434,6 +439,66 @@ def settings(project_id):
         {'$set': update_fields}
     )
     flash('Project settings saved / تم حفظ إعدادات المشروع', 'success')
+    return redirect(url_for('project.detail', project_id=project_id))
+
+
+def _whatsapp_recipient(project, target):
+    """Phone and display name of the project admin or of the owner."""
+    if target == 'admin':
+        admin = mongo.db.users.find_one({'id': int(project.get('admin_user_id') or 0)})
+        if not admin:
+            return None, ''
+        return admin.get('phone'), admin.get('full_name') or admin.get('username') or ''
+    owner = (project.get('spec') or {}).get('owner') or {}
+    return owner.get('phone'), owner.get('name') or ''
+
+
+@project_bp.route('/<int:project_id>/whatsapp', methods=['POST'])
+@login_required
+def whatsapp_message(project_id):
+    """Send a direct WhatsApp message to the project admin or the owner."""
+    project = require_project(project_id)
+    if not project:
+        return redirect(url_for('project.index'))
+
+    target = request.form.get('target', '').strip().lower()
+    message = request.form.get('message', '').strip()
+    if target not in ('admin', 'owner'):
+        flash('Choose who receives the message / اختر مستلم الرسالة', 'danger')
+        return redirect(url_for('project.detail', project_id=project_id))
+    if not message:
+        flash('Write the message first / اكتب الرسالة أولاً', 'warning')
+        return redirect(url_for('project.detail', project_id=project_id))
+    if len(message) > 1000:
+        flash('The message is limited to 1000 characters / الرسالة محدودة '
+              'بـ 1000 حرف', 'warning')
+        return redirect(url_for('project.detail', project_id=project_id))
+
+    phone, name = _whatsapp_recipient(project, target)
+    if not phone:
+        role_en = 'Project Admin' if target == 'admin' else 'Owner'
+        role_ar = 'مسؤول المشروع' if target == 'admin' else 'المالك'
+        flash('No phone number is saved for the %s / لا يوجد رقم هاتف محفوظ '
+              'لـ%s' % (role_en, role_ar), 'warning')
+        return redirect(url_for('project.detail', project_id=project_id))
+
+    status, detail = send_whatsapp(phone, message)
+    role_en = 'Project Admin' if target == 'admin' else 'Owner'
+    role_ar = 'مسؤول المشروع' if target == 'admin' else 'المالك'
+    if status == 'sent':
+        flash('WhatsApp message sent to the %s (%s) / تم إرسال رسالة واتساب '
+              'إلى %s' % (role_en, name or phone, role_ar), 'success')
+    elif status == 'logged':
+        flash('WhatsApp is not configured, so the message was written to the '
+              'server log / لم يُضبط واتساب، لذا كُتبت الرسالة في سجل الخادم',
+              'info')
+    elif status == 'invalid':
+        flash('The %s phone number is not usable for WhatsApp (%s) / رقم %s '
+              'غير صالح لواتساب' % (role_en, detail, role_ar), 'danger')
+    else:
+        flash('The WhatsApp message to the %s could not be sent: %s / تعذر '
+              'إرسال رسالة واتساب إلى %s: %s'
+              % (role_en, detail, role_ar, detail), 'danger')
     return redirect(url_for('project.detail', project_id=project_id))
 
 

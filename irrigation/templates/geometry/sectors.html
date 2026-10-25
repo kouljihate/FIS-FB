@@ -56,9 +56,9 @@
                             {% if sectors|length >= 1 %}
                             <form method="POST" action="{{ url_for('geometry.sector_arrange', project_id=project.id) }}"
                                   class="d-inline"
-                                  data-confirm="Arrange will clip every sector to the land boundary and remove the overlaps between sectors. Continue? / سيقص الترتيب كل قطاع على حدود الأرض ويزيل التداخلات بين القطاعات. متابعة؟">
+                                  data-confirm="Arrange will clip every sector to the land boundary, remove the overlaps and extend the sectors into the remaining land so they meet each other and the boundary. Continue? / سيقص الترتيب كل قطاع على حدود الأرض، ويزيل التداخلات، ويوسع القطاعات في الأرض المتبقية حتى تتلاصق مع بعضها ومع الحدود. متابعة؟">
                                 <button type="submit" class="btn btn-circle btn-sm btn-outline-success"
-                                        title="Arrange: clip every sector to the land boundary and fix the overlaps / ترتيب: قص كل قطاع على حدود الأرض وإصلاح التداخلات">
+                                        title="Arrange: clip to the boundary, remove overlaps and fill the gaps between sectors / ترتيب: قص على الحدود، إزالة التداخلات وملء الفراغات بين القطاعات">
                                     <i class="bi bi-bounding-box-circles"></i>
                                 </button>
                             </form>
@@ -523,7 +523,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const geojsonUrl = '{{ url_for("api.get_geometry", project_id=project.id) }}';
-    const geometryMap = initMap('map', geojsonUrl + '?types=sector,zone', {
+    initMap('map', geojsonUrl + '?types=sector,zone,boundary', {
         center: [34.0, -6.0],
         zoom: 14,
         editor: true,
@@ -542,6 +542,11 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         },
         mapDelete: { onClick: removeSelectedSectors },
+        // The heatmap toggle sits inside the map filter group (see map.js).
+        elevationHeatmap: {
+            url: '{{ url_for("engineering.elevation_heatmap", project_id=project.id) }}',
+            ramp: 'blue-red'
+        },
         onDrawCreated: function(layer, layerType) {
             if (layerType !== 'polygon') return;
             const coords = layer.toGeoJSON().geometry.coordinates[0];
@@ -549,9 +554,6 @@ document.addEventListener('DOMContentLoaded', function() {
             bootstrap.Modal.getOrCreateInstance(document.getElementById('addSectorModal')).show();
         }
     });
-    addElevationHeatmap(geometryMap,
-        '{{ url_for("engineering.elevation_heatmap", project_id=project.id) }}',
-        { ramp: 'blue-red' });
 
     // Merge modal: collect selected sector IDs
     document.getElementById('mergeModal').addEventListener('show.bs.modal', function() {

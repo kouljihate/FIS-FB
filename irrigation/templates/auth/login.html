@@ -37,12 +37,14 @@
                     <div class="tab-pane fade {{ 'show active' if active_tab == 'forgot' else '' }}" id="forgot-pane" role="tabpanel" aria-labelledby="forgot-tab" tabindex="0">
                         <form method="POST" action="{{ url_for('auth.forgot_password') }}">
                             <p class="small text-muted">
-                                Enter the e-mail address of your account: a temporary password will be sent to it.
+                                Enter the e-mail address of your account: a temporary password will be sent to it
+                                by e-mail, and to the phone saved on your profile over WhatsApp.
                                 It can be used only once — after signing in you choose a new password.
                                 <br>
                                 <span class="ar-text" lang="ar">
-                                    أدخل بريد حسابك: ستُرسل إليه كلمة مرور مؤقتة. تُستعمل مرة واحدة فقط —
-                                    بعد الدخول تختار كلمة مرور جديدة.
+                                    أدخل بريد حسابك: ستُرسل إليه كلمة مرور مؤقتة بالبريد الإلكتروني،
+                                    وإلى رقم هاتفك المحفوظ في الملف الشخصي عبر واتساب.
+                                    تُستعمل مرة واحدة فقط — بعد الدخول تختار كلمة مرور جديدة.
                                 </span>
                             </p>
                             <div class="mb-3">

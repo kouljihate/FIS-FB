@@ -85,6 +85,15 @@
                                     data-bs-target="#aiPipingModal" title="Auto Generate / إنشاء تلقائي">
                                 <i class="bi bi-magic"></i>
                             </button>
+                            <form method="POST"
+                                  action="{{ url_for('hydrology.pipe_adjust_boundaries', project_id=project.id, pipe_type='second_pipe') }}"
+                                  class="d-inline"
+                                  data-confirm="Adjust re-routes every second pipe along the land and sector boundary lines; the two ends of each pipe stay in place. Continue? / سيعيد الضبط توجيه كل أنبوب ثانوي على خطوط حدود الأرض والقطاعات، مع إبقاء طرفي كل أنبوب في مكانهما. متابعة؟">
+                                <button type="submit" class="btn btn-circle btn-sm btn-outline-success"
+                                        title="Adjust to boundaries: route every pipe along the land and sector boundaries / ضبط على الحدود: توجيه كل أنبوب على حدود الأرض والقطاعات">
+                                    <i class="bi bi-bounding-box-circles"></i>
+                                </button>
+                            </form>
                             <form method="POST" action="{{ url_for('hydrology.second_pipe_validate', project_id=project.id) }}" class="d-inline">
                                 <button type="submit" class="btn btn-circle btn-primary" title="Validate / التحقق">
                                     <i class="bi bi-check-circle"></i>

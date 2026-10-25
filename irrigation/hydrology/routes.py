@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 from flask_login import login_required, current_user
 from irrigation.extensions import mongo
 from irrigation.models import get_next_id
+from irrigation.engineering.boundaries import adjust_pipes_to_boundaries
 from irrigation.engineering.piping import (
     generate_driplines, generate_piping_structure)
 from irrigation.engineering.hydraulics import (
@@ -537,6 +538,58 @@ def pipe_remove(project_id, pipe_type):
     flash('Removed %d pipe(s) / تمت إزالة %d أنبوب' % (result.deleted_count, result.deleted_count), 'success')
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return jsonify({'ok': True, 'removed': result.deleted_count, 'ids': pipe_ids})
+    return redirect(url_for(_pipe_page_endpoint(pipe_type), project_id=project_id))
+
+
+@hydrology_bp.route('/<int:project_id>/pipe/<pipe_type>/adjust-boundaries', methods=['POST'])
+@login_required
+def pipe_adjust_boundaries(project_id, pipe_type):
+    """Route every pipe of one level along the land / sector / zone boundaries.
+
+    Every pipe of the page is adjusted at once (Pipes -> Adjust) and its two
+    ends stay where they are, so the network keeps its connections while the
+    path in between follows the boundary lines instead of cutting through the
+    blocks (see ``irrigation.engineering.boundaries``).
+    """
+    project = get_project_or_redirect(project_id)
+    if not project:
+        return redirect(url_for('project.index'))
+    if pipe_type not in ('main_pipe', 'second_pipe', 'sub_pipe'):
+        flash('Invalid pipe type / نوع أنبوب غير صالح', 'danger')
+        return redirect(url_for('hydrology.main_pipe', project_id=project_id))
+
+    try:
+        report = adjust_pipes_to_boundaries(project_id, project, pipe_type)
+    except ValueError as exc:
+        flash(str(exc), 'danger')
+        return redirect(url_for(_pipe_page_endpoint(pipe_type), project_id=project_id))
+    except Exception as exc:
+        flash('Boundary adjustment failed: %s / فشل ضبط الأنابيب على الحدود' % exc,
+              'danger')
+        return redirect(url_for(_pipe_page_endpoint(pipe_type), project_id=project_id))
+
+    scope_en = ('the land, sector and zone boundaries'
+                if pipe_type == 'sub_pipe' else 'the land and sector boundaries')
+    scope_ar = ('حدود الأرض والقطاعات والمناطق'
+                if pipe_type == 'sub_pipe' else 'حدود الأرض والقطاعات')
+
+    if not report['total']:
+        flash('No pipes to adjust yet / لا توجد أنابيب لضبطها بعد', 'warning')
+    elif report['adjusted']:
+        _invalidate_piping_report(project_id)
+        flash(
+            'Adjusted %d pipe(s) to %s: length %.1f m -> %.1f m / '
+            'تم ضبط %d أنبوب على %s: الطول %.1f م -> %.1f م'
+            % (report['adjusted'], scope_en, report['length_before_m'],
+               report['length_after_m'], report['adjusted'], scope_ar,
+               report['length_before_m'], report['length_after_m']),
+            'success')
+    elif report['skipped']:
+        flash('%d pipe(s) could not be adjusted / تعذر ضبط %d أنبوب'
+              % (report['skipped'], report['skipped']), 'warning')
+    else:
+        flash('Every pipe already follows the boundaries / '
+              'كل الأنابيب تتبع الحدود بالفعل', 'info')
     return redirect(url_for(_pipe_page_endpoint(pipe_type), project_id=project_id))
 
 

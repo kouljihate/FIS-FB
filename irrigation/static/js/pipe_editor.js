@@ -323,7 +323,9 @@
             { role: 'remove', icon: 'bi-trash', title: 'Remove / إزالة', onClick: removeSelected }
         );
 
-        const control = L.control({ position: 'topright' });
+        // Add / Edit / Rename / Remove are action buttons: left side, below the
+        // zoom and draw controls.
+        const control = L.control({ position: 'topleft' });
         control.onAdd = function () {
             const group = L.DomUtil.create('div', 'leaflet-bar geometry-map-select geometry-map-actions pipe-map-actions');
             L.DomEvent.disableClickPropagation(group);

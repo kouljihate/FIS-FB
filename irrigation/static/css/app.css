@@ -1095,15 +1095,29 @@ body.map-fullscreen-lock {
     line-height: 1;
 }
 
-/* Map filter widget: a compact grid of circles so a page listing every element
-   type still fits in the corner (three per row, head and divider span the row). */
+/* Map filter widget: one circle per row, head and divider spanning the column.
+   The widget scrolls when the map is too short for the whole strip (see the
+   height cap in map.js), so every toggle stays reachable. */
 .map-filter-widget {
     display: grid;
-    grid-template-columns: repeat(3, 30px);
+    grid-template-columns: 1fr;
+    justify-items: center;
     gap: 4px;
     padding: 4px;
     border-radius: 18px;
     background: #fff;
+    scrollbar-width: thin;
+}
+
+/* A long strip scrolls when the map is short: keep the scrollbar out of the
+   30px circle column. */
+.map-filter-widget::-webkit-scrollbar {
+    width: 4px;
+}
+
+.map-filter-widget::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: 2px;
 }
 
 .map-filter-head {
@@ -1146,6 +1160,11 @@ body.map-fullscreen-lock {
 .map-filter-button.map-filter-loading {
     animation: map-filter-pulse 1s ease-in-out infinite;
     cursor: progress;
+}
+
+/* Elevation heatmap toggle: one more circle in the filter group. */
+.map-filter-elevation-button i {
+    font-size: 13px;
 }
 
 @keyframes map-filter-pulse {
@@ -1855,13 +1874,24 @@ body {
 }
 
 .navbar.bg-primary {
-    background-image: linear-gradient(90deg, var(--pal-green), var(--pal-sage) 55%, var(--pal-almond)) !important;
+    /* The fixed header wears the same trianglify fabric as the page.  A light
+       veil keeps the dark navbar text readable over the dark facets. */
+    background-image:
+        linear-gradient(rgba(248, 245, 236, 0.72), rgba(248, 245, 236, 0.72)),
+        url("../img/trianglify10.png") !important;
+    background-size: cover, cover;
+    background-position: center, center;
+    background-repeat: no-repeat, no-repeat;
+    background-attachment: scroll, scroll;
 }
 
 /* ── Footer: green → brown gradient ──────────────────────────────────────── */
 footer {
-    background: linear-gradient(90deg, var(--pal-green-2), var(--pal-tan));
-    color: var(--pal-ink);
+    background-image:
+        linear-gradient(rgba(173, 154, 95, 0.72), rgba(43, 42, 40, 0.72)),
+        url("../img/trianglify10.png") !important;
+    /* background: linear-gradient(90deg, var(--pal-green-2), var(--pal-tan));
+    color: var(--pal-ink); */
 }
 
 .version-badge {
@@ -2435,4 +2465,24 @@ table th {
         height: 46px;
         font-size: 1.2rem;
     }
+}
+
+/* ── Map control columns ─────────────────────────────────────────────────────
+   Filters and label toggles live under the layer switcher on the right; the
+   action widgets (Select / Add / Edit / Rename / Remove / Split / Merge / Swap)
+   live on the left; legends keep the bottom-right corner.  The left stack is
+   tight so every action stays visible on a short map card. */
+.leaflet-top.leaflet-left > .leaflet-control + .leaflet-control {
+    margin-top: 4px;
+}
+
+/* The split / merge panel opens beside the action toolbar (top of the map)
+   instead of taking a place in the column, so it never pushes the sector and
+   elevation widgets past the map's bottom edge. */
+.leaflet-top.leaflet-left > .map-action-panel-control {
+    position: absolute;
+    top: 10px;
+    left: 56px;
+    margin: 0;
+    z-index: 1100;
 }

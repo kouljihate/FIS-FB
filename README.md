@@ -1,6 +1,6 @@
 # FIS (Farming Irrigation System)
 
-Version: **0.4.39**
+Version: **0.4.49**
 
 FIS is a Flask irrigation-planning application for organizing farm projects, field geometry, irrigation networks, trees, and engineering validation.
 
@@ -23,7 +23,8 @@ FIS is a Flask irrigation-planning application for organizing farm projects, fie
 - Auto-compute a whole-project cost estimate with editable unit prices, then review the 5-year return on investment (ROI %, payback, yearly cash flow) with assumptions saved per project.
 - Attach land/owner/other documents to a project.
 - Run engineering validation and review elevation-aware reports.
-- Forgotten-password flow on the login page: a single-use temporary password is e-mailed, a new password is forced at first sign-in, and an unused temporary password that is requested again disables the account until an administrator re-enables it.
+- Forgotten-password flow on the login page: a single-use temporary password is e-mailed and sent over WhatsApp, a new password is forced at first sign-in, and an unused temporary password that is requested again disables the account until an administrator re-enables it.
+- Send a direct WhatsApp message to a project's Project Admin or Owner from the project page.
 - Use the bilingual English/Arabic interface.
 
 ## Requirements
@@ -58,6 +59,27 @@ $env:SMTP_USE_TLS = '0'              # only for a relay without STARTTLS
 ```
 
 Without SMTP settings the message, temporary password included, is written to `logs/irrigation.log`, which is enough to exercise the flow locally.
+
+### WhatsApp (Blueticks)
+
+The same one-time password also goes to the phone number saved on the account, and the project page has a WhatsApp composer that messages the Project Admin or the Owner. Messages are sent through the Blueticks REST API (https://blueticks.co) from the WhatsApp number linked to that account.
+
+Create a key at https://dev.blueticks.co, then either set it in the environment:
+
+```powershell
+$env:BLUETICKS_API_KEY = 'bt_live_...'
+$env:WHATSAPP_DEFAULT_COUNTRY_CODE = '216'   # prefix for local numbers
+$env:WHATSAPP_TIMEOUT = '15'                 # seconds
+```
+
+or keep it in a `.env` file at the project root, which the application loads on startup and git ignores:
+
+```
+BLUETICKS_API_KEY=bt_live_...
+WHATSAPP_DEFAULT_COUNTRY_CODE=216
+```
+
+Phone numbers can be written with a country prefix (`+216 ...`, `00216 ...`) or locally (`12345678`); the local form gets `WHATSAPP_DEFAULT_COUNTRY_CODE`. The Project Admin's number comes from that user's profile, the Owner's from the project settings. Without `BLUETICKS_API_KEY` the message is written to `logs/irrigation.log` instead of being sent, so the flow still works locally.
 
 ## Database
 

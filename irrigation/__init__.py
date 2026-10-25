@@ -3,7 +3,7 @@ from flask import Flask, render_template, request
 from irrigation.extensions import mongo, login_manager
 from irrigation.utils.logger import setup_logging
 
-__version__ = '0.4.39'
+__version__ = '0.4.49'
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
