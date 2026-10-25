@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Azguar1</name>
+    <Style id="icon-1899-0288D1-normal">
+      <IconStyle>
+        <scale>1</scale>
+        <Icon>
+          <href>images/icon-1.png</href>
+        </Icon>
+        <hotSpot x="32" xunits="pixels" y="64" yunits="insetPixels"/>
+      </IconStyle>
+      <LabelStyle>
+        <scale>0</scale>
+      </LabelStyle>
+    </Style>
+    <Style id="icon-1899-0288D1-highlight">
+      <IconStyle>
+        <scale>1</scale>
+        <Icon>
+          <href>images/icon-1.png</href>
+        </Icon>
+        <hotSpot x="32" xunits="pixels" y="64" yunits="insetPixels"/>
+      </IconStyle>
+      <LabelStyle>
+        <scale>1</scale>
+      </LabelStyle>
+    </Style>
+    <StyleMap id="icon-1899-0288D1">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#icon-1899-0288D1-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#icon-1899-0288D1-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Style id="poly-097138-1200-77-normal">
+      <LineStyle>
+        <color>ff387109</color>
+        <width>1.2</width>
+      </LineStyle>
+      <PolyStyle>
+        <color>4d387109</color>
+        <fill>1</fill>
+        <outline>1</outline>
+      </PolyStyle>
+    </Style>
+    <Style id="poly-097138-1200-77-highlight">
+      <LineStyle>
+        <color>ff387109</color>
+        <width>1.8</width>
+      </LineStyle>
+      <PolyStyle>
+        <color>4d387109</color>
+        <fill>1</fill>
+        <outline>1</outline>
+      </PolyStyle>
+    </Style>
+    <StyleMap id="poly-097138-1200-77">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#poly-097138-1200-77-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#poly-097138-1200-77-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Placemark>
+      <name>m_almo_1</name>
+      <description>8Ha</description>
+      <styleUrl>#poly-097138-1200-77</styleUrl>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <tessellate>1</tessellate>
+            <coordinates>
+              -4.725138,33.616968,0
+              -4.725439,33.617397,0
+              -4.725691,33.617857,0
+              -4.726007,33.618331,0
+              -4.727064,33.619666,0
+              -4.729709,33.618277,0
+              -4.72862,33.616861,0
+              -4.726831,33.616794,0
+              -4.725138,33.616968,0
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    </Placemark>
+    <Placemark>
+      <name>Well</name>
+      <description>Well</description>
+      <styleUrl>#icon-1899-0288D1</styleUrl>
+      <Point>
+        <coordinates>
+          -4.7289268,33.618477,0
+        </coordinates>
+      </Point>
+    </Placemark>
+  </Document>
+</kml>

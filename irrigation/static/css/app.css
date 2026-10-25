@@ -217,7 +217,7 @@ footer {
 }
 
 .version-badge {
-    background-color: rgba(255, 255, 255, 0.15);
+    background-color: rgba(223, 214, 214, 0.15);
     color: rgba(255, 255, 255, 0.85);
     font-weight: 500;
     font-size: 0.72rem;
@@ -229,12 +229,14 @@ footer {
     display: inline-flex;
     flex-wrap: wrap;
     justify-content: flex-end;
-    align-items: center;
+    align-items: right;
     gap: 0.35rem;
+    
 }
 
 .repo-badge .bi {
     margin-right: 0.25em;
+    color: rgba(255, 255, 255, 0.85);
 }
 
 .flash-toast-container {
@@ -1895,7 +1897,7 @@ footer {
 }
 
 .version-badge {
-    background-color: rgba(69, 64, 47, 0.15);
+    background-color: rgba(186, 179, 154, 0.15);
     color: var(--pal-ink);
 }
 

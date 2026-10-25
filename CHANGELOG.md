@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.4.52 - 2026-10-25
+
+### Changed
+- `CHANGELOG.md` (M)
+- `OPENCODE.md` (M)
+- `README.md` (M)
+- `app.py` (M)
+- `irrigation/__init__.py` (M)
+- `irrigation/api/routes.py` (M)
+- `irrigation/project/routes.py` (M)
+- `irrigation/static/css/app.css` (M)
+- `irrigation/templates/project/detail.html` (M)
+- `irrigation/templates/water/basin.html` (D)
+- `irrigation/templates/water/other.html` (D)
+- `irrigation/templates/water/well.html` (D)
+- `irrigation/water/routes.py` (M)
+- `irrigation/templates/water/sources.html` (??)
+- `maps/` (??)
+
+## 0.4.51 - 2026-10-25
+
+### Added
+- Water Resources: the Add and Edit forms show only the attributes of the selected type. A **Well** asks for depth, borehole diameter and static water level; a **Basin** or **Reservoir** asks for its footprint polygon (the `[[lng, lat], ...]` ring, filled by drawing on the map or pasted), its length × width and its depth, and the table shows the derived **Area (m²)** and **Estimate (m³)**; a **Pump** asks for power and rated head; a **Canal** asks for length, width and depth
+- A basin estimate follows its footprint polygon when one is drawn and falls back to length × width, so the m³ figure updates with the depth; the Edit form shows the same Area ≈ / Volume ≈ hint while typing
+- Changing a source's type in the Edit form swaps its attributes for those of the new kind and clears its validation
+
+### Fixed
+- The type-specific attribute groups were never rendered - the template read `kind_fields_all` while the route passed `kind_fields` - so no water source could carry its own fields
+- A source with no flow or no position (a KML-imported water body) no longer breaks the Well, Basin and Other pages; those cells show an em dash
+
+## 0.4.50 - 2026-10-25
+
+### Added
+- The three Water Resource sub-tabs are built with the Sectors layout: the same header, project badges, table card with a circle-button toolbar, per-row Edit / Rename modals and the map editor (boundary and water source filters plus the elevation heatmap)
+- **Well** lists wells, **Basin** lists basins and reservoirs, and **Other** lists pumps, canals and any other kind, each with its own total row
+- The toolbar adds, removes the ticked rows and validates the tab; Validate checks that a source has a position inside the land boundary and marks it valid, and the table shows the Valid badge, type, flow and coordinates
+- The Add form can be filled from the map (place the marker tool and the coordinates are copied in), and a new source takes its own name when none is typed
+- Water sources now keep a stable `id`, an Arabic name and the validation flag, so the row links survive a delete; the project settings page keeps them too, and the legacy `water_source` point follows the first positioned source
+
+### Changed
+- The Well, Basin and Other pages replace the Coming Soon placeholders
+
 ## 0.4.49 - 2026-10-25
 
 ### Changed

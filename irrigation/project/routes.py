@@ -82,8 +82,31 @@ def _get_spec(project):
     return spec
 
 
-def _spec_from_form(request):
-    """Build a spec dict from the project settings form."""
+#: Water-source keys this settings form edits; everything else a source
+#: carries (id, footprint, depth, diameter ...) is kept as it is.
+_WS_FORM_KEYS = {'type', 'name', 'lat', 'lng', 'flow_lpm', 'notes', 'validated'}
+
+
+def _source_signature(source):
+    """Fields whose change makes a validated water source unvalidated again."""
+    return (
+        str(source.get('type') or ''),
+        str(source.get('name') or ''),
+        source.get('lat'),
+        source.get('lng'),
+        source.get('flow_lpm'),
+        str(source.get('notes') or ''),
+    )
+
+
+def _spec_from_form(request, existing_sources=None):
+    """Build a spec dict from the project settings form.
+
+    ``existing_sources`` carries the id, the Arabic name and the validation of
+    the sources already stored, so saving this form keeps the Water Resource
+    tabs pointing at the same rows (a row removed in the browser shifts every
+    ``ws_*`` list, hence the hidden ``ws_id``).
+    """
     def f(name, cast=str, default=None):
         value = request.form.get(name, '').strip()
         if not value:
@@ -124,6 +147,9 @@ def _spec_from_form(request):
     ws_lngs = request.form.getlist('ws_lng')
     ws_flows = request.form.getlist('ws_flow_lpm')
     ws_notes = request.form.getlist('ws_notes')
+    ws_ids = request.form.getlist('ws_id')
+    known = {source['id']: source for source in (existing_sources or [])
+             if isinstance(source.get('id'), int)}
     water_sources = []
     for i, wtype in enumerate(ws_types):
         wtype = wtype.strip().lower()
@@ -145,14 +171,38 @@ def _spec_from_form(request):
             flow = float(flow_s) if flow_s else None
         except ValueError:
             flow = None
-        water_sources.append({
+        raw_id = ws_ids[i].strip() if i < len(ws_ids) else ''
+        previous = known.get(int(raw_id)) if raw_id.isdigit() else None
+        previous = previous or {}
+        # The Water Resource tabs own the attributes (depth, footprint, ...),
+        # so they are carried over untouched by a settings save.
+        entry = {key: value for key, value in previous.items()
+                 if key not in _WS_FORM_KEYS}
+        entry.update({
             'type': wtype or 'other',
             'name': name,
+            'name_ar': previous.get('name_ar') or '',
             'lat': lat,
             'lng': lng,
             'flow_lpm': flow,
             'notes': ws_notes[i].strip() if i < len(ws_notes) else '',
         })
+        # Editing the source resets its validation; an untouched row keeps it.
+        entry['validated'] = bool(previous.get('validated')) and (
+            _source_signature(previous) == _source_signature(entry))
+        water_sources.append(entry)
+
+    # New rows (added with the table's + button) get the next free id.
+    used = {source['id'] for source in water_sources
+            if isinstance(source.get('id'), int)}
+    nxt = (max(used) + 1) if used else 1
+    for source in water_sources:
+        if 'id' in source:
+            continue
+        while nxt in used:
+            nxt += 1
+        source['id'] = nxt
+        used.add(nxt)
 
     return {
         'owner': {
@@ -406,7 +456,10 @@ def settings(project_id):
     if not project:
         return redirect(url_for('project.index'))
 
-    spec = _spec_from_form(request)
+    spec = _spec_from_form(
+        request,
+        (project.get('spec') or {}).get('water_sources') or project.get('water') or [],
+    )
     spec['land_documents'] = _land_documents_from_request(
         project_id, (project.get('spec') or {}).get('land_documents') or []
     )

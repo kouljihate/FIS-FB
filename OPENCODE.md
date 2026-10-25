@@ -4,7 +4,7 @@
 Irrigation Planning System - A Flask-based web application for irrigation planning and management.
 
 ## Current Version
-- **Version**: 0.4.49
+- **Version**: 0.4.52
 - **Last Updated**: 2026-10-25
 
 ## Architecture Overview
@@ -23,9 +23,11 @@ Project - Water Resource - Geometry - Pipes - Trees - Components - Estimation - 
 - **Link**: Open the project workspace (land documents, water sources, KML link/upload) and its map: sector outlines, water sources and the elevation heatmap only
 
 #### 2. Water Resource
-- **Well**: Well management (Coming Soon placeholder)
-- **Basin**: Basin management (Coming Soon placeholder)
-- **Other**: Other water sources (Coming Soon placeholder)
+Built with the Sectors layout (header, table card with a circle-button toolbar, per-row modals, map editor); `irrigation/templates/water/sources.html` serves all three tabs and `irrigation/water/routes.py` filters the project's water sources by kind.
+- **Well**: Wells (add, edit, rename, remove, validate)
+- **Basin**: Basins and reservoirs (add, edit, rename, remove, validate)
+- **Other**: Pumps, canals and other sources (add, edit, rename, remove, validate)
+- Water sources live in `project.spec.water_sources` (mirrored in `project.water`) with a stable `id`, `name_ar` and `validated`; the legacy `water_source` Point follows the first positioned source
 
 #### 3. Geometry
 - **Sectors**: Sector management (add, edit, rename, remove, split, merge, swap)
@@ -165,7 +167,7 @@ Key API endpoints for rebuild:
 
 ### Version Control
 - Git branches: `project-settings-v1`
-- Version: 0.4.49
+- Version: 0.4.52
 - Changelog: CHANGELOG.md
 - **ALWAYS bump the version on every change (never forget).** Increment `__version__` in
   `irrigation/__init__.py` (patch `+1`, e.g. `0.3.44` -> `0.3.45`), add a dated `## <version> - YYYY-MM-DD`

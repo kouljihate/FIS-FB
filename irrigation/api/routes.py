@@ -247,31 +247,63 @@ WATER_SOURCE_KINDS = {
 }
 
 
+def _source_ring(raw):
+    """A closed ``[[lng, lat], ...]`` ring from a basin footprint, or ``None``."""
+    if not isinstance(raw, (list, tuple)) or len(raw) < 3:
+        return None
+    ring = []
+    for point in raw:
+        if not isinstance(point, (list, tuple)) or len(point) < 2:
+            return None
+        try:
+            lng = float(point[0])
+            lat = float(point[1])
+        except (TypeError, ValueError):
+            return None
+        ring.append([lng, lat])
+    if ring[0] != ring[-1]:
+        ring.append(ring[0])
+    return ring
+
+
 def _water_source_features(project):
-    """One point per positioned water source, with a kind-specific colour."""
+    """One feature per water source, with a kind-specific colour.
+
+    A source that carries a footprint (a basin or a reservoir drawn as a
+    polygon) is emitted as that polygon; the others stay point markers.
+    """
     sources = project.get('water') or (project.get('spec') or {}).get('water_sources') or []
     features = []
     for index, source in enumerate(sources):
+        kind = str(source.get('type') or 'other').strip().lower()
+        label_en, label_ar, color = WATER_SOURCE_KINDS.get(
+            kind, ('Water Source', 'مصدر المياه', '#17a2b8'))
+        name = str(source.get('name') or '').strip() or label_en
+        properties = {
+            'name': name,
+            'name_ar': label_ar,
+            'type': 'water_source',
+            'source_type': kind,
+            'id': index,
+            'flow_lpm': source.get('flow_lpm'),
+            'color': color,
+        }
+        ring = _source_ring(source.get('polygon'))
+        if ring:
+            features.append({
+                'type': 'Feature',
+                'properties': properties,
+                'geometry': {'type': 'Polygon', 'coordinates': [ring]},
+            })
+            continue
         try:
             lat = float(source.get('lat'))
             lng = float(source.get('lng'))
         except (TypeError, ValueError):
             continue
-        kind = str(source.get('type') or 'other').strip().lower()
-        label_en, label_ar, color = WATER_SOURCE_KINDS.get(
-            kind, ('Water Source', 'مصدر المياه', '#17a2b8'))
-        name = str(source.get('name') or '').strip() or label_en
         features.append({
             'type': 'Feature',
-            'properties': {
-                'name': name,
-                'name_ar': label_ar,
-                'type': 'water_source',
-                'source_type': kind,
-                'id': index,
-                'flow_lpm': source.get('flow_lpm'),
-                'color': color,
-            },
+            'properties': properties,
             'geometry': {'type': 'Point', 'coordinates': [lng, lat]},
         })
     if features:

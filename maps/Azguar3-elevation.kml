@@ -1,0 +1,55 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<kml:kml xmlns:kml="http://www.opengis.net/kml/2.2">
+  <kml:Document>
+    <kml:name>Coordinates with elevation</kml:name>
+    <kml:Placemark>
+      <kml:name>33.617808, -4.731121</kml:name>
+      <kml:description>Elevation: 1507.74 m</kml:description>
+      <kml:Point>
+        <kml:coordinates>-4.73112100,33.61780800,1507.74</kml:coordinates>
+      </kml:Point>
+    </kml:Placemark>
+    <kml:Placemark>
+      <kml:name>33.617972, -4.731185</kml:name>
+      <kml:description>Elevation: 1507.74 m</kml:description>
+      <kml:Point>
+        <kml:coordinates>-4.73118520,33.61797170,1507.74</kml:coordinates>
+      </kml:Point>
+    </kml:Placemark>
+    <kml:Placemark>
+      <kml:name>33.618154, -4.731212</kml:name>
+      <kml:description>Elevation: 1507.74 m</kml:description>
+      <kml:Point>
+        <kml:coordinates>-4.73121190,33.61815440,1507.74</kml:coordinates>
+      </kml:Point>
+    </kml:Placemark>
+    <kml:Placemark>
+      <kml:name>33.618117, -4.731499</kml:name>
+      <kml:description>Elevation: 1498.23 m</kml:description>
+      <kml:Point>
+        <kml:coordinates>-4.73149880,33.61811700,1498.23</kml:coordinates>
+      </kml:Point>
+    </kml:Placemark>
+    <kml:Placemark>
+      <kml:name>33.618089, -4.731767</kml:name>
+      <kml:description>Elevation: 1498.23 m</kml:description>
+      <kml:Point>
+        <kml:coordinates>-4.73176700,33.61808860,1498.23</kml:coordinates>
+      </kml:Point>
+    </kml:Placemark>
+    <kml:Placemark>
+      <kml:name>33.617682, -4.731707</kml:name>
+      <kml:description>Elevation: 1498.23 m</kml:description>
+      <kml:Point>
+        <kml:coordinates>-4.73170670,33.61768200,1498.23</kml:coordinates>
+      </kml:Point>
+    </kml:Placemark>
+    <kml:Placemark>
+      <kml:name>33.617808, -4.731121</kml:name>
+      <kml:description>Elevation: 1507.74 m</kml:description>
+      <kml:Point>
+        <kml:coordinates>-4.73112100,33.61780800,1507.74</kml:coordinates>
+      </kml:Point>
+    </kml:Placemark>
+  </kml:Document>
+</kml:kml>
