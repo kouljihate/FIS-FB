@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.75 - 2026-11-01
+
+### Fixed
+- the Main Pipe generator now applies rules MP-1..MP-4 for real - it starts at the water source, links the well to the basin when both exist (MP-1, previously declared but never built), serves only the highest-elevation entry sectors (MP-4; flat terrain falls back to the boundary point nearest the source), and sweeps smoothly around the source in bearing order with straight legs instead of the old Steiner tree that wandered 840m along every sector boundary; each leg of the trunk is stored as its own Main Pipe element (Main Pipe 1..n, per-leg diameter/flow) instead of one merged blob, so the Dhar sample map now shows 6 main pipes (feed + 4 sweep legs + well-basin) tapering 110 to 63mm with real demand; page alert and Auto Generate modal texts updated to describe the new behavior; verified on a scratch copy of the sample (all scopes, full validation passes) and regenerated the sample main pipe
+
 ## 0.4.74 - 2026-11-01
 
 ### Added

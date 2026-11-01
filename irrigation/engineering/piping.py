@@ -3,8 +3,10 @@
 Builds a complete hierarchical irrigation piping network for a project:
 
     Basin / Well (source)
-        -> Main Pipe (MP)  : minimum-spanning-tree over the source + all
-                             sector centroids, serving every sector.
+        -> Main Pipe (MP)  : a smooth sweep that leaves the water source and
+                             serves the entry of every highest-elevation
+                             sector in turn (Rules MP-1..MP-4); each leg is
+                             stored as its own Main Pipe element.
         -> Zone Pipes (ZP) : from the MP to every zone centroid (nearest tap).
         -> Laterals / Drip : from the network to every tree row, so that
                              every tree is served without exception.
@@ -12,8 +14,9 @@ Builds a complete hierarchical irrigation piping network for a project:
 The generator:
 
 * sizes every PVC segment (diameter) from its flow and a velocity limit,
-* optimises total pipe length (MST for the MP, nearest-point taps for the
-  ZP and for the drip lines),
+* keeps the MP smooth: it starts at the water source and serves the high
+  sectors in order of bearing (nearest-point taps for the ZP and for the
+  drip lines),
 * starts the hydraulic calculation at the water source and walks the tree
   downhill/uphill using terrain elevation (gravity aware),
 * places master / sector / zone valves and diameter reductions,
@@ -22,7 +25,6 @@ The generator:
 Public entry point: :func:`generate_piping_structure`.
 """
 import math
-import heapq
 from datetime import datetime
 from collections import defaultdict
 
@@ -450,6 +452,27 @@ def generate_piping_structure(project_id, project=None, options=None):
         net, source_id, sectors, zones, proj, elevation_lookup,
         elevation_range, config, opts, main_only=main_only,
         build_second=build_second)
+
+    # -- MP-1: a well and a basin both exist ------------------------------
+    # Rule MP-1 links the two sources with a main-pipe segment. Built for
+    # the main-pipe stage, where it is a visible element of the network.
+    if main_only:
+        pair = _well_basin_pair(primary, secondary)
+        if pair:
+            well_src, basin_src = pair
+            aid = source_id
+            if basin_src is not primary:
+                bx, by = proj(basin_src['lng'], basin_src['lat'])
+                bid = net.add_node(bx, by, 'src2')
+            else:
+                bid = source_id
+            if well_src is not primary:
+                wx2, wy2 = proj(well_src['lng'], well_src['lat'])
+                aid = net.add_node(wx2, wy2, 'src2')
+            e = net.add_edge(aid, bid, 'mp', 'main_pipe',
+                             config['main_max_velocity_mps'],
+                             MAIN_MIN_DIAMETER_MM)
+            e['rule'] = 'MP-1'
 
     # -- demand -----------------------------------------------------------
     q_tree_lps = config['emitter_flow_lph'] * config['emitters_per_tree'] / 3600.0
@@ -891,103 +914,6 @@ class _BoundaryGraph:
         self.adj[j].append((i, ei))
 
 
-def _dijkstra(graph, src, cost):
-    dist = {src: 0.0}
-    prev = {}
-    pq = [(0.0, src)]
-    while pq:
-        d, u = heapq.heappop(pq)
-        if d > dist.get(u, float('inf')) + 1e-12:
-            continue
-        for v, ei in graph.adj[u]:
-            nd = d + cost(graph.edges[ei], u, v)
-            if nd < dist.get(v, float('inf')) - 1e-12:
-                dist[v] = nd
-                prev[v] = (u, ei)
-                heapq.heappush(pq, (nd, v))
-    return dist, prev
-
-
-def _steiner_tree_edges(graph, terminals, cost):
-    """Distance-network Steiner heuristic: returns the set of edge indices
-    connecting all terminals along the boundary graph."""
-    terminals = list(dict.fromkeys(terminals))
-    if len(terminals) <= 1:
-        return set()
-
-    dists = {}
-    prevs = {}
-    for t in terminals:
-        dists[t], prevs[t] = _dijkstra(graph, t, cost)
-
-    in_tree = {terminals[0]}
-    pending = set(terminals[1:])
-    tree_edges = set()
-    while pending:
-        best = None
-        for v in pending:
-            for u in in_tree:
-                d = dists[u].get(v)
-                if d is not None and (best is None or d < best[0]):
-                    best = (d, u, v)
-        if best is None:
-            break
-        _, u, v = best
-        cur = v
-        while cur != u:
-            step = prevs[u].get(cur)
-            if step is None:
-                break
-            pnode, ei = step
-            tree_edges.add(ei)
-            cur = pnode
-        in_tree.add(v)
-        pending.discard(v)
-    return tree_edges
-
-
-def _join_components(graph):
-    """Connect disconnected boundary components with straight spans so the
-    main pipe can form a single network even when sectors do not touch."""
-    if not graph.nodes:
-        return
-    parent = list(range(len(graph.nodes)))
-
-    def find(a):
-        while parent[a] != a:
-            parent[a] = parent[parent[a]]
-            a = parent[a]
-        return a
-
-    for i, j, _ in graph.edges:
-        ra, rb = find(i), find(j)
-        if ra != rb:
-            parent[rb] = ra
-
-    comps = defaultdict(list)
-    for i in range(len(graph.nodes)):
-        comps[find(i)].append(i)
-
-    while len(comps) > 1:
-        roots = list(comps)
-        best = None
-        for ai in range(len(roots)):
-            for bi in range(ai + 1, len(roots)):
-                for i in comps[roots[ai]]:
-                    ix, iy = graph.nodes[i][0], graph.nodes[i][1]
-                    for j in comps[roots[bi]]:
-                        d = math.hypot(graph.nodes[j][0] - ix,
-                                       graph.nodes[j][1] - iy)
-                        if best is None or d < best[0]:
-                            best = (d, roots[ai], roots[bi], i, j)
-        if best is None:
-            break
-        _, ra, rb, i, j = best
-        graph.add_edge(i, j)
-        comps[ra].extend(comps[rb])
-        del comps[rb]
-
-
 def _nearest_ring_vertex(ring, pt):
     """Index of the ring vertex nearest to ``pt`` (ZP-3: nearest entry)."""
     if not ring:
@@ -1129,6 +1055,11 @@ def _build_boundary_network(net, source_id, sectors, zones, proj,
       4. it stays on the highest ground; low sectors are fed by a branch
          zone pipe dropped from the high main pipe.
 
+    The trunk leaves the source towards the closest high entry and then
+    serves the remaining high sectors in order of bearing — a smooth sweep
+    around the water source instead of a tree over every boundary vertex.
+    Each leg of the sweep is one straight Main Pipe element (MP-1..MP-4).
+
     When ``main_only`` is set, only the main spine over the highest sectors
     is built: no branch pipes to lower sectors and no zone pipes inside the
     sectors (those belong to the zone-pipe step).
@@ -1147,6 +1078,10 @@ def _build_boundary_network(net, source_id, sectors, zones, proj,
             return float(elevation_lookup(Point(x, y)) or 0.0)
         except Exception:
             return 0.0
+
+    # Water source position (UTM): the sweep starts here (Rules MP-2/MP-3).
+    sx = net.nodes[source_id]['x']
+    sy = net.nodes[source_id]['y']
 
     # --- boundary graph of all sector edges ---
     graph = _BoundaryGraph()
@@ -1179,7 +1114,16 @@ def _build_boundary_network(net, source_id, sectors, zones, proj,
             graph.add_edge(m, b)
             cand.append(m)
 
-        entry = max(cand, key=lambda idx: graph.nodes[idx][2])
+        # Entry point of the sector (MP-4): the highest boundary node, so
+        # the main pipe reaches the sector over its highest ground. A ring
+        # without elevation relief falls back to the node nearest the
+        # source, meeting the sector on the side facing the network.
+        zs = [graph.nodes[idx][2] for idx in cand]
+        if max(zs) - min(zs) < 1e-6:
+            entry = min(cand, key=lambda idx: math.hypot(
+                graph.nodes[idx][0] - sx, graph.nodes[idx][1] - sy))
+        else:
+            entry = max(cand, key=lambda idx: graph.nodes[idx][2])
         try:
             poly = Polygon(utm)
             if not poly.is_valid:
@@ -1196,22 +1140,9 @@ def _build_boundary_network(net, source_id, sectors, zones, proj,
     if not sector_data:
         return [], {}
 
-    _join_components(graph)
-
-    # --- elevation-weighted cost: prefer high ground (Rule 4) ---
-    zs = [n[2] for n in graph.nodes]
-    zmax = max(zs) if zs else 0.0
-    zmin = min(zs) if zs else 0.0
-    zrange = max(elevation_range or 0.0, zmax - zmin, 1.0)
-    elev_weight = float(opts.get('main_spine_elev_weight', 2.0))
-
-    def cost(edge, u, v):
-        i, j, length = edge
-        z = (graph.nodes[i][2] + graph.nodes[j][2]) / 2.0
-        penalty = max(0.0, zmax - z) / zrange
-        return length * (1.0 + elev_weight * penalty)
-
-    # --- choose which sectors the main pipe actually serves (Rule 4) ---
+    # --- which sectors the main pipe serves (MP-4) ------------------------
+    # MP1 covers only the highest-elevation entry sectors; every lower
+    # sector is fed from MP1 through its own branch pipe.
     entry_elev = {sid: graph.nodes[d['entry']][2]
                   for sid, d in sector_data.items()}
     max_entry = max(entry_elev.values())
@@ -1221,15 +1152,34 @@ def _build_boundary_network(net, source_id, sectors, zones, proj,
     main_sids = [sid for sid, e in entry_elev.items() if e >= max_entry - drop_tol]
     main_set = set(main_sids)
 
-    # --- connect the source to the nearest boundary node (Rule 2) ---
-    sx = net.nodes[source_id]['x']
-    sy = net.nodes[source_id]['y']
+    # --- connect the source to the nearest boundary node (MP-2 / MP-3) ---
     src_idx = min(range(len(graph.nodes)),
                   key=lambda i: math.hypot(graph.nodes[i][0] - sx,
                                            graph.nodes[i][1] - sy))
-    terminals = [src_idx] + [sector_data[sid]['entry'] for sid in main_sids]
 
-    tree_edge_ids = _steiner_tree_edges(graph, terminals, cost)
+    # --- smooth serve order: sweep around the water source (MP-4) --------
+    # The trunk leaves the source towards the closest served entry, then
+    # serves the remaining entries in order of bearing, so it sweeps
+    # steadily around the source instead of criss-crossing the sectors.
+    def _entry_dist(sid):
+        ex, ey = sector_data[sid]['entry_xy']
+        return math.hypot(ex - sx, ey - sy)
+
+    def _bearing(sid):
+        ex, ey = sector_data[sid]['entry_xy']
+        return math.atan2(ey - sy, ex - sx)
+
+    order = sorted(main_sids, key=lambda sid: (_bearing(sid), _entry_dist(sid)))
+    if order:
+        start = min(range(len(order)), key=lambda k: _entry_dist(order[k]))
+        n = len(order)
+        fwd = order[start:] + order[:start]
+        bwd = [order[(start - k) % n] for k in range(n)]
+        d_fwd = _entry_dist(fwd[1]) if n > 1 else float('inf')
+        d_bwd = _entry_dist(bwd[1]) if n > 1 else float('inf')
+        order = fwd if d_fwd <= d_bwd else bwd
+
+    terminals = [src_idx] + [sector_data[sid]['entry'] for sid in order]
 
     g2net = {}
 
@@ -1239,13 +1189,18 @@ def _build_boundary_network(net, source_id, sectors, zones, proj,
             g2net[idx] = net.add_node(x, y, 'bnd', z=z)
         return g2net[idx]
 
-    for ei in tree_edge_ids:
-        i, j, _ = graph.edges[ei]
-        net.add_edge(net_of(i), net_of(j), 'mp', 'main_pipe',
-                     config['main_max_velocity_mps'], MAIN_MIN_DIAMETER_MM)
-
+    # The trunk starts at the water source (MP-2 / MP-3)...
     net.add_edge(source_id, net_of(src_idx), 'mp', 'main_pipe',
                  config['main_max_velocity_mps'], MAIN_MIN_DIAMETER_MM)
+    # ...then serves every high sector in sweep order; each leg of the
+    # sweep is one Main Pipe element on its own, drawn straight between
+    # the two entries for the shortest, smoothest trunk (Pipes -> Adjust
+    # can still snap the legs onto the sector boundaries afterwards).
+    for u, v in zip(terminals, terminals[1:]):
+        if u == v:
+            continue
+        net.add_edge(net_of(u), net_of(v), 'mp', 'main_pipe',
+                     config['main_max_velocity_mps'], MAIN_MIN_DIAMETER_MM)
 
     # --- sector entries: MP directly (high) or branch pipe (low) ---
     sector_nodes = []
@@ -1343,6 +1298,16 @@ def _build_boundary_network(net, source_id, sectors, zones, proj,
             zone_nodes[z['id']] = znid
 
     return sector_nodes, zone_nodes
+
+
+def _well_basin_pair(primary, secondary):
+    """``(well, basin)`` source dicts when both exist — Rule MP-1."""
+    sources = ([primary] if primary else []) + list(secondary or [])
+    well = next((s for s in sources if s.get('type') == 'well'), None)
+    basin = next((s for s in sources if s.get('type') == 'basin'), None)
+    if well and basin and well is not basin:
+        return well, basin
+    return None
 
 
 def _resolve_sources(project):
@@ -1512,6 +1477,8 @@ def _insert_elements(project_id, net, unproj, valve_elements,
             props['sector_id'] = e['sector_id']
         if e.get('row_id'):
             props['row_id'] = e['row_id']
+        if e.get('rule'):
+            props['rule'] = e['rule']
         if kind == 'lat':
             props['role'] = 'lateral'
 
@@ -1525,27 +1492,14 @@ def _insert_elements(project_id, net, unproj, valve_elements,
     # graph edges (mp, zp, stub): merge tap-split fragments back into the
     # original pipes so each zone/main pipe is stored as a single element.
     if scope == 'main':
-        # One single main pipe covering only the highest sectors: merge the
-        # whole main-pipe spine into a single element.
-        mp_edges = [e for e in net.edges if e['kind'] == 'mp']
-        if mp_edges:
-            lines = [[unproj(x, y) for x, y in e['coords']] for e in mp_edges]
-            geometry = ({'type': 'LineString', 'coordinates': lines[0]}
-                        if len(lines) == 1
-                        else {'type': 'MultiLineString', 'coordinates': lines})
-            max_d = max(e['diameter'] for e in mp_edges)
-            max_f = max(e['flow_lps'] for e in mp_edges)
-            total_len = sum(e['length_m'] for e in mp_edges)
-            counters['mp_edges'] = 1
-            emit('main_pipe', 'Main Pipe 1', 'الأنبوب الرئيسي 1', geometry, {
-                'generated': 'ai',
-                'diameter': max_d,
-                'flow_lps': round(max_f, 4),
-                'velocity_mps': round(pipe_velocity_mps(max_f / 1000.0, max_d), 3),
-                'length_m': round(total_len, 2),
-            })
-            lengths['main_pipe'] += total_len
-            diameters['main_pipe'].add(max_d)
+        # One Main Pipe element per trunk leg — the feed from the water
+        # source, each sweep leg over the high sectors, and the MP-1
+        # well -> basin link — so the map shows the real network instead
+        # of one merged blob.
+        for e in net.edges:
+            if e['kind'] != 'mp':
+                continue
+            emit_pipe(e)
     else:
         merged_pipes = []
         by_origin = defaultdict(list)
