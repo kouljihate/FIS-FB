@@ -17,6 +17,7 @@ import math
 from shapely.geometry import shape, mapping, box, Polygon, LineString, Point, MultiPolygon, GeometryCollection
 from shapely.affinity import rotate as affine_rotate
 from shapely.ops import unary_union, split as shapely_split
+from shapely.errors import GEOSException
 import numpy as np
 
 from irrigation.extensions import mongo
@@ -170,6 +171,21 @@ def _extract_polygons(geom):
     return []
 
 
+def _repair_polygon(geom):
+    """Return a valid version of ``geom``, or ``None`` when it cannot be fixed.
+
+    A sector polygon saved from a drawn map (or projected lat/lng -> UTM)
+    can come back self-intersecting; GEOS then raises ``TopologyException:
+    side location conflict`` on every intersection, which used to 500 the
+    whole regeneration request.
+    """
+    if geom is None or geom.is_empty:
+        return None
+    if geom.is_valid:
+        return geom
+    return _largest_polygon(geom)
+
+
 def _largest_polygon(geom):
     """Return the largest valid polygon from a geometry."""
     polys = _extract_polygons(geom)
@@ -209,7 +225,14 @@ def _rotate_polygon(polygon, angle_degrees, origin=None):
         new_ring = [rotate_point(x, y) for x, y in ring.coords]
         rotated_coords.append(new_ring)
 
-    return Polygon(rotated_coords[0], rotated_coords[1:])
+    rotated = Polygon(rotated_coords[0], rotated_coords[1:])
+    # Rounding during rotation can push an already-fragile polygon into a
+    # self-intersection, which makes every later slice raise: repair it here.
+    if not rotated.is_valid:
+        repaired = _largest_polygon(rotated)
+        if repaired is not None:
+            return repaired
+    return rotated
 
 
 def _split_polygon_equal_area(polygon, n_parts, axis='x'):
@@ -221,6 +244,12 @@ def _split_polygon_equal_area(polygon, n_parts, axis='x'):
     reaches the next 1/n of the area, found by binary search, so concave
     shapes stay fully covered.
     """
+    # The sweep below intersects this polygon dozens of times; an invalid
+    # one makes GEOS raise "side location conflict", so repair it once here.
+    polygon = _repair_polygon(polygon)
+    if polygon is None:
+        return []
+
     bounds = polygon.bounds
     minx, miny, maxx, maxy = bounds
     total_area = polygon.area
@@ -421,7 +450,11 @@ def _try_partition(polygon, n_parts, angle, water_source_point=None,
     rotated = _rotate_polygon(polygon, angle)
 
     # Split into equal-area strips
-    parts = _split_polygon_equal_area(rotated, n_parts)
+    try:
+        parts = _split_polygon_equal_area(rotated, n_parts)
+    except GEOSException:
+        # This angle yields no usable strips: not a candidate, keep searching.
+        return None
 
     # Rotate parts back and filter
     original_parts = []
@@ -461,13 +494,19 @@ def _try_grid_partition(polygon, n_rows, n_cols, angle, water_source_point=None,
         return None
 
     rotated = _rotate_polygon(polygon, angle)
-    bands = _split_polygon_equal_area(rotated, n_rows, axis='y')
+    try:
+        bands = _split_polygon_equal_area(rotated, n_rows, axis='y')
+    except GEOSException:
+        return None
     if len(bands) != n_rows:
         return None
 
     cells = []
-    for band in bands:
-        cells.extend(_split_polygon_equal_area(band, n_cols, axis='x'))
+    try:
+        for band in bands:
+            cells.extend(_split_polygon_equal_area(band, n_cols, axis='x'))
+    except GEOSException:
+        return None
     if len(cells) != n_rows * n_cols:
         return None
 
@@ -1418,6 +1457,9 @@ def regenerate_zones(project_id, sector_id=None, zones_per_sector=None, use_elev
 def _fallback_grid(polygon, n_parts, water_point, elevation_model=None,
                    water_source_elevation=None, weights=None):
     """Simple grid-based fallback if optimization fails."""
+    polygon = _repair_polygon(polygon)
+    if polygon is None:
+        return {'parts': [], 'score': -1.0, 'angle': 0}
     bounds = polygon.bounds
     minx, miny, maxx, maxy = bounds
     total_area = polygon.area

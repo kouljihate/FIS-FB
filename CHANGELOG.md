@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.72 - 2026-11-01
+
+### Fixed
+- GEOS 'side location conflict' crash when a self-intersecting sector polygon (e.g. after UTM projection) is split into zones - invalid geometry is repaired via buffer(0) before rotation/slicing, and a split that still fails GEOS is skipped as a candidate instead of failing the whole request
+
 ## 0.4.71 - 2026-11-01
 
 ### Added
