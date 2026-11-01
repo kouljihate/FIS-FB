@@ -2,10 +2,35 @@
 {% block title %}Create Project / إنشاء مشروع{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-8">
-        <div class="card shadow-sm">
-            <div class="card-header bg-primary text-white">
+<!-- Instructions card first, then Create New Project -->
+<div class="card shadow-sm mb-3">
+    <div class="card-header bg-info text-white">
+        <h5 class="mb-0"><i class="bi bi-info-circle"></i> Instructions / تعليمات</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <ol class="small mb-0 ps-4">
+                    <li>Create a project with a name</li>
+                    <li>Add water source location</li>
+                    <li>Enter land boundary manually OR upload KML/KMZ later</li>
+                    <li>Proceed to Geometry tab to draw sectors</li>
+                </ol>
+            </div>
+            <div class="col-md-6">
+                <ol class="small mb-0 ar-text" lang="ar" style="padding-inline-start: 1.25rem;">
+                    <li>أنشئ مشروعاً باسم</li>
+                    <li>أضف موقع مصدر المياه</li>
+                    <li>أدخل حدود الأرض يدوياً أو ارفع ملف KML لاحقاً</li>
+                    <li>انتقل إلى تبويب الهندسة لرسم القطاعات</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-primary text-white">
                 <h4 class="mb-0"><i class="bi bi-plus-circle"></i> Create New Project / إنشاء مشروع جديد</h4>
             </div>
             <div class="card-body">
@@ -22,6 +47,87 @@
                         <label class="form-label">Description / الوصف</label>
                         <textarea name="description" class="form-control" rows="2"></textarea>
                     </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="admin_user_id">Project Admin / مسؤول المشروع</label>
+                        <div class="input-group">
+                            <select name="admin_user_id" id="admin_user_id" class="form-select"
+                                    {% if not project_admins %}disabled{% endif %} required>
+                                {% if not project_admins %}
+                                <option value="">No Project Admin yet / لا يوجد مسؤول مشروع بعد</option>
+                                {% else %}
+                                {% for admin in project_admins %}
+                                <option value="{{ admin.id }}" {% if admin.id == selected_admin_id %}selected{% endif %}>
+                                    {{ admin.full_name or admin.username }}{% if admin.email %} — {{ admin.email }}{% endif %}
+                                </option>
+                                {% endfor %}
+                                {% endif %}
+                            </select>
+                            {% if current_user.is_admin %}
+                            <button class="btn btn-outline-success" type="button"
+                                    data-bs-toggle="modal" data-bs-target="#newProjectAdminModal">
+                                <i class="bi bi-person-plus"></i> New / جديد
+                            </button>
+                            {% endif %}
+                        </div>
+                        <div class="form-text">
+                            The project is linked to this Project Admin / يرتبط المشروع بمسؤول المشروع
+                        </div>
+                    </div>
+                    {% if not project_admins %}
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        {% if current_user.is_admin %}
+                        No Project Admin exists yet — create one to continue /
+                        لا يوجد مسؤول مشروع بعد — أنشئ واحداً للمتابعة
+                        {% else %}
+                        No Project Admin exists yet — ask an Admin to create one /
+                        لا يوجد مسؤول مشروع بعد — اطلب من المسؤول إنشاء واحد
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    <div class="mb-3">
+                        <label class="form-label" for="owner_user_id">Project Owner / المالك (account / الحساب)</label>
+                        <select name="owner_user_id" id="owner_user_id" class="form-select">
+                            <option value="">— none / بدون —</option>
+                            {% for owner in project_owners %}
+                            <option value="{{ owner.id }}">
+                                {{ owner.full_name or owner.username }}{% if owner.email %} — {{ owner.email }}{% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">
+                            This account sees the project when it signs in / هذا الحساب يرى المشروع عند تسجيل الدخول
+                        </div>
+                    </div>
+
+                    <details class="mb-3">
+                        <summary class="text-primary"><i class="bi bi-gear"></i> Project Settings (optional) / إعدادات المشروع (اختياري)</summary>
+                        <div class="card card-body mt-2">
+                            <h6><i class="bi bi-person-circle"></i> Owner / المالك</h6>
+                            <div class="row g-2 mb-2">
+                                <div class="col-md-4"><label class="form-label">Name / الاسم</label><input type="text" name="owner_name" class="form-control"></div>
+                                <div class="col-md-4"><label class="form-label">E-mail / البريد</label><input type="email" name="owner_email" class="form-control"></div>
+                                <div class="col-md-4"><label class="form-label">Phone / الهاتف</label><input type="text" name="owner_phone" class="form-control"></div>
+                            </div>
+                            <div class="form-text">
+                                Filling the owner's Name and E-mail creates a Project Owner account with a generated username and a one-time password / ملء اسم المالك وبريده ينشئ حساب مالك المشروع باسم مستخدم مولَّد وكلمة مرور لمرة واحدة
+                            </div>
+                            <h6><i class="bi bi-sliders"></i> Configuration / Layout</h6>
+                            <div class="row g-2 mb-2">
+                                <div class="col-md-3 col-6"><label class="form-label">Zones / Sector</label><input type="number" name="zones_per_sector" class="form-control" min="1" value="2"></div>
+                                <div class="col-md-3 col-6"><label class="form-label">Row Spacing (m)</label><input type="number" step="0.1" name="row_spacing_m" class="form-control" value="3.0"></div>
+                                <div class="col-md-3 col-6"><label class="form-label">Tree Spacing (m)</label><input type="number" step="0.1" name="tree_spacing_m" class="form-control" value="4.0"></div>
+                                <div class="col-md-3 col-6"><label class="form-label">Emitter Flow (L/h)</label><input type="number" step="0.1" name="emitter_flow_lph" class="form-control" value="2.0"></div>
+                            </div>
+                            <h6><i class="bi bi-rulers"></i> Rules</h6>
+                            <div class="row g-2 mb-2">
+                                <div class="col-md-3 col-6"><label class="form-label">Min Sector Area (m²)</label><input type="number" name="min_sector_area_m2" class="form-control" min="0" value="5000"></div>
+                                <div class="col-md-3 col-6"><label class="form-label">Max Sector Area (m²)</label><input type="number" name="max_sector_area_m2" class="form-control" min="0" value="50000"></div>
+                            </div>
+                        </div>
+                    </details>
 
                     <hr>
                     <h5><i class="bi bi-water"></i> Water Source / مصدر المياه</h5>
@@ -59,22 +165,75 @@
                 </form>
             </div>
         </div>
-    </div>
+</div>
 
-    <div class="col-md-4">
-        <div class="card shadow-sm">
-            <div class="card-header bg-info text-white">
-                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Instructions / تعليمات</h5>
-            </div>
-            <div class="card-body">
-                <ol class="small">
-                    <li>Create a project with a name / أنشئ مشروعاً باسم</li>
-                    <li>Add water source location / أضف موقع مصدر المياه</li>
-                    <li>Enter land boundary manually OR upload KML/KMZ later / أدخل حدود الأرض يدوياً أو ارفع ملف KML لاحقاً</li>
-                    <li>Proceed to Geometry tab to draw sectors / انتقل إلى تبويب الهندسة لرسم القطاعات</li>
-                </ol>
-            </div>
+{% if current_user.is_admin %}
+<!-- New Project Admin Modal -->
+<div class="modal fade" id="newProjectAdminModal" tabindex="-1" aria-labelledby="newProjectAdminTitle"
+     aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content modal-green">
+            <form method="POST" action="{{ url_for('auth.create_project_admin') }}">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="newProjectAdminTitle">
+                        <i class="bi bi-person-plus"></i> New Project Admin / مسؤول مشروع جديد
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"
+                            aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-2">
+                        <label class="form-label">Full Name / الاسم الكامل</label>
+                        <input type="text" name="full_name" class="form-control">
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <label class="form-label">Username / اسم المستخدم</label>
+                            <input type="text" name="username" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">E-mail / البريد</label>
+                            <input type="email" name="email" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="row g-2 mt-1">
+                        <div class="col-md-6">
+                            <label class="form-label">Phone / الهاتف</label>
+                            <input type="text" name="phone" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">CIN / البطاقة الوطنية</label>
+                            <input type="text" name="cin" class="form-control">
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <label class="form-label">Password / كلمة المرور</label>
+                        <input type="password" name="password" class="form-control" required>
+                    </div>
+                    <p class="text-muted small mt-2 mb-0">
+                        Profile / الدور: <strong>Project Admin</strong>
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel / إلغاء</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i> Create / إنشاء
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
+{% endif %}
+
+{% if not project_admins and current_user.is_admin %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var modal = document.getElementById('newProjectAdminModal');
+        if (modal) {
+            bootstrap.Modal.getOrCreateInstance(modal).show();
+        }
+    });
+</script>
+{% endif %}
 {% endblock %}

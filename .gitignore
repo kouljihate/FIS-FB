@@ -10,3 +10,9 @@ uploads/
 logs/
 .DS_Store
 *.log
+patchs/
+zip/
+.pytest_cache/
+FIS - 0.*/
+.cloud-attachments/
+

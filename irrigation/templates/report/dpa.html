@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ meta.title }} — {{ project.name }}</title>
+<style>
+    /* ---------------------------------------------------------------
+       A4 report.  Every section is one sheet: the company header and
+       the legal footer are part of the sheet, so they reappear on each
+       printed page without relying on fixed positioning.
+       --------------------------------------------------------------- */
+    @page { size: A4; margin: 11mm 12mm; }
+
+    /* Comfortaa ships with the application, so the report keeps its font
+       even when the machine printing it is offline. */
+    @font-face {
+        font-family: 'Comfortaa';
+        src: url("{{ url_for('static', filename='fonts/Comfortaa-Light.ttf') }}") format('truetype');
+        font-weight: 300; font-style: normal; font-display: swap;
+    }
+    @font-face {
+        font-family: 'Comfortaa';
+        src: url("{{ url_for('static', filename='fonts/Comfortaa-Regular.ttf') }}") format('truetype');
+        font-weight: 400; font-style: normal; font-display: swap;
+    }
+    @font-face {
+        font-family: 'Comfortaa';
+        src: url("{{ url_for('static', filename='fonts/Comfortaa-Bold.ttf') }}") format('truetype');
+        font-weight: 600 700; font-style: normal; font-display: swap;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+        font-family: 'Comfortaa', "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        font-size: 9.6pt;
+        color: #1c1c1c;
+        line-height: 1.33;
+        background: #eef1f5;
+    }
+
+    /* -- toolbar (never printed) ------------------------------------ */
+    .dpa-toolbar {
+        position: sticky; top: 0; z-index: 50;
+        display: flex; align-items: center; gap: 10px;
+        padding: 8px 16px; background: #12324f; color: #fff;
+        box-shadow: 0 2px 6px rgba(0,0,0,.25);
+    }
+    .dpa-toolbar .grow { flex: 1; }
+    .dpa-toolbar a, .dpa-toolbar button {
+        font: inherit; color: #fff; background: rgba(255,255,255,.12);
+        border: 1px solid rgba(255,255,255,.35); border-radius: 5px;
+        padding: 5px 12px; cursor: pointer; text-decoration: none;
+    }
+    .dpa-toolbar a:hover, .dpa-toolbar button:hover { background: rgba(255,255,255,.24); }
+    .dpa-toolbar .primary { background: #2f9e44; border-color: #2f9e44; }
+    .dpa-toolbar .title { font-weight: 600; }
+
+    /* -- sheets ------------------------------------------------------ */
+    main { padding: 0 0 10mm; }
+    .page {
+        display: flex; flex-direction: column;
+        width: 210mm; min-height: 297mm;
+        margin: 6mm auto; padding: 12mm;
+        background: #fff; box-shadow: 0 3px 14px rgba(0,0,0,.15);
+    }
+    .page-body { flex: 1 1 auto; }
+
+    .sheet-head {
+        display: flex; align-items: flex-start; justify-content: space-between;
+        gap: 8mm; padding-bottom: 2.2mm; margin-bottom: 3.5mm;
+        border-bottom: 1.3pt solid #12324f;
+    }
+    .brand { display: flex; align-items: center; gap: 4mm; }
+    .brand img { height: 13mm; width: auto; max-width: 30mm; object-fit: contain; }
+    .brand .name { font-size: 10.5pt; font-weight: 700; }
+    .brand .line { font-size: 7.8pt; color: #4a4a4a; }
+    .sheet-ref { text-align: right; font-size: 8pt; color: #4a4a4a; white-space: nowrap; }
+    .sheet-ref strong { display: block; font-size: 9.2pt; color: #12324f; }
+
+    .sheet-foot {
+        margin-top: 4mm; padding-top: 1.8mm;
+        border-top: .9pt solid #12324f;
+        display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+        gap: 2px 8px; font-size: 7.3pt; color: #333;
+    }
+    .sheet-foot .ids { display: flex; flex-wrap: wrap; gap: 2px 9px; }
+    .sheet-foot .ids span { white-space: nowrap; }
+
+    .page.cover .page-body {
+        display: flex; flex-direction: column; justify-content: center;
+        text-align: center; padding: 0 6mm;
+    }
+    .cover-ministry { font-size: 9.4pt; line-height: 1.5; white-space: pre-line; color: #23384c; }
+    .cover-rule { width: 46mm; height: 2pt; background: #12324f; margin: 7mm auto; }
+    .cover h1 { font-size: 25pt; letter-spacing: 2px; margin: 0 0 4mm; color: #12324f; }
+    .cover h2 { font-size: 12.5pt; font-weight: 500; max-width: 138mm; margin: 0 auto 12mm; letter-spacing: .4px; }
+    .cover-box {
+        border: 1pt solid #12324f; padding: 5mm 9mm; margin: 0 auto 11mm;
+        width: 128mm; text-align: left; font-size: 9.6pt;
+    }
+    .cover-box div { display: flex; justify-content: space-between; gap: 8mm; padding: 1mm 0; }
+    .cover-box span { color: #6a7885; }
+    .cover-box strong { text-align: right; }
+    .cover-date { font-size: 12.5pt; font-weight: 600; color: #12324f; }
+    .cover-company { margin-top: 10mm; font-size: 8.6pt; color: #4a4a4a; }
+
+    .page-head { border-bottom: 1.2pt solid #12324f; padding-bottom: 2.2mm; margin-bottom: 3.6mm; }
+    .page-kicker {
+        display: block; font-size: 7.2pt; letter-spacing: 1.3px;
+        text-transform: uppercase; color: #6a7885;
+    }
+    .page-head h2 { margin: .8mm 0 0; font-size: 13pt; color: #12324f; }
+
+    h3 { font-size: 10.2pt; color: #12324f; margin: 4mm 0 1.6mm; }
+    h3:first-child { margin-top: 0; }
+    p { margin: 0 0 1.8mm; }
+    .muted { color: #6a7885; }
+    .small { font-size: 8.2pt; }
+    .center { text-align: center; }
+
+    /* -- tables ------------------------------------------------------ */
+    table { width: 100%; border-collapse: collapse; margin: 1.6mm 0 3.2mm; font-size: 7.9pt; }
+    thead { display: table-header-group; }
+    th, td { border: .55pt solid #8d9aa6; padding: .9mm 1.5mm; vertical-align: top; }
+    th { background: #e7edf3; color: #12324f; font-weight: 600; text-align: left; }
+    td.num, th.num { text-align: right; white-space: nowrap; }
+    tr.total td { background: #f1f5f9; font-weight: 700; }
+    tr { break-inside: avoid; page-break-inside: avoid; }
+
+    dl.kv { display: grid; grid-template-columns: 62mm 1fr; gap: 1.1mm 4mm; margin: 0 0 3.2mm; font-size: 9pt; }
+    dl.kv dt { color: #55636f; }
+    dl.kv dd { margin: 0; font-weight: 600; }
+
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; }
+    .note {
+        border-left: 2.5pt solid #12324f; background: #f4f7fa;
+        padding: 2mm 3mm; font-size: 8.2pt; margin: 1.6mm 0 3mm;
+    }
+    .formula { font-family: "Cambria Math", Georgia, serif; font-size: 9.2pt; }
+    .formula-box { border: .6pt solid #8d9aa6; padding: 1.6mm 2.6mm; background: #fbfcfd; margin: 1.6mm 0; }
+
+    /* -- documents --------------------------------------------------- */
+    .doc-frame {
+        border: .8pt solid #8d9aa6; padding: 1.6mm; display: flex;
+        align-items: center; justify-content: center; height: 196mm; background: #fff;
+    }
+    .doc-frame img { max-width: 100%; max-height: 192mm; object-fit: contain; }
+    .doc-frame.small-frame { height: 118mm; }
+    .doc-frame.small-frame img { max-height: 114mm; }
+    .doc-frame.tall-frame { height: 205mm; }
+    .doc-frame.tall-frame img { max-height: 201mm; }
+    .doc-placeholder {
+        border: 1.2pt dashed #9aa7b3; border-radius: 3px; height: 120mm;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 2mm; color: #7b8894; text-align: center; padding: 8mm;
+        background: repeating-linear-gradient(45deg, #fafbfc, #fafbfc 6px, #f3f5f8 6px, #f3f5f8 12px);
+    }
+    .doc-placeholder.small-frame { height: 112mm; }
+    .doc-placeholder.tall-frame { height: 190mm; }
+    .doc-placeholder strong { font-size: 10.5pt; color: #55636f; }
+    .doc-placeholder .hint { font-size: 8.2pt; max-width: 95mm; }
+
+    .plans-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; }
+    .plans-grid .doc-frame { height: 105mm; }
+    .plans-grid .doc-placeholder { height: 105mm; }
+    .plans-grid .doc-placeholder strong { font-size: 9pt; }
+    .plans-grid .doc-placeholder .hint { font-size: 7.4pt; }
+    .plan h4 { margin: 0 0 1.2mm; font-size: 8.6pt; color: #12324f; }
+
+    .signatures { display: flex; justify-content: space-between; margin-top: 10mm; }
+    .signature { width: 62mm; border-top: .8pt solid #55636f; padding-top: 1.4mm; font-size: 8.4pt; text-align: center; color: #55636f; }
+
+    /* -- print ------------------------------------------------------- */
+    @media print {
+        body { background: #fff; }
+        .dpa-toolbar { display: none !important; }
+        main { padding: 0; }
+        .page {
+            width: auto; min-height: 275mm; margin: 0; padding: 0;
+            box-shadow: none; background: transparent;
+            break-after: page; page-break-after: always;
+        }
+        .page:last-child { break-after: auto; page-break-after: auto; }
+        a { color: inherit; text-decoration: none; }
+    }
+</style>
+</head>
+
+{%- macro num(value, digits=2) -%}
+{{ ('%.' ~ digits ~ 'f')|format(value if value is not none else 0) }}
+{%- endmacro -%}
+
+{% macro sheet_head() %}
+<header class="sheet-head">
+    <div class="brand">
+        {% if company.logo %}
+        <img src="{{ url_for('auth.uploaded_file', filename=company.logo) }}" alt="Logo">
+        {% endif %}
+        <div>
+            <div class="name">{{ company.name or project.name }}</div>
+            {% if company.address or company.city %}
+            <div class="line">{{ company.address }}{% if company.address and company.city %} — {% endif %}{{ company.city }}</div>
+            {% endif %}
+            <div class="line">
+                {% if company.phone %}Tél. {{ company.phone }}{% endif %}
+                {% if company.phone and company.email %} · {% endif %}
+                {% if company.email %}{{ company.email }}{% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="sheet-ref">
+        <strong>{{ project.name }}</strong>
+        <span>{{ meta.reference or ('DPA-%03d'|format(project.id)) }}</span>
+    </div>
+</header>
+{% endmacro %}
+
+{% macro sheet_foot() %}
+<footer class="sheet-foot">
+    <div>
+        {{ company.name }}{% if company.address %} — {{ company.address }}{% endif %}{% if company.city %} {{ company.city }}{% endif %}
+    </div>
+    <div class="ids">
+        <span><b>ICE :</b> {{ legal.ice or '—' }}</span>
+        <span><b>I.F :</b> {{ legal['if'] or '—' }}</span>
+        <span><b>Patente :</b> {{ legal.patente or '—' }}</span>
+        <span><b>RC :</b> {{ legal.rc or '—' }}</span>
+        <span><b>CNSS :</b> {{ legal.cnss or '—' }}</span>
+    </div>
+</footer>
+{% endmacro %}
+
+{% macro page_heading(kicker, title) %}
+<div class="page-head">
+    <span class="page-kicker">{{ kicker }}</span>
+    <h2>{{ title }}</h2>
+</div>
+{% endmacro %}
+
+{% macro doc_frame(slot, label, size='') %}
+    {% set document = documents[slot] %}
+    {% if document and document.path %}
+    <div class="doc-frame{% if size %} {{ size }}-frame{% endif %}">
+        <img src="{{ url_for('auth.uploaded_file', filename=document.path) }}" alt="{{ label }}">
+    </div>
+    {% else %}
+    <div class="doc-placeholder{% if size %} {{ size }}-frame{% endif %}">
+        <strong>{{ label }}</strong>
+        <span class="hint">Document non joint — à téléverser depuis « En-tête &amp; documents ».</span>
+    </div>
+    {% endif %}
+{% endmacro %}
+
+<body>
+<div class="dpa-toolbar no-print">
+    <span class="title">{{ meta.title }} · {{ project.name }}</span>
+    <span class="grow"></span>
+    {% if current_user.can_edit_projects %}
+    <a href="{{ url_for('report.dpa_settings', project_id=project.id) }}">En-tête &amp; documents</a>
+    {% endif %}
+    <a href="{{ url_for('report.dpa_view', project_id=project.id) }}">Retour au rapport</a>
+    <button class="primary" type="button" onclick="window.print()">Imprimer / PDF</button>
+</div>
+
+<main>
+    <!-- ================= PAGE 1 — COVER ============================= -->
+    <section class="page cover">
+        {{ sheet_head() }}
+        <div class="page-body">
+            <div class="cover-ministry">{{ meta.ministry }}</div>
+            <div class="cover-rule"></div>
+            <h1>{{ meta.title }}</h1>
+            <h2>{{ meta.subtitle }}</h2>
+
+            <div class="cover-box">
+                <div><span>Client</span><strong>{{ client or '—' }}</strong></div>
+                {% if meta.cr %}<div><span>Commune Rurale</span><strong>{{ meta.cr }}</strong></div>{% endif %}
+                {% if meta.province %}<div><span>Province</span><strong>{{ meta.province }}</strong></div>{% endif %}
+                {% if meta.perimeter %}<div><span>Périmètre d'irrigation</span><strong>{{ meta.perimeter }}</strong></div>{% endif %}
+                <div><span>Référence</span><strong>{{ meta.reference or ('DPA-%03d'|format(project.id)) }}</strong></div>
+            </div>
+
+            <div class="cover-date">{{ month_label }}</div>
+            <div class="cover-company">{{ company.name }}</div>
+        </div>
+        {{ sheet_foot() }}
+    </section>
+
+    <!-- ================= PAGE 2 — CIN =============================== -->
+    <section class="page">
+        {{ sheet_head() }}
+        <div class="page-body">
+            {{ page_heading('Pièces justificatives', "Carte Nationale d'Identité — Client") }}
+            <p class="small muted">CIN recto-verso de {{ client }}{% if client_cin %} — {{ client_cin }}{% endif %}.</p>
+            <div class="two-col">
+                <div>
+                    <h3>Recto</h3>
+                    {{ doc_frame('cin_front', 'CIN — recto', 'small') }}
+                </div>
+                <div>
+                    <h3>Verso</h3>
+                    {{ doc_frame('cin_back', 'CIN — verso', 'small') }}
+                </div>
+            </div>
+        </div>
+        {{ sheet_foot() }}
+    </section>
+
+    <!-- ================= PAGE 3 — CNSS ============================== -->
+    <section class="page">
+        {{ sheet_head() }}
+        <div class="page-body">
+            {{ page_heading('Pièces justificatives', 'Attestation CNSS du Client') }}
+            {{ doc_frame('cnss', 'Attestation CNSS') }}
+        </div>
+        {{ sheet_foot() }}
+    </section>
+
+    <!-- ================= PAGE 4 — WELL ============================== -->
+    <section class="page">
+        {{ sheet_head() }}
+        <div class="page-body">
+            {{ page_heading('Pièces justificatives', 'Attestation de Creusement du Puits') }}
+            {{ doc_frame('well', 'Attestation de creusement du puits') }}
+        </div>
+        {{ sheet_foot() }}
+    </section>
+
+    <!-- ================= PAGE 5 — SUPPLIER ENGAGEMENT ================ -->
+    <section class="page">
+        {{ sheet_head() }}
+        <div class="page-body">
+            {{ page_heading('Pièces justificatives', 'Engagement Fournisseur') }}
+            {{ doc_frame('supplier', 'Engagement fournisseur') }}
+        </div>
+        {{ sheet_foot() }}
+    </section>
+
+    <!-- ================= PAGE 6 — QUALIFICATION ====================== -->
+    <section class="page">
+        {{ sheet_head() }}
+        <div class="page-body">
+            {{ page_heading('Pièces justificatives', 'Certificat de Qualification et de Classification') }}
+            {{ doc_frame('qualification', 'Certificat de qualification et de classification') }}
+        </div>
+        {{ sheet_foot() }}
+    </section>
+
+    <!-- ================= PAGE 7 — EXPLOITATION ======================= -->
+    <section class="page">
+        {{ sheet_head() }}
+        <div class="page-body">
+            {{ page_heading('Chapitre 1', "Identification de l'Exploitation") }}
+
+            <dl class="kv">
+                <dt>Nom et prénom</dt><dd>{{ client or '—' }}</dd>
+                <dt>C.I.N.</dt><dd>{{ client_cin or '—' }}</dd>
+                <dt>Adresse de l'exploitation</dt><dd>{{ client_address or '—' }}</dd>
+                {% if meta.cr %}<dt>Commune Rurale</dt><dd>{{ meta.cr }}</dd>{% endif %}
+                {% if meta.province %}<dt>Province</dt><dd>{{ meta.province }}</dd>{% endif %}
+            </dl>
+
+            <h3>Données de base</h3>
+            <dl class="kv">
+                <dt>Superficie totale de l'exploitation</dt>
+                <dd>{{ num(total_area_ha, 4) }} ha{% if total_area_ha %} ({{ num(total_area_ha * 10000, 0) }} m²){% endif %}</dd>
+                <dt>Superficie nette à équiper</dt>
+                <dd>{{ num(net_area_ha, 4) }} ha{% if net_area_ha %} ({{ num(net_area_ha * 10000, 0) }} m²){% endif %}</dd>
+                <dt>Sol</dt><dd>{{ exploitation.soil or '—' }}</dd>
+                <dt>Perméabilité du sol</dt>
+                <dd>{% if exploitation.permeability_mm_h %}{{ exploitation.permeability_mm_h }} mm/h{% else %}—{% endif %}</dd>
+                <dt>Topographie</dt><dd>{{ exploitation.topography or '—' }}</dd>
+            </dl>
+
+            <h3>Cultures à irriguer</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Culture</th>
+                        <th class="num">Superficie (ha)</th>
+                        <th class="num">Part (%)</th>
+                        <th class="num">Densité</th>
+                        <th class="num">Arbres</th>
+                        <th>Observations</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for crop in crops %}
+                    <tr>
+                        <td>{{ crop.variety }}</td>
+                        <td class="num">{{ num(crop.area_ha, 4) }}</td>
+                        <td class="num">{{ num(crop.share_pct, 2) }}</td>
+                        <td class="num">
+                            {% if crop.spacing_m and crop.row_spacing_m %}
+                            {{ num(crop.spacing_m, 2) }} m × {{ num(crop.row_spacing_m, 2) }} m
+                            {% else %}—{% endif %}
+                        </td>
+                        <td class="num">{{ crop.trees }}</td>
+                        <td>—</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="6" class="center muted">Aucune culture enregistrée (onglet Trees).</td></tr>
+                    {% endfor %}
+                    {% if crops %}
+                    <tr class="total">
+                        <td>Total</td>
+                        <td class="num">{{ num(net_area_ha, 4) }}</td>
+                        <td class="num">100.00</td>
+                        <td></td>
+                        <td class="num">{{ trees_count }}</td>
+                        <td></td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+
+            <h3>Ressources en eau</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Source</th>
+                        <th>Type</th>
+                        <th class="num">Profondeur (m)</th>
+                        <th class="num">Ø (mm)</th>
+                        <th class="num">Niveau statique (m)</th>
+                        <th class="num">Débit (m³/h)</th>
+                        <th>Coordonnées</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for source in sources %}
+                    <tr>
+                        <td>{{ source.name or ('Source %s'|format(source.id)) }}</td>
+                        <td>{{ {'well': 'Puits / Forage', 'basin': 'Bassin', 'reservoir': 'Réservoir',
+                                'pump': 'Pompe', 'canal': 'Canal', 'other': 'Autre'}.get(source.type, source.type) }}</td>
+                        <td class="num">{{ num(source.depth_m, 1) if source.depth_m else '—' }}</td>
+                        <td class="num">{{ num(source.diameter_mm, 0) if source.diameter_mm else '—' }}</td>
+                        <td class="num">{{ num(source.water_level_m, 1) if source.water_level_m else '—' }}</td>
+                        <td class="num">
+                            {% if source.flow_lpm %}{{ num(source.flow_lpm * 0.06, 2) }}{% else %}—{% endif %}
+                        </td>
+                        <td class="small">
+                            {% if source.lat and source.lng %}
+                            X = {{ num(source.lng, 5) }} · Y = {{ num(source.lat, 5) }}
+                            {% else %}—{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% if not sources %}
+                    <tr><td colspan="7" class="center muted">Aucune ressource enregistrée (onglet Water Resource).</td></tr>
+                    {% endif %}
+                </tbody>
+            </table>
+            {% if exploitation.water_note %}
+            <p class="small">{{ exploitation.water_note }}</p>
+            {% endif %}
+        </div>
+        {{ sheet_foot() }}
+    </section>
+
+    <!-- ================= PAGE 8 — BESOINS EN EAU ==================== -->
+    <section class="page">
+        {{ sheet_head() }}
+        <div class="page-body">
+            {{ page_heading('Chapitre 2', "Besoins en Eau et Calculs Hydrauliques") }}
+
+            <h3>Besoins nets en eau d'irrigation</h3>
+            <p class="small">
+                Les besoins nets en eau d'irrigation des cultures durant le mois de pointe
+                ({{ peak_month }} : le mois le plus exigeant en eau) valent :
+            </p>
+            {% for crop in crops %}
+            <div class="formula-box formula">
+                {{ crop.variety }} — B<sub>b</sub> (mm/j) = Kr × Kc × ETo / Ea
+                = 1.00 × {{ num(crop.kc, 2) }} × {{ num(peak_eto, 2) }} / 0.90
+                = <strong>{{ num(crop.bb_mm_day, 2) }} mm/j</strong>
+            </div>
+            {% endfor %}
+            <p class="small muted">
+                ETo : évapotranspiration de référence · Kc : coefficient cultural ·
+                Kr : coefficient de réduction (1.00 en pointe) · Ea : efficience d'application (90 %).
+            </p>
+
+            <h3>Pluviométrie fictive (Pf) et durée d'irrigation par poste (T)</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Culture</th>
+                        <th class="num">Densité</th>
+                        <th class="num">Goutteurs / plante</th>
+                        <th class="num">Q goutteur (l/h)</th>
+                        <th class="num">Q plante (l/h)</th>
+                        <th class="num">Pf (mm/h)</th>
+                        <th class="num">B<sub>b</sub> (mm/j)</th>
+                        <th class="num">T (h/j)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for crop in crops %}
+                    <tr>
+                        <td>{{ crop.variety }}</td>
+                        <td class="num">
+                            {% if crop.spacing_m and crop.row_spacing_m %}
+                            {{ num(crop.spacing_m, 2) }} × {{ num(crop.row_spacing_m, 2) }} m
+                            {% else %}—{% endif %}
+                        </td>
+                        <td class="num">{{ crop.drips_per_tree }}</td>
+                        <td class="num">{{ num(crop.emitter_lph, 2) }}</td>
+                        <td class="num">{{ num(crop.q_plant_lph, 2) }}</td>
+                        <td class="num">{{ num(crop.pf_mm_h, 2) }}</td>
+                        <td class="num">{{ num(crop.bb_mm_day, 2) }}</td>
+                        <td class="num">{{ num(crop.hours, 2) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="8" class="center muted">Aucune culture enregistrée.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <h3>Calculs hydrauliques — réseau</h3>
+            <dl class="kv">
+                <dt>Débit de projet (toutes zones)</dt><dd>{{ num(total_flow_m3h, 2) }} m³/h</dd>
+                <dt>Débit de la ressource</dt>
+                <dd>{% if source_flow_known %}{{ num(source_flow_m3h, 2) }} m³/h{% else %}<span class="muted">à renseigner</span>{% endif %}</dd>
+                <dt>Nombre de postes (zones)</dt><dd>{{ posts|length }}</dd>
+                <dt>Nombre de goutteurs</dt><dd>{{ drippers }}</dd>
+                <dt>Longueur de rampes</dt><dd>{{ num(dripline_m, 1) }} m</dd>
+                <dt>Longueur de conduites</dt><dd>{{ num(total_pipe_m, 1) }} m</dd>
+            </dl>
+        </div>
+        {{ sheet_foot() }}
+    </section>
+
+    <!-- ================= PAGE 9 — POSTES D'IRRIGATION ================ -->
+    <section class="page">
+        {{ sheet_head() }}
+        <div class="page-body">
+            {{ page_heading('Chapitre 3', "Postes d'Irrigation") }}
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Secteur</th>
+                        <th>Poste</th>
+                        <th>Culture</th>
+                        <th class="num">Surface (m²)</th>
+                        <th class="num">Arbres</th>
+                        <th class="num">Nb. goutteurs</th>
+                        <th class="num">Débit (m³/h)</th>
+                        <th class="num">Durée (h/j)</th>
+                        <th class="num">Cote (m)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for post in posts %}
+                    <tr>
+                        <td>{{ post.sector }}</td>
+                        <td>{{ post.zone }}</td>
+                        <td>{{ post.crop or '—' }}</td>
+                        <td class="num">{{ num(post.area_m2, 0) }}</td>
+                        <td class="num">{{ post.trees }}</td>
+                        <td class="num">{{ post.drippers }}</td>
+                        <td class="num">{{ num(post.flow_m3h, 2) }}</td>
+                        <td class="num">{{ num(post.hours, 2) }}</td>
+                        <td class="num">{{ num(post.elevation, 1) if post.elevation is not none else '—' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="9" class="center muted">Aucun poste : valider les zones dans Geometry.</td></tr>
+                    {% endfor %}
+                    {% if posts %}
+                    <tr class="total">
+                        <td colspan="3">Total</td>
+                        <td class="num">{{ num(posts|sum(attribute='area_m2'), 0) }}</td>
+                        <td class="num">{{ posts|sum(attribute='trees') }}</td>
+                        <td class="num">{{ drippers }}</td>
+                        <td class="num">{{ num(total_flow_m3h, 2) }}</td>
+                        {% set durations = posts|map(attribute='hours')|reject('none')|list %}
+                        <td class="num">{{ num(durations|max if durations else 0, 2) }}</td>
+                        <td></td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+            <p class="small muted">
+                Chaque zone est un poste d'irrigation, commandé par sa vanne. Le débit du poste est
+                la somme des débits de ses goutteurs ; la durée est le volume de pointe divisé par ce débit.
+            </p>
+        </div>
+        {{ sheet_foot() }}
+    </section>
+
+    <!-- ================= PAGE 10 — RAMPES & CONDUITES ================ -->
+    <section class="page">
+        {{ sheet_head() }}
+        <div class="page-body">
+            {{ page_heading('Chapitre 3 (suite)', "Rampes") }}
+
+            <h3>Rampes par poste</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Poste</th>
+                        <th>Secteur</th>
+                        <th class="num">Nb. rampes (lignes)</th>
+                        <th class="num">Longueur L<sub>r</sub> (m)</th>
+                        <th class="num">Écartement (m)</th>
+                        <th class="num">Nb. goutteurs</th>
+                        <th class="num">Q<sub>r</sub> (l/h)</th>
+                        <th class="num">Ø (mm)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for rampe in rampes %}
+                    <tr>
+                        <td>{{ rampe.zone }}</td>
+                        <td>{{ rampe.sector }}</td>
+                        <td class="num">{{ rampe.rows }}</td>
+                        <td class="num">{{ num(rampe.length_m, 1) }}</td>
+                        <td class="num">{{ num(rampe.spacing_m, 2) if rampe.spacing_m else '—' }}</td>
+                        <td class="num">{{ rampe.drippers }}</td>
+                        <td class="num">{{ num(rampe.flow_lph, 1) }}</td>
+                        <td class="num">{{ num(rampe.diameter_mm, 0) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="8" class="center muted">Aucune rampe : générer les DripLines dans Pipes.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <div class="note">
+                Chaque ligne de plantation porte une rampe ; le porte-rampes alimente les rampes du
+                poste et le débit du poste est la somme des débits de ses goutteurs.
+            </div>
+        </div>
+        {{ sheet_foot() }}
+    </section>
+
+    <!-- ================= PAGE 11 — PORTE-RAMPES & CONDUITES ========== -->
+    <section class="page">
+        {{ sheet_head() }}
+        <div class="page-body">
+            {{ page_heading('Chapitre 3 (suite)', "Porte-rampes, Antennes Secondaires, Têtes d'Unités et Conduites Principales") }}
+
+            <h3>Porte-rampes / antennes secondaires (Zone Pipes)</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Conduite</th>
+                        <th class="num">Longueur (m)</th>
+                        <th class="num">Q (m³/h)</th>
+                        <th class="num">Ø (mm)</th>
+                        <th class="num">V (m/s)</th>
+                        <th class="num">J (mce)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pipe in zone_pipes %}
+                    <tr>
+                        <td>{{ pipe.name }}</td>
+                        <td class="num">{{ num(pipe.length_m, 1) }}</td>
+                        <td class="num">{{ num(pipe.flow_m3h, 2) }}</td>
+                        <td class="num">{{ num(pipe.diameter_mm, 0) }}</td>
+                        <td class="num">{{ num(pipe.velocity_ms, 2) }}</td>
+                        <td class="num">{{ num(pipe.head_loss_m, 2) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="6" class="center muted">Aucune conduite de zone.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <h3>Conduites principales (MP / SP)</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Conduite</th>
+                        <th class="num">Longueur (m)</th>
+                        <th class="num">Q (m³/h)</th>
+                        <th class="num">Ø (mm)</th>
+                        <th class="num">V (m/s)</th>
+                        <th class="num">J (mce)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pipe in main_rows %}
+                    <tr>
+                        <td>{{ pipe.name }}</td>
+                        <td class="num">{{ num(pipe.length_m, 1) }}</td>
+                        <td class="num">{{ num(pipe.flow_m3h, 2) }}</td>
+                        <td class="num">{{ num(pipe.diameter_mm, 0) }}</td>
+                        <td class="num">{{ num(pipe.velocity_ms, 2) }}</td>
+                        <td class="num">{{ num(pipe.head_loss_m, 2) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="6" class="center muted">Aucune conduite principale.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <h3>Têtes d'unités (station de tête)</h3>
+            <table>
+                <thead><tr><th>Équipement de la station</th><th class="num">Quantité</th></tr></thead>
+                <tbody>
+                    {% for key, label in [('valves', 'Vannes'),
+                                          ('pressure_reduction', 'Réducteurs de pression'),
+                                          ('air_removal', 'Évacuations d’air'),
+                                          ('terminators', 'Bouchons / terminaux')] %}
+                    <tr>
+                        <td>{{ label }}</td>
+                        <td class="num">{{ component_counts.get(key, 0) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <div class="note">
+                Vitesse maximale admissible : 1,5 m/s dans les porte-rampes, antennes secondaires et
+                conduites principales, 1,0 m/s dans les rampes. Les pertes de charge singulières sont
+                prises égales à 10 % des pertes linéaires (Hazen-Williams, C = 140).
+            </div>
+        </div>
+        {{ sheet_foot() }}
+    </section>
+
+    <!-- ================= PAGE 11 — GOUTTEUR ========================== -->
+    <section class="page">
+        {{ sheet_head() }}
+        <div class="page-body">
+            {{ page_heading('Chapitre 3 (suite)', "Goutteur") }}
+
+            {% if settings.essai.brand or settings.essai.model %}
+            <div class="note">
+                <strong>Distributeur :</strong>
+                {{ settings.essai.brand }}{% if settings.essai.model %} — {{ settings.essai.model }}{% endif %}
+                {% if settings.essai.pressure_mce %} · Pression d'essai {{ settings.essai.pressure_mce }} mCE{% endif %}
+                {% if settings.essai.flow_lph %} · Débit mesuré {{ settings.essai.flow_lph }} l/h{% endif %}
+            </div>
+            {% endif %}
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Culture</th>
+                        <th>Densité</th>
+                        <th class="num">Goutteurs / plante</th>
+                        <th class="num">Q goutteur (l/h)</th>
+                        <th class="num">Q plante (l/h)</th>
+                        <th class="num">Pf (mm/h)</th>
+                        <th class="num">T (h/j)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for crop in crops %}
+                    <tr>
+                        <td>{{ crop.variety }}</td>
+                        <td>
+                            {% if crop.spacing_m and crop.row_spacing_m %}
+                            {{ num(crop.spacing_m, 2) }} m × {{ num(crop.row_spacing_m, 2) }} m
+                            {% else %}—{% endif %}
+                        </td>
+                        <td class="num">{{ crop.drips_per_tree }}</td>
+                        <td class="num">{{ num(crop.emitter_lph, 2) }}</td>
+                        <td class="num">{{ num(crop.q_plant_lph, 2) }}</td>
+                        <td class="num">{{ num(crop.pf_mm_h, 2) }}</td>
+                        <td class="num">{{ num(crop.hours, 2) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" class="center muted">Aucune culture enregistrée.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <h3>Conditions de fonctionnement</h3>
+            <dl class="kv">
+                <dt>Pression nominale de service</dt><dd>{{ num(min_pressure_mce, 1) }} mCE minimum au goutteur</dd>
+                <dt>Pression à la station de tête</dt><dd>{{ num(station_head_mce, 1) }} mCE</dd>
+                <dt>Efficience d'application</dt><dd>{{ num(application_efficiency * 100, 0) }} %</dd>
+                <dt>Variation admissible de pression</dt><dd>10 % (règle de Christiansen)</dd>
+            </dl>
+
+            <div class="note">
+                Loi débit-pression : q = k · P<sup>x</sup>. La variation de pression admissible entre le
+                goutteur le plus favorisé et le plus défavorisé est limitée à 10 % du débit nominal,
+                ce qui borne les pertes de charge cumulées du poste.
+            </div>
+        </div>
+        {{ sheet_foot() }}
+    </section>
+
+    <!-- ================= PAGE 12 — TRONCONS ========================== -->
+    <section class="page">
+        {{ sheet_head() }}
+        <div class="page-body">
+            {{ page_heading('Chapitre 4', "Les Tronçons") }}
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Tronçon</th>
+                        <th>Type</th>
+                        <th class="num">L (m)</th>
+                        <th class="num">Q (m³/h)</th>
+                        <th class="num">Ø ext. (mm)</th>
+                        <th class="num">V (m/s)</th>
+                        <th class="num">J (mce)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in troncons %}
+                    <tr>
+                        <td>{{ row.name }}</td>
+                        <td>{{ {'main_pipe': 'Principale', 'second_pipe': 'Secondaire', 'sub_pipe': 'Zone'}.get(row.type, row.type) }}</td>
+                        <td class="num">{{ num(row.length_m, 1) }}</td>
+                        <td class="num">{{ num(row.flow_m3h, 2) }}</td>
+                        <td class="num">{{ num(row.diameter_mm, 0) }}</td>
+                        <td class="num">{{ num(row.velocity_ms, 2) }}</td>
+                        <td class="num">{{ num(row.head_loss_m, 2) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" class="center muted">Aucun tronçon : générer les conduites dans Pipes.</td></tr>
+                    {% endfor %}
+                    {% if troncons %}
+                    <tr class="total">
+                        <td colspan="2">Total</td>
+                        <td class="num">{{ num(total_pipe_m, 1) }}</td>
+                        <td colspan="4"></td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+
+            <div class="note">
+                J = pertes de charge linéaires + 10 % de pertes singulières, calculées par la formule
+                de Hazen-Williams (C = 140) : J = (0,478 × Q<sup>1,75</sup> × D<sup>−4,75</sup> × L) × 1,10.
+                Le débit d'un tronçon principal est le débit de pointe qu'il dessert ; celui d'un tronçon de
+                zone est la somme des goutteurs de la zone.
+            </div>
+        </div>
+        {{ sheet_foot() }}
+    </section>
+
+    <!-- ================= PAGE 13 — PRESSIONS ========================= -->
+    <section class="page">
+        {{ sheet_head() }}
+        <div class="page-body">
+            {{ page_heading('Chapitre 4 (suite)', "Les Pressions") }}
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Poste</th>
+                        <th>Secteur</th>
+                        <th class="num">Q (m³/h)</th>
+                        <th class="num">Cote (m)</th>
+                        <th class="num">Pertes cumulées (mce)</th>
+                        <th class="num">P disponible (mCE)</th>
+                        <th class="num">P requise (mCE)</th>
+                        <th class="center">État</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in pressions %}
+                    <tr>
+                        <td>{{ row.zone }}</td>
+                        <td>{{ row.sector }}</td>
+                        <td class="num">{{ num(row.flow_m3h, 2) }}</td>
+                        <td class="num">{{ num(row.elevation, 1) if row.elevation is not none else '—' }}</td>
+                        <td class="num">{{ num(row.head_loss_m, 2) }}</td>
+                        <td class="num">{{ num(row.available_mce, 2) }}</td>
+                        <td class="num">{{ num(row.required_mce, 1) }}</td>
+                        <td class="center">{% if row.ok %}<strong>OK</strong>{% else %}<strong>À vérifier</strong>{% endif %}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="8" class="center muted">Aucun poste à contrôler.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <p class="small muted">
+                P disponible = pression à la station de tête ({{ num(station_head_mce, 1) }} mCE)
+                − pertes de charge cumulées (conduite secondaire du secteur la plus défavorable
+                + conduite de la zone) − dénivelée entre la source et le poste. La pression requise au
+                goutteur le plus défavorisé est de {{ num(min_pressure_mce, 1) }} mCE.
+            </p>
+        </div>
+        {{ sheet_foot() }}
+    </section>
+
+    <!-- ================= PAGE 14 — MOTOPOMPE FORAGE ================== -->
+    <section class="page">
+        {{ sheet_head() }}
+        <div class="page-body">
+            {{ page_heading('Chapitre 5', "Groupe Motopompe pour Forage") }}
+
+            {% if well %}
+            <h3>Caractéristiques du forage</h3>
+            <dl class="kv">
+                <dt>Profondeur totale</dt><dd>{{ num(well.depth_m, 1) if well.depth_m else '—' }} m</dd>
+                <dt>Niveau statique</dt><dd>{{ num(well.water_level_m, 1) if well.water_level_m else '—' }} m</dd>
+                <dt>Diamètre</dt><dd>{{ num(well.diameter_mm, 0) if well.diameter_mm else '—' }} mm</dd>
+                <dt>Débit d'exploitation</dt>
+                <dd>{% if source_flow_known %}{{ num(source_flow_m3h, 2) }} m³/h{% else %}<span class="muted">—</span>{% endif %}</dd>
+            </dl>
+            {% endif %}
+
+            {% if well_pump %}
+            <h3>Hauteur manométrique totale</h3>
+            <table>
+                <thead><tr><th>Désignation</th><th class="num">Valeur</th><th>Unité</th></tr></thead>
+                <tbody>
+                    <tr><td>Niveau dynamique de pompage</td><td class="num">{{ num(pumping_level, 2) }}</td><td>m</td></tr>
+                    <tr><td>Hauteur de refoulement (pression à la station)</td><td class="num">{{ num(station_head_mce, 1) }}</td><td>mCE</td></tr>
+                    <tr class="total"><td>Hauteur manométrique totale</td><td class="num">{{ num(well_pump.head_mce, 2) }}</td><td>mCE</td></tr>
+                </tbody>
+            </table>
+
+            <h3>Puissance de la pompe et du moteur</h3>
+            <div class="formula-box formula">
+                P pompe (kW) = (Q × HMT × 9,81) / (3600 × η) ——
+                P moteur = P pompe × (1 + marge) / η<sub>moteur</sub>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th class="num">Q (m³/h)</th>
+                        <th class="num">HMT (mCE)</th>
+                        <th class="num">η pompe</th>
+                        <th class="num">P pompe (kW)</th>
+                        <th class="num">P moteur (kW)</th>
+                        <th class="num">P moteur (CV)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="num">{{ num(well_pump.flow_m3h, 2) }}</td>
+                        <td class="num">{{ num(well_pump.head_mce, 2) }}</td>
+                        <td class="num">{{ num(well_pump.efficiency, 2) }}</td>
+                        <td class="num">{{ num(well_pump.pump_kw, 2) }}</td>
+                        <td class="num">{{ num(well_pump.motor_kw, 2) }}</td>
+                        <td class="num">{{ num(well_pump.motor_cv, 2) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+            {% else %}
+            <div class="doc-placeholder">
+                <strong>Forage non renseigné</strong>
+                <span class="hint">Ajouter un puits avec sa profondeur ou son niveau d'eau dans l'onglet
+                    Water Resource : la hauteur manométrique et la puissance se calculent à partir de ces entrées.</span>
+            </div>
+            {% endif %}
+        </div>
+        {{ sheet_foot() }}
+    </section>
+
+    <!-- ================= PAGE 15 — MOTOPOMPE BASSIN ================== -->
+    <section class="page">
+        {{ sheet_head() }}
+        <div class="page-body">
+            {{ page_heading('Chapitre 5 (suite)', "Groupe Motopompe pour Bassin") }}
+
+            {% if basin_pump %}
+            <h3>Hauteur manométrique totale</h3>
+            <table>
+                <thead><tr><th>Désignation</th><th class="num">Valeur</th><th>Unité</th></tr></thead>
+                <tbody>
+                    <tr><td>Pression à l'aval immédiat de la station de tête</td><td class="num">{{ num(station_head_mce, 1) }}</td><td>mCE</td></tr>
+                    <tr><td>Hauteur d'aspiration (profondeur du bassin)</td><td class="num">{{ num(basin.depth_m, 2) }}</td><td>m</td></tr>
+                    <tr><td>Marge de sécurité</td><td class="num">0.50</td><td>mCE</td></tr>
+                    <tr class="total"><td>Hauteur manométrique totale</td><td class="num">{{ num(basin_pump.head_mce, 2) }}</td><td>mCE</td></tr>
+                </tbody>
+            </table>
+
+            <h3>Puissance de la pompe et du moteur</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th class="num">Q (m³/h)</th>
+                        <th class="num">HMT (mCE)</th>
+                        <th class="num">η pompe</th>
+                        <th class="num">P pompe (kW)</th>
+                        <th class="num">P moteur (kW)</th>
+                        <th class="num">P moteur (CV)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="num">{{ num(basin_pump.flow_m3h, 2) }}</td>
+                        <td class="num">{{ num(basin_pump.head_mce, 2) }}</td>
+                        <td class="num">{{ num(basin_pump.efficiency, 2) }}</td>
+                        <td class="num">{{ num(basin_pump.pump_kw, 2) }}</td>
+                        <td class="num">{{ num(basin_pump.motor_kw, 2) }}</td>
+                        <td class="num">{{ num(basin_pump.motor_cv, 2) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+            {% else %}
+            <div class="doc-placeholder">
+                <strong>Bassin non renseigné</strong>
+                <span class="hint">Ajouter un bassin (longueur, largeur, profondeur) dans l'onglet Water
+                    Resource pour calculer sa pompe.</span>
+            </div>
+            {% endif %}
+        </div>
+        {{ sheet_foot() }}
+    </section>
+
+    <!-- ================= PAGE 16 — BASSIN ============================ -->
+    <section class="page">
+        {{ sheet_head() }}
+        <div class="page-body">
+            {{ page_heading('Chapitre 6', "Bassin de Stockage — Dimensions et Volume") }}
+
+            {% if basin.complete %}
+            <div class="two-col">
+                <div>
+                    <h3>Dimensions</h3>
+                    <dl class="kv">
+                        <dt>Longueur (fond)</dt><dd>{{ num(basin.length_m, 2) }} m</dd>
+                        <dt>Largeur (fond)</dt><dd>{{ num(basin.width_m, 2) }} m</dd>
+                        <dt>Profondeur</dt><dd>{{ num(basin.depth_m, 2) }} m</dd>
+                        <dt>Longueur en gueule</dt><dd>{{ num(basin.top_length_m, 2) }} m</dd>
+                        <dt>Largeur en gueule</dt><dd>{{ num(basin.top_width_m, 2) }} m</dd>
+                        <dt>Talus</dt><dd>1 : {{ num(basin.talus, 2) }}</dd>
+                        <dt>Revanche</dt><dd>{{ num(basin.revanche_m, 2) }} m</dd>
+                    </dl>
+                </div>
+                <div>
+                    <h3>Volumes et étanchéité</h3>
+                    <dl class="kv">
+                        <dt>Surface au fond</dt><dd>{{ num(basin.area_m2, 0) }} m²</dd>
+                        <dt>Volume total</dt><dd>{{ num(basin.volume_m3, 0) }} m³</dd>
+                        <dt>Volume utile</dt><dd>{{ num(basin.useful_m3, 0) }} m³</dd>
+                        <dt>Surface géomembrane</dt><dd>{{ num(basin.membrane_m2, 0) }} m²</dd>
+                    </dl>
+                </div>
+            </div>
+            {% else %}
+            <div class="doc-placeholder">
+                <strong>Bassin non renseigné</strong>
+                <span class="hint">Renseigner la longueur, la largeur et la profondeur du bassin dans
+                    l'onglet Water Resource : le volume, le volume utile et la surface de géomembrane
+                    se calculent à partir de ces entrées.</span>
+            </div>
+            {% endif %}
+        </div>
+        {{ sheet_foot() }}
+    </section>
+
+    <!-- ================= PAGE 17 — BILAN HYDRIQUE ==================== -->
+    <section class="page">
+        {{ sheet_head() }}
+        <div class="page-body">
+            {{ page_heading('Chapitre 7', "Bilan Hydrique") }}
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Mois</th>
+                        <th class="num">ETo (mm/j)</th>
+                        <th class="num">ETo (mm)</th>
+                        <th class="num">Kc</th>
+                        <th class="num">Pluie eff. (mm)</th>
+                        <th class="num">Besoin net (mm)</th>
+                        <th class="num">Besoin brut (mm)</th>
+                        <th class="num">Volume (m³)</th>
+                        <th class="num">Heures</th>
+                        <th class="num">Ressource (m³)</th>
+                        <th class="num">Bilan (m³)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for month in balance.months %}
+                    <tr>
+                        <td>{{ month.month }}</td>
+                        <td class="num">{{ num(month.eto_mm_day, 2) }}</td>
+                        <td class="num">{{ num(month.eto_mm, 1) }}</td>
+                        <td class="num">{{ num(month.kc, 2) }}</td>
+                        <td class="num">{{ num(month.rain_mm, 1) }}</td>
+                        <td class="num">{{ num(month.net_mm, 1) }}</td>
+                        <td class="num">{{ num(month.gross_mm, 1) }}</td>
+                        <td class="num">{{ num(month.volume_m3, 0) }}</td>
+                        <td class="num">{{ num(month.hours, 1) }}</td>
+                        <td class="num">{% if balance.estimated_source %}—{% else %}{{ num(month.supply_m3, 0) }}{% endif %}</td>
+                        <td class="num">{% if balance.estimated_source %}—{% else %}{{ num(month.balance_m3, 0) }}{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                    <tr class="total">
+                        <td>Total</td>
+                        <td colspan="6"></td>
+                        <td class="num">{{ num(balance.total_need_m3, 0) }}</td>
+                        <td colspan="3"></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p class="small muted">
+                Superficie équipée : {{ num(net_area_ha, 4) }} ha · Kc moyen pondéré : {{ num(balance.kc, 2) }} ·
+                Débit de la ressource : {{ num(balance.flow_m3h, 2) }} m³/h ·
+                {{ num(balance.pumping_hours, 0) }} h de pompage par jour.
+                Besoins calculés avec Ea = 90 %.
+                {% if balance.estimated_source %}
+                <br>Débit de la ressource non saisi : le bilan des ressources n'est pas comparé.
+                {% endif %}
+            </p>
+            <div class="note">
+                Le bilan compare, mois par mois, le volume nécessaire aux cultures et le volume que la
+                ressource peut fournir. Un solde négatif signale les mois où le bassin doit prendre le relais.
+            </div>
+        </div>
+        {{ sheet_foot() }}
+    </section>
+
+    <!-- ================= PAGE 18 — DEVIS ============================= -->
+    <section class="page">
+        {{ sheet_head() }}
+        <div class="page-body">
+            {{ page_heading('Chapitre 8', "Devis / Offre") }}
+
+            <dl class="kv">
+                <dt>Client</dt><dd>{{ client or '—' }}</dd>
+                {% if meta.cr %}<dt>Commune Rurale</dt><dd>{{ meta.cr }}</dd>{% endif %}
+                {% if meta.province %}<dt>Province</dt><dd>{{ meta.province }}</dd>{% endif %}
+                <dt>Devis n°</dt><dd>{{ meta.reference or ('DPA-%03d'|format(project.id)) }}</dd>
+                <dt>Date</dt><dd>{{ month_label }}</dd>
+            </dl>
+
+            {% if quote.has_lines %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Désignation</th>
+                        <th class="num">Qté</th>
+                        <th>Unité</th>
+                        <th class="num">P.U. HT ({{ quote.currency }})</th>
+                        <th class="num">Montant HT ({{ quote.currency }})</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for line in quote.lines %}
+                    <tr>
+                        <td>{{ line.label }}</td>
+                        <td class="num">{{ num(line.quantity, 2) }}</td>
+                        <td>{{ line.unit }}</td>
+                        <td class="num">{{ num(line.unit_price, 2) }}</td>
+                        <td class="num">{{ num(line.total, 2) }}</td>
+                    </tr>
+                    {% endfor %}
+                    <tr class="total">
+                        <td colspan="4">Total HT</td>
+                        <td class="num">{{ num(quote.subtotal, 2) }}</td>
+                    </tr>
+                    {% if quote.discount_pct %}
+                    <tr>
+                        <td colspan="4">Remise ({{ num(quote.discount_pct, 2) }} %)</td>
+                        <td class="num">− {{ num(quote.discount_amount, 2) }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if quote.tax_pct %}
+                    <tr>
+                        <td colspan="4">TVA ({{ num(quote.tax_pct, 2) }} %)</td>
+                        <td class="num">{{ num(quote.tax_amount, 2) }}</td>
+                    </tr>
+                    {% endif %}
+                    <tr class="total">
+                        <td colspan="4">Total TTC</td>
+                        <td class="num">{{ num(quote.total, 2) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p class="small">
+                Arrêté le présent devis à la somme de :
+                <strong>{{ quote.total_words|capitalize }}</strong>.
+            </p>
+            {% if quote.notes %}<p class="small muted">{{ quote.notes }}</p>{% endif %}
+            {% else %}
+            <div class="doc-placeholder">
+                <strong>Devis non chiffré</strong>
+                <span class="hint">Saisir les prix unitaires dans l'onglet Estimation : les quantités
+                    sont reprises du projet (conduites, rampes, goutteurs, arbres, composants).</span>
+            </div>
+            {% endif %}
+
+            <div class="signatures">
+                <div class="signature">Le Client</div>
+                <div class="signature">{{ company.name }}</div>
+            </div>
+        </div>
+        {{ sheet_foot() }}
+    </section>
+
+    <!-- ================= PAGE 19 — PLANS ============================= -->
+    <section class="page">
+        {{ sheet_head() }}
+        <div class="page-body">
+            {{ page_heading('Chapitre 9', "Plans") }}
+
+            <div class="plans-grid">
+                <div class="plan">
+                    <h4>Plan de sectorisation</h4>
+                    {{ doc_frame('plan_sectors', 'Plan de sectorisation') }}
+                </div>
+                <div class="plan">
+                    <h4>Plan de réseau</h4>
+                    {{ doc_frame('plan_network', 'Plan de réseau') }}
+                </div>
+                <div class="plan">
+                    <h4>Plan de bassin</h4>
+                    {{ doc_frame('plan_basin', 'Plan de bassin') }}
+                </div>
+                <div class="plan">
+                    <h4>Plan de station de tête</h4>
+                    {{ doc_frame('plan_head', 'Plan de station de tête') }}
+                </div>
+            </div>
+        </div>
+        {{ sheet_foot() }}
+    </section>
+
+    <!-- ================= PAGE 20 — BULLETIN D'ESSAI ================== -->
+    <section class="page">
+        {{ sheet_head() }}
+        <div class="page-body">
+            {{ page_heading("Annexe 1", "Bulletin d'Essai") }}
+
+            {{ doc_frame('bulletin', "Bulletin d'essai", 'tall') }}
+
+            {% if settings.essai.brand or settings.essai.model or settings.essai.flow_lph %}
+            <h3>Résultats d'essai — goutteur</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Distributeur</th>
+                        <th>Modèle</th>
+                        <th class="num">Pression d'essai (mCE)</th>
+                        <th class="num">Débit mesuré (l/h)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>{{ settings.essai.brand or '—' }}</td>
+                        <td>{{ settings.essai.model or '—' }}</td>
+                        <td class="num">{{ settings.essai.pressure_mce or '—' }}</td>
+                        <td class="num">{{ settings.essai.flow_lph or '—' }}</td>
+                    </tr>
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+        {{ sheet_foot() }}
+    </section>
+
+    <!-- ================= PAGE 21 — CATALOGUE ========================= -->
+    <section class="page">
+        {{ sheet_head() }}
+        <div class="page-body">
+            {{ page_heading("Annexe 2", "Catalogue des Équipements") }}
+
+            {% if component_counts %}
+            <h3>Équipements du réseau</h3>
+            <table>
+                <thead><tr><th>Catégorie</th><th class="num">Quantité</th></tr></thead>
+                <tbody>
+                    {% for key, count in component_counts.items() %}
+                    <tr>
+                        <td>{{ {'valves': 'Vannes', 'connectors': 'Visserie et raccords', 'reductions': 'Réductions',
+                                'air_removal': 'Évacuation d’air', 'pressure_reduction': 'Réducteurs de pression',
+                                'terminators': 'Bouchons / terminaux'}.get(key, key|capitalize) }}</td>
+                        <td class="num">{{ count }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+
+            {{ doc_frame('catalogue', 'Catalogue des équipements') }}
+        </div>
+        {{ sheet_foot() }}
+    </section>
+</main>
+</body>
+</html>

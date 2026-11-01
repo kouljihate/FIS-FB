@@ -1,0 +1,118 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<kml:kml xmlns:kml="http://www.opengis.net/kml/2.2">
+  <kml:Document>
+    <kml:name>Coordinates with elevation</kml:name>
+    <kml:Placemark>
+      <kml:name>33.620293, -4.730911</kml:name>
+      <kml:description>Elevation: 1527.12 m</kml:description>
+      <kml:Point>
+        <kml:coordinates>-4.73091070,33.62029310,1527.12</kml:coordinates>
+      </kml:Point>
+    </kml:Placemark>
+    <kml:Placemark>
+      <kml:name>33.619936, -4.731115</kml:name>
+      <kml:description>Elevation: 1527.12 m</kml:description>
+      <kml:Point>
+        <kml:coordinates>-4.73111450,33.61993570,1527.12</kml:coordinates>
+      </kml:Point>
+    </kml:Placemark>
+    <kml:Placemark>
+      <kml:name>33.619212, -4.731265</kml:name>
+      <kml:description>Elevation: 1517.71 m</kml:description>
+      <kml:Point>
+        <kml:coordinates>-4.73126470,33.61921200,1517.71</kml:coordinates>
+      </kml:Point>
+    </kml:Placemark>
+    <kml:Placemark>
+      <kml:name>33.618828, -4.731329</kml:name>
+      <kml:description>Elevation: 1517.71 m</kml:description>
+      <kml:Point>
+        <kml:coordinates>-4.73132910,33.61882790,1517.71</kml:coordinates>
+      </kml:Point>
+    </kml:Placemark>
+    <kml:Placemark>
+      <kml:name>33.618154, -4.731212</kml:name>
+      <kml:description>Elevation: 1507.74 m</kml:description>
+      <kml:Point>
+        <kml:coordinates>-4.73121190,33.61815440,1507.74</kml:coordinates>
+      </kml:Point>
+    </kml:Placemark>
+    <kml:Placemark>
+      <kml:name>33.617808, -4.731121</kml:name>
+      <kml:description>Elevation: 1507.74 m</kml:description>
+      <kml:Point>
+        <kml:coordinates>-4.73112100,33.61780800,1507.74</kml:coordinates>
+      </kml:Point>
+    </kml:Placemark>
+    <kml:Placemark>
+      <kml:name>33.616264, -4.730889</kml:name>
+      <kml:description>Elevation: 1508.97 m</kml:description>
+      <kml:Point>
+        <kml:coordinates>-4.73088920,33.61626370,1508.97</kml:coordinates>
+      </kml:Point>
+    </kml:Placemark>
+    <kml:Placemark>
+      <kml:name>33.616147, -4.730546</kml:name>
+      <kml:description>Elevation: 1508.97 m</kml:description>
+      <kml:Point>
+        <kml:coordinates>-4.73054590,33.61614750,1508.97</kml:coordinates>
+      </kml:Point>
+    </kml:Placemark>
+    <kml:Placemark>
+      <kml:name>33.616165, -4.730299</kml:name>
+      <kml:description>Elevation: 1508.97 m</kml:description>
+      <kml:Point>
+        <kml:coordinates>-4.73029910,33.61616540,1508.97</kml:coordinates>
+      </kml:Point>
+    </kml:Placemark>
+    <kml:Placemark>
+      <kml:name>33.616355, -4.730331</kml:name>
+      <kml:description>Elevation: 1508.97 m</kml:description>
+      <kml:Point>
+        <kml:coordinates>-4.73033120,33.61635470,1508.97</kml:coordinates>
+      </kml:Point>
+    </kml:Placemark>
+    <kml:Placemark>
+      <kml:name>33.617666, -4.730543</kml:name>
+      <kml:description>Elevation: 1507.74 m</kml:description>
+      <kml:Point>
+        <kml:coordinates>-4.73054310,33.61766580,1507.74</kml:coordinates>
+      </kml:Point>
+    </kml:Placemark>
+    <kml:Placemark>
+      <kml:name>33.618515, -4.730653</kml:name>
+      <kml:description>Elevation: 1507.74 m</kml:description>
+      <kml:Point>
+        <kml:coordinates>-4.73065320,33.61851520,1507.74</kml:coordinates>
+      </kml:Point>
+    </kml:Placemark>
+    <kml:Placemark>
+      <kml:name>33.619006, -4.730664</kml:name>
+      <kml:description>Elevation: 1527.12 m</kml:description>
+      <kml:Point>
+        <kml:coordinates>-4.73066390,33.61900650,1527.12</kml:coordinates>
+      </kml:Point>
+    </kml:Placemark>
+    <kml:Placemark>
+      <kml:name>33.619945, -4.730460</kml:name>
+      <kml:description>Elevation: 1527.12 m</kml:description>
+      <kml:Point>
+        <kml:coordinates>-4.73046000,33.61994460,1527.12</kml:coordinates>
+      </kml:Point>
+    </kml:Placemark>
+    <kml:Placemark>
+      <kml:name>33.620114, -4.730846</kml:name>
+      <kml:description>Elevation: 1527.12 m</kml:description>
+      <kml:Point>
+        <kml:coordinates>-4.73084630,33.62011440,1527.12</kml:coordinates>
+      </kml:Point>
+    </kml:Placemark>
+    <kml:Placemark>
+      <kml:name>33.620293, -4.730911</kml:name>
+      <kml:description>Elevation: 1527.12 m</kml:description>
+      <kml:Point>
+        <kml:coordinates>-4.73091070,33.62029310,1527.12</kml:coordinates>
+      </kml:Point>
+    </kml:Placemark>
+  </kml:Document>
+</kml:kml>

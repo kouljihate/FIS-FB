@@ -14,90 +14,152 @@
     <span class="badge bg-info">Status: {{ project.status }}</span>
 </div>
 
-<!-- Add Sector Button -->
-<div class="d-flex gap-2 mb-3 flex-wrap">
-    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addSectorModal">
-        <i class="bi bi-plus-circle"></i> Add Sector / إضافة قطاع
-    </button>
-    {% if sectors|length >= 1 %}
-    <button class="btn btn-outline-warning" type="button" onclick="openSplitSelected()">
-        <i class="bi bi-scissors"></i> Split Selected / تقسيم المحدد
-    </button>
-    {% endif %}
-    {% if sectors|length >= 2 %}
-    <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#mergeModal">
-        <i class="bi bi-union"></i> Merge Selected / دمج المحدد
-    </button>
-    <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#swapModal">
-        <i class="bi bi-arrow-left-right"></i> Swap / تبديل
-    </button>
-    {% endif %}
-    <form method="POST" action="{{ url_for('geometry.sector_ai_regenerate', project_id=project.id) }}" class="d-inline">
-        <button type="submit" class="btn btn-warning"
-            data-confirm="AI will rebuild all sectors. Continue? / سيعيد الذكاء الاصطناعي بناء القطاعات. متابعة؟">
-            <i class="bi bi-robot"></i> AI Regenerate / إعادة إنشاء بالذكاء الاصطناعي
-        </button>
-    </form>
-    <form method="POST" action="{{ url_for('geometry.sector_validate', project_id=project.id) }}" class="d-inline">
-        <button type="submit" class="btn btn-primary">
-            <i class="bi bi-check-circle"></i> Validate All / التحقق من الكل
-        </button>
-    </form>
-</div>
-
 <!-- Sectors Table -->
 <div class="card shadow-sm">
     <div class="card-body p-0">
         <div class="table-responsive">
             <table class="table table-hover mb-0">
-                <thead>
+<thead>
                     <tr>
-                        <th width="40"><input type="checkbox" id="selectAll" onclick="toggleAll(this)"></th>
-                        <th>ID</th>
-                        <th>Name (EN) / الاسم (EN)</th>
-                        <th>Name (AR) / الاسم (AR)</th>
-                        <th>Validated / تم التحقق</th>
-                        <th class="text-center">Actions / إجراءات</th>
+                        <th colspan="9" class="text-center" style="width: 100%; min-width: 1200px;">
+                            <button class="btn btn-circle btn-sm btn-success" data-bs-toggle="modal"
+                                    data-bs-target="#addSectorModal" title="Add /_ENABLED">
+                                <i class="bi bi-plus-circle"></i>
+                            </button>
+                            <form method="POST" id="removeSectorsForm"
+                                      action="{{ url_for('geometry.sector_remove', project_id=project.id) }}" class="d-inline">
+                                <button class="btn btn-circle btn-sm btn-outline-danger" type="button"
+                                        onclick="removeSelectedSectors()" title="Remove /_ENABLED">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                            {% if sectors|length >= 1 %}
+                            <button class="btn btn-circle btn-sm btn-outline-warning" type="button"
+                                    onclick="openSplitSelected()" title="Split / تقسيم">
+                                <i class="bi bi-scissors"></i>
+                            </button>
+                            {% endif %}
+                            {% if sectors|length >= 2 %}
+                            <button class="btn btn-circle btn-sm btn-outline-primary" data-bs-toggle="modal"
+                                    data-bs-target="#mergeModal" title="Merge / دمج">
+                                <i class="bi bi-union"></i>
+                            </button>
+                            <button class="btn btn-circle btn-sm btn-outline-primary" data-bs-toggle="modal"
+                                    data-bs-target="#swapModal" title="Swap /_ENABLED">
+                                <i class="bi bi-arrow-left-right"></i>
+                            </button>
+                            {% endif %}
+                            <button class="btn btn-circle btn-sm btn-warning" data-bs-toggle="modal"
+                                    data-bs-target="#aiGenerateModal" title="Auto Generate / توليد تلقائي">
+                                <i class="bi bi-magic"></i>
+                            </button>
+                            {% if sectors|length >= 1 %}
+                            <form method="POST" action="{{ url_for('geometry.sector_arrange', project_id=project.id) }}"
+                                  class="d-inline"
+                                  data-confirm="Arrange will clip every sector to the land boundary, remove the overlaps and extend the sectors into the remaining land so they meet each other and the boundary. Continue? / سيقص الترتيب كل قطاع على حدود الأرض، ويزيل التداخلات، ويوسع القطاعات في الأرض المتبقية حتى تتلاصق مع بعضها ومع الحدود. متابعة؟">
+                                <button type="submit" class="btn btn-circle btn-sm btn-outline-success"
+                                        title="Arrange: clip to the boundary, remove overlaps and fill the gaps between sectors / ترتيب: قص على الحدود، إزالة التداخلات وملء الفراغات بين القطاعات">
+                                    <i class="bi bi-bounding-box-circles"></i>
+                                </button>
+                            </form>
+                            {% else %}
+                            <button type="button" class="btn btn-circle btn-sm btn-outline-success" disabled
+                                    title="Create sectors first / أنشئ القطاعات أولاً">
+                                <i class="bi bi-bounding-box-circles"></i>
+                            </button>
+                            {% endif %}
+                            <form method="POST" action="{{ url_for('geometry.sector_validate', project_id=project.id) }}" class="d-inline">
+                                <button type="submit" class="btn btn-circle btn-sm btn-primary" title="Validate /_ENABLED">
+                                    <i class="bi bi-check-circle"></i>
+                                </button>
+                            </form>
+                        </th>
                     </tr>
-                </thead>
+                    <tr>
+                        <th width="40" style="vertical-align: middle;"><input type="checkbox" id="selectAll" onclick="toggleAll(this)"></th>
+                        <th style="text-align: center; vertical-align: middle;">ID</th>
+                        <th style="text-align: center; vertical-align: middle;" aria-label="Name ar top / Name en bottom"><span class="ar-text">الاسم</span><br>Name</th>
+                        <th style="text-align: center; vertical-align: middle;" aria-label="Valid ar top / Valid en top"><span class="ar-text">مثبت</span><br>Valid</th>
+                        <th style="text-align: center; vertical-align: middle;" aria-label="Area ar top / Area en top"><span class="ar-text">المساحة</span><br>Area (m²)</th>
+                        <th style="text-align: center; vertical-align: middle;" aria-label="Percentage ar top / Percentage en top"><span class="ar-text">النسبة المئوية</span><br>Percentage (%)</th>
+                        <th style="text-align: center; vertical-align: middle;" aria-label="Orientation ar top / Orientation en top"><span class="ar-text">الاتجاه</span><br>Orientation</th>
+                        <th style="text-align: center; vertical-align: middle;" aria-label="Orientation° ar top / Orientation° en top"><span class="ar-text">الاتجاه</span><br>Orientation (°)</th>
+                        <th style="text-align: center; vertical-align: middle;" aria-label="Actions ar top / Actions en top"><span class="ar-text">إجراءات</span><br>Actions</th>
+                    </tr>
+                </tbody>
+                <tfoot class="table-light">
+                    <tr>
+                        <th colspan="9" class="text-center">Total Sectors: {{ sectors|length }} / إجمالي القطاعات: {{ sectors|length }}</th>
+                    </tr>
+                </tfoot>
                 <tbody>
                     {% for s in sectors %}
-                    <tr>
-                        <td><input type="checkbox" class="sector-checkbox" value="{{ s.id }}"></td>
+                    <tr class="align-middle">
+                        <td><input type="checkbox" class="sector-checkbox" value="{{ s.id }}"
+                                   data-name-en="{{ s.name_en }}" data-name-ar="{{ s.name_ar }}"></td>
                         <td>{{ s.id }}</td>
-                        <td>{{ s.name_en }}</td>
-                        <td class="ar-text">{{ s.name_ar }}</td>
                         <td>
+                            {{ s.name_en }}
+                            {% if s.name_ar %}<span class="ar-text text-muted"> / {{ s.name_ar }}</span>{% endif %}
+                        </td>
+                        <td class="text-center">
                             {% if s.validated %}
                             <span class="badge bg-success"><i class="bi bi-check"></i></span>
                             {% else %}
                             <span class="badge bg-warning"><i class="bi bi-clock"></i></span>
                             {% endif %}
                         </td>
+                        <td class="text-center">{{ '{:,.0f}'.format(s.area_m2 or 0) }}</td>
                         <td class="text-center">
-                            <button class="btn btn-circle btn-primary" data-bs-toggle="modal"
-                                    data-bs-target="#editModal{{ s.id }}" title="Edit / تعديل">
+                            {% if global_area_m2 %}{{ '{:.1f}'.format((s.area_m2 or 0) / global_area_m2 * 100) }}%{% else %}&mdash;{% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if s.orientation %}
+                            <span class="badge bg-secondary" title="Downhill direction / اتجاه الانحدار">
+                                <i class="bi bi-compass"></i> {{ s.orientation }}
+                            </span>
+                            {% else %}
+                            <span class="text-muted">&mdash;</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% set _deg = orientation_degrees.get(s.orientation) %}
+                            {% if _deg is not none %}{{ _deg }}°{% else %}<span class="text-muted">&mdash;</span>{% endif %}
+                        </td>
+<td class="text-center">
+                            <button class="btn btn-circle btn-sm btn-primary" data-bs-toggle="modal"
+                                    data-bs-target="#editModal{{ s.id }}" title="Edit /_ENABLED">
                                 <i class="bi bi-pencil"></i>
                             </button>
-                            <button class="btn btn-circle btn-info" data-bs-toggle="modal"
-                                    data-bs-target="#renameModal{{ s.id }}" title="Rename / إعادة تسمية">
+                            <button class="btn btn-circle btn-sm btn-info" data-bs-toggle="modal"
+                                    data-bs-target="#renameModal{{ s.id }}" title="Rename /_ENABLED">
                                 <i class="bi bi-input-cursor-text"></i>
                             </button>
-                            <button class="btn btn-circle btn-warning" data-bs-toggle="modal"
-                                    data-bs-target="#splitModal{{ s.id }}" title="Split / تقسيم">
+                            <button class="btn btn-circle btn-sm btn-warning" data-bs-toggle="modal"
+                                    data-bs-target="#splitModal{{ s.id }}" title="Split /_ENABLED">
                                 <i class="bi bi-scissors"></i>
                             </button>
                         </td>
                     </tr>
 
-                    <!-- Edit Modal -->
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Per-row modals: kept outside <tbody> so the browser does not
+     foster-parent them away from their <form> elements. -->
+{% for s in sectors %}
+<!-- Edit Modal -->
                     <div class="modal fade" id="editModal{{ s.id }}" tabindex="-1">
                         <div class="modal-dialog">
-                            <div class="modal-content">
+                            <div class="modal-content modal-green">
                                 <form method="POST" action="{{ url_for('geometry.sector_edit', project_id=project.id, sector_id=s.id) }}">
-                                    <div class="modal-header bg-primary text-white">
+                                    <div class="modal-header">
                                         <h5 class="modal-title"><i class="bi bi-pencil"></i> Edit Sector / تعديل القطاع</h5>
-                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                     </div>
                                     <div class="modal-body">
                                         <div class="mb-3">
@@ -113,6 +175,16 @@
                                             <textarea name="polygon_coords" class="form-control" rows="4"
                                                       placeholder='[[lng,lat],...]'>{{ s.polygon.coordinates[0] | tojson | safe if s.polygon else '' }}</textarea>
                                         </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Orientation / الاتجاه</label>
+                                            {% set s_orient = {'ES': 'SE', 'WN': 'NW'}.get(s.orientation, s.orientation) %}
+                                            <select name="orientation" class="form-select">
+                                                <option value="auto"{% if not s.orientation %} selected{% endif %}>Auto (from slope) / تلقائي (من الميل)</option>
+                                                {% for opt in orientation_options %}
+                                                <option value="{{ opt.code }}"{% if s_orient == opt.code %} selected{% endif %}>{{ opt.en }} / {{ opt.ar }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
                                     </div>
                                     <div class="modal-footer">
                                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close / إغلاق</button>
@@ -126,11 +198,11 @@
                     <!-- Rename Modal -->
                     <div class="modal fade" id="renameModal{{ s.id }}" tabindex="-1">
                         <div class="modal-dialog">
-                            <div class="modal-content">
+                            <div class="modal-content modal-green">
                                 <form method="POST" action="{{ url_for('geometry.sector_rename', project_id=project.id, sector_id=s.id) }}">
-                                    <div class="modal-header bg-info text-white">
+                                    <div class="modal-header">
                                         <h5 class="modal-title"><i class="bi bi-input-cursor-text"></i> Rename Sector / إعادة تسمية القطاع</h5>
-                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                     </div>
                                     <div class="modal-body">
                                         <div class="mb-3">
@@ -154,9 +226,9 @@
                     <!-- Split Modal -->
                     <div class="modal fade" id="splitModal{{ s.id }}" tabindex="-1">
                         <div class="modal-dialog">
-                            <div class="modal-content">
+                            <div class="modal-content modal-green">
                                 <form method="POST" action="{{ url_for('geometry.sector_split', project_id=project.id, sector_id=s.id) }}">
-                                    <div class="modal-header bg-warning text-dark">
+                                    <div class="modal-header">
                                         <h5 class="modal-title"><i class="bi bi-scissors"></i> Split Sector / تقسيم القطاع</h5>
                                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                     </div>
@@ -170,7 +242,7 @@
                                             </select>
                                         </div>
                                     </div>
-                                    <div class="modal-footer">
+<div class="modal-footer">
                                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close / إغلاق</button>
                                         <button type="submit" class="btn btn-warning"><i class="bi bi-scissors"></i> Split / تقسيم</button>
                                     </div>
@@ -179,17 +251,11 @@
                         </div>
                     </div>
                     {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
 
 <!-- Map -->
 <div class="card shadow-sm mt-4 geometry-map-card">
-    <div class="card-header">
-        <h5 class="mb-0"><i class="bi bi-map"></i> Map Editor - Sectors / محرر الخريطة - القطاعات</h5>
-    </div>
+    {% set map_title_en = "Map Editor - Sectors" %}{% set map_title_ar = "محرر الخريطة - القطاعات" %}
+    {% include "_map_header.html" %}
     <div class="card-body">
         <div id="map"></div>
     </div>
@@ -198,11 +264,11 @@
 <!-- Add Sector Modal -->
 <div class="modal fade" id="addSectorModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
-        <div class="modal-content">
+        <div class="modal-content modal-green">
             <form method="POST" action="{{ url_for('geometry.sector_add', project_id=project.id) }}">
-                <div class="modal-header bg-success text-white">
+                <div class="modal-header">
                     <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Add New Sector / إضافة قطاع جديد</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="row">
@@ -220,6 +286,15 @@
                         <textarea name="polygon_coords" id="polygonCoords" class="form-control" rows="5"
                                   placeholder='Draw on map or enter coordinates: [[lng,lat],[lng,lat],...]' required></textarea>
                     </div>
+                    <div class="mt-3">
+                        <label class="form-label">Orientation / الاتجاه</label>
+                        <select name="orientation" class="form-select">
+                            <option value="auto" selected>Auto (from slope) / تلقائي (من الميل)</option>
+                            {% for opt in orientation_options %}
+                            <option value="{{ opt.code }}">{{ opt.en }} / {{ opt.ar }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
                     <p class="text-muted small mt-2">
                         Draw a polygon on the map above and coordinates will be auto-filled, or enter manually.
                         <br>
@@ -228,7 +303,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close / إغلاق</button>
-                    <button type="submit" class="btn btn-success"><i class="bi bi-check"></i> Add / إضافة</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check"></i> Add / إضافة</button>
                 </div>
             </form>
         </div>
@@ -238,11 +313,11 @@
 <!-- Merge Modal -->
 <div class="modal fade" id="mergeModal" tabindex="-1">
     <div class="modal-dialog">
-        <div class="modal-content">
+        <div class="modal-content modal-green">
             <form method="POST" action="{{ url_for('geometry.sector_merge', project_id=project.id) }}" id="mergeForm">
-                <div class="modal-header bg-primary text-white">
+                <div class="modal-header">
                     <h5 class="modal-title"><i class="bi bi-union"></i> Merge Sectors / دمج القطاعات</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <p>Selected sectors will be merged into one / سيتم دمج القطاعات المحددة في قطاع واحد</p>
@@ -260,9 +335,9 @@
 <!-- Split Selected Modal -->
 <div class="modal fade" id="splitSelectedModal" tabindex="-1">
     <div class="modal-dialog">
-        <div class="modal-content">
+        <div class="modal-content modal-green">
             <form method="POST" action="{{ url_for('geometry.sector_split_selected', project_id=project.id) }}">
-                <div class="modal-header bg-warning text-dark">
+                <div class="modal-header">
                     <h5 class="modal-title"><i class="bi bi-scissors"></i> Split Selected Sectors / تقسيم القطاعات المحددة</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
@@ -290,11 +365,11 @@
 <!-- Swap Modal -->
 <div class="modal fade" id="swapModal" tabindex="-1">
     <div class="modal-dialog">
-        <div class="modal-content">
+        <div class="modal-content modal-green">
             <form method="POST" action="{{ url_for('geometry.sector_swap', project_id=project.id) }}">
-                <div class="modal-header bg-primary text-white">
+                <div class="modal-header">
                     <h5 class="modal-title"><i class="bi bi-arrow-left-right"></i> Swap Sectors / تبديل القطاعات</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
@@ -323,18 +398,159 @@
     </div>
 </div>
 
+<!-- Auto Generate Sectors Modal -->
+<div class="modal fade" id="aiGenerateModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content modal-green">
+            <form method="POST" action="{{ url_for('geometry.sector_ai_regenerate', project_id=project.id) }}"
+                data-confirm="AI will rebuild all sectors, zones, network and trees using these parameters. Continue? / سيعيد الذكاء الاصطناعي بناء القطاعات والمناطق والشبكة والأشجار بناءً على هذه المعايير. متابعة؟">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-magic"></i> Auto Generate Sectors / إنشاء القطاعات بالذكاء الاصطناعي</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+
+                    <!-- Smart split -->
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" name="smart_split" id="aiSmartSplit" checked>
+                        <label class="form-check-label fw-semibold" for="aiSmartSplit">
+                            Smart split — read the land first / تقسيم ذكي — قراءة الأرض أولاً
+                        </label>
+                    </div>
+                    <p class="text-muted small mb-3" id="aiSmartHint">
+                        The land decides: it is cut recursively into equal-area blocks that follow each piece's
+                        shape and terrain (a grid, strip or contour layout only when that cannot deliver the count), every water
+                        point of the project is taken into account, and leaving the number of sectors empty
+                        derives the count from the min/max area rules.
+                        <span lang="ar">الأرض تقرر: تُقسم الأرض تكرارياً إلى كتل متساوية المساحة تتبع شكل كل جزء وتضاريسه (ويُستخدم التخطيط الشبكي أو بالشرائح أو بخطوط الارتفاع عند تعذّر الحصول على العدد)، مع أخذ كل نقاط المياه بعين الاعتبار، وترك عدد القطاعات فارغاً يشتق العدد من قاعدتي المساحة.</span>
+                    </p>
+
+                    <!-- Layout & Sizing -->
+                    <h6 class="text-primary"><i class="bi bi-bounding-box"></i> Layout & Sizing / التخطيط والحجم</h6>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-3 col-6">
+                            <label class="form-label">Number of Sectors / عدد القطاعات</label>
+                            <input type="number" name="n_sectors" id="aiNSectors" class="form-control" min="1" max="200"
+                                placeholder="Auto — from the area rules / تلقائي من قواعد المساحة"
+                                title="Leave empty for a smart count derived from the min/max area rules; type a number to force it / اتركه فارغاً لعدد ذكي مشتق من قاعدتي المساحة، أو أدخل رقماً لفرضه">
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <label class="form-label">Min Sector Area (m²) / أقل مساحة</label>
+                            <input type="number" name="min_sector_area_m2" class="form-control" min="0"
+                                value="{{ project.spec.rules.min_sector_area_m2 if project.spec and project.spec.rules else 5000 }}">
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <label class="form-label">Max Sector Area (m²) / أكبر مساحة</label>
+                            <input type="number" name="max_sector_area_m2" class="form-control" min="0"
+                                value="{{ project.spec.rules.max_sector_area_m2 if project.spec and project.spec.rules else 50000 }}">
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <label class="form-label">Edge Buffer (m) / هامش الحافة</label>
+                            <input type="number" name="inset_m" class="form-control" min="0" step="0.1" value="0"
+                                title="Inset the boundary inward so sectors keep a buffer from the land edge">
+                        </div>
+                    </div>
+
+                    <!-- Orientation & Naming -->
+                    <h6 class="text-primary"><i class="bi bi-fonts"></i> Naming / التسمية</h6>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Name Prefix (EN) / البادئة (EN)</label>
+                            <input type="text" name="name_prefix_en" class="form-control" value="Sector"
+                                placeholder="Sector">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Name Prefix (AR) / البادئة (AR)</label>
+                            <input type="text" name="name_prefix_ar" class="form-control" value="القطاع"
+                                lang="ar" placeholder="القطاع">
+                        </div>
+                    </div>
+
+                    <!-- Water Source -->
+                    <h6 class="text-primary"><i class="bi bi-droplet"></i> Water Point(s) / نقطة أو نقاط المياه</h6>
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-6">
+                            <label class="form-label">Water Source Mode / مصدر المياه</label>
+                            <select name="water_source_mode" id="aiWaterMode" class="form-select">
+                                <option value="project" {% if project.water_source and project.water_source.coordinates %}selected{% endif %}>
+                                    Use project water source / استخدام مصدر المياه للمشروع
+                                </option>
+                                <option value="custom">Custom point / نقطة مخصصة</option>
+                                <option value="none">Ignore water / تجاهل المياه</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <label class="form-label">Custom Lat / خط العرض</label>
+                            <input type="number" step="any" name="water_lat" id="aiWaterLat" class="form-control"
+                                placeholder="34.0200" disabled>
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <label class="form-label">Custom Lng / خط الطول</label>
+                            <input type="number" step="any" name="water_lng" id="aiWaterLng" class="form-control"
+                                placeholder="-6.0000" disabled>
+                        </div>
+                    </div>
+                    {% if project.water_source and project.water_source.coordinates %}
+                    <p class="text-muted small mb-3">
+                        Project water source:
+                        [{{ project.water_source.coordinates[1] }}, {{ project.water_source.coordinates[0] }}]
+                    </p>
+                    {% else %}
+                    <p class="text-muted small mb-3">No project water source set / لا يوجد مصدر مياه محدد</p>
+                    {% endif %}
+
+                    <!-- Elevation & Priority -->
+                    <h6 class="text-primary"><i class="bi bi-arrows-vertical"></i> Terrain & Priority / التضاريس والأولوية</h6>
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-6">
+                            <div class="form-check form-switch mt-4">
+                                <input class="form-check-input" type="checkbox" name="use_elevation" id="aiUseElevation"
+                                    checked>
+                                <label class="form-check-label" for="aiUseElevation">
+                                    Use elevation data (Open-Meteo) / استخدام بيانات الارتفاع
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Optimization Priority / أولوية التحسين</label>
+                            <select name="priority" class="form-select">
+                                <option value="balanced" selected>Balanced / متوازن</option>
+                                <option value="water">Water proximity / قرب نقطة المياه</option>
+                                <option value="elevation">Elevation uniformity / تجانس الارتفاع</option>
+                                <option value="area">Area balance / توازن المساحات</option>
+                                <option value="compactness">Compact shape / شكل متماسك</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel / إلغاء</button>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="bi bi-magic"></i> Generate / إنشاء
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const geojsonUrl = '{{ url_for("api.get_geometry", project_id=project.id) }}';
-    initMap('map', geojsonUrl, {
+    // Water sources are fetched with the layout so the filter can switch them:
+    // a well or basin placed by hand is what the sector split is drawn around.
+    initMap('map', geojsonUrl + '?types=sector,zone,boundary,water_source', {
         center: [34.0, -6.0],
         zoom: 14,
         editor: true,
+        drawTypes: ['polygon'],
         ruler: true,
         showArea: true,
+        // The funnel widget: land border (always first) + water sources.
+        mapFilters: ['water_source'],
         selectable: { type: 'sector', checkboxSelector: '.sector-checkbox' },
         mapActions: {
             idField: 'sector_ids',
@@ -345,6 +561,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 merge: '{{ url_for("geometry.sector_merge", project_id=project.id) }}',
                 swap: '{{ url_for("geometry.sector_swap", project_id=project.id) }}'
             }
+        },
+        mapDelete: { onClick: removeSelectedSectors },
+        // The heatmap toggle sits inside the map filter group (see map.js).
+        elevationHeatmap: {
+            url: '{{ url_for("engineering.elevation_heatmap", project_id=project.id) }}',
+            ramp: 'blue-red'
         },
         onDrawCreated: function(layer, layerType) {
             if (layerType !== 'polygon') return;
@@ -368,6 +590,16 @@ document.addEventListener('DOMContentLoaded', function() {
             list.innerHTML += `<div>Sector ID: ${cb.value}</div>`;
         });
     });
+
+    // Auto Generate modal: toggle custom water point inputs
+    const waterMode = document.getElementById('aiWaterMode');
+    function toggleCustomWater() {
+        const custom = waterMode.value === 'custom';
+        document.getElementById('aiWaterLat').disabled = !custom;
+        document.getElementById('aiWaterLng').disabled = !custom;
+    }
+    waterMode.addEventListener('change', toggleCustomWater);
+    toggleCustomWater();
 });
 
 function openSplitSelected() {
@@ -392,7 +624,39 @@ function openSplitSelected() {
 }
 
 function toggleAll(source) {
-    document.querySelectorAll('.sector-checkbox').forEach(cb => cb.checked = source.checked);
+    document.querySelectorAll('.sector-checkbox').forEach(cb => {
+        cb.checked = source.checked;
+        cb.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+}
+
+function removeSelectedSectors() {
+    const selected = document.querySelectorAll('.sector-checkbox:checked');
+    if (!selected.length) {
+        alert('Select at least one sector first / اختر قطاعا واحدا على الأقل أولا');
+        return;
+    }
+    const namesEn = Array.from(selected).map(cb => cb.dataset.nameEn).filter(Boolean);
+    const namesAr = Array.from(selected).map(cb => cb.dataset.nameAr).filter(Boolean);
+    const nameEn = namesEn.join(', ') || 'sector(s)';
+    const nameAr = namesAr.join('، ') || 'قطاع';
+    const doSubmit = function () {
+        const form = document.getElementById('removeSectorsForm');
+        form.querySelectorAll('input[name="sector_ids"]').forEach(el => el.remove());
+        selected.forEach(cb => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'sector_ids';
+            input.value = cb.value;
+            form.appendChild(input);
+        });
+        form.requestSubmit();
+    };
+    if (window.confirmDelete) {
+        window.confirmDelete(nameEn, nameAr, doSubmit);
+    } else if (window.confirm('Delete ' + nameEn + ' ?')) {
+        doSubmit();
+    }
 }
 </script>
 {% endblock %}

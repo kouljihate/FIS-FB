@@ -70,6 +70,14 @@
 </div>
 
 <!-- Valves Tables -->
+<div class="mb-3">
+    <button class="btn btn-circle btn-outline-danger" id="valveRemoveBtn" type="button"
+            onclick="valvesRemoveSelected()" title="Remove / إزالة">
+        <i class="bi bi-trash"></i>
+    </button>
+    <form method="POST" id="removeValvesForm"
+          action="{{ url_for('hydrology.valves_remove', project_id=project.id) }}" class="d-none"></form>
+</div>
 <div class="row">
     <!-- Master Valves -->
     <div class="col-md-4">
@@ -79,10 +87,11 @@
             </div>
             <div class="card-body p-0">
                 <table class="table table-sm mb-0">
-                    <thead><tr><th>ID</th><th>Name</th><th>Validated</th></tr></thead>
+                    <thead><tr><th width="30"><input type="checkbox" onclick="toggleAllValves(this)"></th><th>ID</th><th>Name</th><th>Validated</th></tr></thead>
                     <tbody>
                         {% for v in master_valves %}
                         <tr>
+                            <td><input type="checkbox" class="valve-checkbox" value="{{ v.id }}" data-name-en="{{ v.name_en }}" data-name-ar="{{ v.name_ar }}"></td>
                             <td>{{ v.id }}</td>
                             <td>{{ v.name_en }}</td>
                             <td>
@@ -91,7 +100,7 @@
                             </td>
                         </tr>
                         {% else %}
-                        <tr><td colspan="3" class="text-center text-muted">None / لا يوجد</td></tr>
+                        <tr><td colspan="4" class="text-center text-muted">None / لا يوجد</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -107,10 +116,11 @@
             </div>
             <div class="card-body p-0">
                 <table class="table table-sm mb-0">
-                    <thead><tr><th>ID</th><th>Name</th><th>Sector</th><th>Validated</th></tr></thead>
+                    <thead><tr><th width="30"><input type="checkbox" onclick="toggleAllValves(this)"></th><th>ID</th><th>Name</th><th>Sector</th><th>Validated</th></tr></thead>
                     <tbody>
                         {% for v in sector_valves %}
                         <tr>
+                            <td><input type="checkbox" class="valve-checkbox" value="{{ v.id }}" data-name-en="{{ v.name_en }}" data-name-ar="{{ v.name_ar }}"></td>
                             <td>{{ v.id }}</td>
                             <td>{{ v.name_en }}</td>
                             <td>{{ v.properties.sector_id or '-' }}</td>
@@ -120,7 +130,7 @@
                             </td>
                         </tr>
                         {% else %}
-                        <tr><td colspan="4" class="text-center text-muted">None / لا يوجد</td></tr>
+                        <tr><td colspan="5" class="text-center text-muted">None / لا يوجد</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -136,10 +146,11 @@
             </div>
             <div class="card-body p-0">
                 <table class="table table-sm mb-0">
-                    <thead><tr><th>ID</th><th>Name</th><th>Zone</th><th>Validated</th></tr></thead>
+                    <thead><tr><th width="30"><input type="checkbox" onclick="toggleAllValves(this)"></th><th>ID</th><th>Name</th><th>Zone</th><th>Validated</th></tr></thead>
                     <tbody>
                         {% for v in zone_valves %}
                         <tr>
+                            <td><input type="checkbox" class="valve-checkbox" value="{{ v.id }}" data-name-en="{{ v.name_en }}" data-name-ar="{{ v.name_ar }}"></td>
                             <td>{{ v.id }}</td>
                             <td>{{ v.name_en }}</td>
                             <td>{{ v.properties.zone_id or '-' }}</td>
@@ -149,7 +160,7 @@
                             </td>
                         </tr>
                         {% else %}
-                        <tr><td colspan="4" class="text-center text-muted">None / لا يوجد</td></tr>
+                        <tr><td colspan="5" class="text-center text-muted">None / لا يوجد</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -169,9 +180,8 @@
 
 <!-- Map -->
 <div class="card shadow-sm mt-4">
-    <div class="card-header">
-        <h5 class="mb-0"><i class="bi bi-map"></i> Map - Add Valves / الخريطة - إضافة الصمامات</h5>
-    </div>
+    {% set map_title_en = "Map - Add Valves" %}{% set map_title_ar = "الخريطة - إضافة الصمامات" %}
+    {% include "_map_header.html" %}
     <div class="card-body">
         <div class="mb-2">
             <button class="btn btn-outline-primary btn-sm" onclick="startDrawPoint()">
@@ -191,8 +201,65 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const geojsonUrl = '{{ url_for("api.get_geometry", project_id=project.id) }}';
-    initMap('map', geojsonUrl, { center: [34.0, -6.0], zoom: 14 });
+    initMap('map', geojsonUrl, {
+        center: [34.0, -6.0], zoom: 14,
+        selectable: { type: ['master_valve', 'sector_valve', 'zone_valve'], checkboxSelector: '.valve-checkbox', toggleOnClick: true },
+        mapDelete: { onClick: valvesRemoveSelected },
+        elevationHeatmap: {
+            url: '{{ url_for("engineering.elevation_heatmap", project_id=project.id) }}',
+            ramp: 'blue-red'
+        }
+    });
+
+    document.addEventListener('change', function(event) {
+        if (event.target && event.target.matches && event.target.matches('.valve-checkbox')) {
+            updateValvesToolbar();
+        }
+    });
+    updateValvesToolbar();
 });
+
+function updateValvesToolbar() {
+    const count = document.querySelectorAll('.valve-checkbox:checked').length;
+    const removeBtn = document.getElementById('valveRemoveBtn');
+    if (removeBtn) removeBtn.disabled = count === 0;
+}
+
+function toggleAllValves(source) {
+    document.querySelectorAll('.valve-checkbox').forEach(cb => {
+        cb.checked = source.checked;
+        cb.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+}
+
+function valvesRemoveSelected() {
+    const selected = document.querySelectorAll('.valve-checkbox:checked');
+    if (!selected.length) {
+        alert('Select at least one valve first / اختر صماماً واحداً على الأقل أولا');
+        return;
+    }
+    const namesEn = Array.from(selected).map(cb => cb.dataset.nameEn).filter(Boolean);
+    const namesAr = Array.from(selected).map(cb => cb.dataset.nameAr).filter(Boolean);
+    const nameEn = namesEn.join(', ') || 'valve(s)';
+    const nameAr = namesAr.join('، ') || 'صمام';
+    const doSubmit = function () {
+        const form = document.getElementById('removeValvesForm');
+        form.querySelectorAll('input[name="element_ids"]').forEach(el => el.remove());
+        selected.forEach(cb => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'element_ids';
+            input.value = cb.value;
+            form.appendChild(input);
+        });
+        form.requestSubmit();
+    };
+    if (window.confirmDelete) {
+        window.confirmDelete(nameEn, nameAr, doSubmit);
+    } else if (window.confirm('Delete ' + nameEn + ' ?')) {
+        doSubmit();
+    }
+}
 
 function toggleSectorZone(select) {
     const type = select.value;

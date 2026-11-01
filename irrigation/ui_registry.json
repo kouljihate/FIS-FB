@@ -1,0 +1,122 @@
+{
+  "pages": [
+    { "key": "auth.login", "id": "0.0", "name": "Login", "description": "Sign in page; entry point for every user." },
+    { "key": "auth.set_password", "id": "0.1", "name": "Set Password", "description": "Replace the administrator-issued temporary password." },
+    { "key": "auth.profile", "id": "0.2", "name": "Profile", "description": "User account details, photo and password." },
+
+    { "key": "auth.users", "id": "1.0", "name": "Users", "description": "Admin management of accounts, roles and access." },
+
+    { "key": "project.index", "id": "2.0", "name": "Projects", "description": "Dashboard listing all projects, with open and create actions." },
+    { "key": "project.create", "id": "2.1", "name": "New Project", "description": "Create a project: identity, location and land documents." },
+    { "key": "project.detail", "id": "2.2", "name": "Project Detail", "description": "Project file: info, settings, KML import/export and documents." },
+
+    { "key": "water.well", "id": "3.0", "name": "Water - Well", "description": "Register and edit wells as water sources." },
+    { "key": "water.basin", "id": "3.1", "name": "Water - Basin", "description": "Register and edit basins as water sources." },
+    { "key": "water.other", "id": "3.2", "name": "Water - Other", "description": "Other water sources outside well and basin types." },
+
+    { "key": "geometry.sectors_view", "id": "4.0", "name": "Geometry - Sectors", "description": "Draw, split, merge and arrange project sectors." },
+    { "key": "geometry.zones_view", "id": "4.1", "name": "Geometry - Zones", "description": "Draw, split and orient zones inside each sector." },
+
+    { "key": "hydrology.main_pipe", "id": "5.0", "name": "Pipes - Main Pipe", "description": "Main pipe (MP) network from the water source." },
+    { "key": "hydrology.second_pipe", "id": "5.1", "name": "Pipes - Second Pipe", "description": "Second pipe (SP) branches feeding the sectors." },
+    { "key": "hydrology.sub_pipe", "id": "5.2", "name": "Pipes - Zone Pipe", "description": "Zone pipes (ZP) distributing water inside sectors." },
+    { "key": "hydrology.dripline", "id": "5.3", "name": "Pipes - Dripline", "description": "Drip lines (DL), one per tree row; unlocked after rows validation." },
+    { "key": "hydrology.network_elements", "id": "5.4", "name": "Pipes - Network", "description": "Full irrigation network overview and validation." },
+
+    { "key": "trees.rows_view", "id": "6.0", "name": "Trees - Rows", "description": "Define planting rows, spacing and orientation." },
+    { "key": "trees.trees_view", "id": "6.1", "name": "Trees - Trees", "description": "Generate and manage individual trees per row." },
+
+    { "key": "components.valves", "id": "7.0", "name": "Components - Valves", "description": "Master, sector and zone valves on the map." },
+    { "key": "components.connectors", "id": "7.1", "name": "Components - Connectors", "description": "Connector fittings placed on the pipe network." },
+    { "key": "components.reductors", "id": "7.2", "name": "Components - Reductors", "description": "Pressure-reducing fittings on the pipe network." },
+    { "key": "components.air_removal", "id": "7.3", "name": "Components - Air Removal", "description": "Air release / air valves on the pipe network." },
+    { "key": "components.pressure_reduction", "id": "7.4", "name": "Components - Pressure Reduction", "description": "Pressure reduction assemblies on the pipe network." },
+    { "key": "components.terminators", "id": "7.5", "name": "Components - Terminators", "description": "End-of-line terminator fittings." },
+
+    { "key": "overview.index", "id": "8.0", "name": "Map Overview", "description": "Interactive map of the whole project with object editing." },
+
+    { "key": "engineering.validation_view", "id": "9.0", "name": "Validation", "description": "Engineering checks, regeneration report and elevation data." },
+
+    { "key": "estimation.quote_view", "id": "10.0", "name": "Estimation - Pricing", "description": "Quantities and costed quotation for the project." },
+    { "key": "estimation.roi_view", "id": "10.1", "name": "Estimation - ROI", "description": "Return on investment and payback over the exploitation years." },
+
+    { "key": "report.dpa_view", "id": "11.0", "name": "Report - DPA", "description": "Report tab: sheets overview and the button that builds the report." },
+    { "key": "report.dpa_print", "id": "11.1", "name": "Report - DPA Print", "description": "Printable DPA technical report built from project entries." },
+    { "key": "report.dpa_settings", "id": "11.2", "name": "Report - DPA Settings", "description": "Report header, footer, cover and scanned documents." },
+
+    { "key": "error:404", "id": "12.0", "name": "Page Not Found", "description": "404 error page for unknown URLs." },
+    { "key": "error:500", "id": "12.1", "name": "Server Error", "description": "500 error page for unexpected failures." }
+  ],
+
+  "modals": [
+    { "key": "auth/users.html#newUserModal", "id": "1.0.1", "name": "New User", "description": "Modal form: create an account with role and temporary password." },
+
+    { "key": "project/index.html#linkKmlModal", "id": "2.0.1", "name": "Link KML/KMZ File", "description": "Modal form: attach a KML/KMZ file to a project from the list." },
+    { "key": "project/create.html#newProjectAdminModal", "id": "2.1.1", "name": "New Project Admin", "description": "Modal form: assign the administrator of the new project." },
+    { "key": "project/detail.html#editSpecModal", "id": "2.2.1", "name": "Project Settings", "description": "Modal form: edit project identity, owner and specification." },
+    { "key": "project/detail.html#kmlElementsModal", "id": "2.2.2", "name": "KML/KMZ Elements", "description": "Modal form: preview layers and elements read from the KML." },
+    { "key": "project/detail.html#deleteProjectModal", "id": "2.2.3", "name": "Delete Project", "description": "Modal form: confirm permanent deletion of the project." },
+
+    { "key": "water/sources.html#addSourceModal", "id": "3.0.1", "name": "Add Water Source", "description": "Modal form: add a source of the active tab; shared by Well, Basin and Other (3.0, 3.1, 3.2)." },
+    { "key": "water/sources.html#editSourceModal", "id": "3.0.2", "name": "Edit Water Source", "description": "Modal form: edit one source's parameters (per-row); shared by 3.0, 3.1, 3.2." },
+    { "key": "water/sources.html#renameSourceModal", "id": "3.0.3", "name": "Rename Water Source", "description": "Modal form: rename a source in English and Arabic; shared by 3.0, 3.1, 3.2." },
+
+    { "key": "geometry/sectors.html#addSectorModal", "id": "4.0.1", "name": "Add New Sector", "description": "Modal form: create a sector with area and shape." },
+    { "key": "geometry/sectors.html#editModal", "id": "4.0.2", "name": "Edit Sector", "description": "Modal form: edit one sector's properties (per-row)." },
+    { "key": "geometry/sectors.html#renameModal", "id": "4.0.3", "name": "Rename Sector", "description": "Modal form: rename a sector in English and Arabic (per-row)." },
+    { "key": "geometry/sectors.html#splitModal", "id": "4.0.4", "name": "Split Sector", "description": "Modal form: split one sector into parts (per-row)." },
+    { "key": "geometry/sectors.html#mergeModal", "id": "4.0.5", "name": "Merge Sectors", "description": "Modal form: merge two or more selected sectors." },
+    { "key": "geometry/sectors.html#splitSelectedModal", "id": "4.0.6", "name": "Split Selected Sectors", "description": "Modal form: batch-split every selected sector." },
+    { "key": "geometry/sectors.html#swapModal", "id": "4.0.7", "name": "Swap Sectors", "description": "Modal form: exchange two sectors' identifiers." },
+    { "key": "geometry/sectors.html#aiGenerateModal", "id": "4.0.8", "name": "Auto Generate Sectors", "description": "Modal form: AI generation of the sector layout." },
+
+    { "key": "geometry/zones.html#addZoneModal", "id": "4.1.1", "name": "Add Zone", "description": "Modal form: create a zone inside a sector." },
+    { "key": "geometry/zones.html#editZoneModal", "id": "4.1.2", "name": "Edit Zone", "description": "Modal form: edit one zone's properties (per-row)." },
+    { "key": "geometry/zones.html#orientationZoneModal", "id": "4.1.3", "name": "Edit Zone Orientation", "description": "Modal form: set the zone's orientation in degrees (per-row)." },
+    { "key": "geometry/zones.html#renameZoneModal", "id": "4.1.4", "name": "Rename Zone", "description": "Modal form: rename a zone in English and Arabic (per-row)." },
+    { "key": "geometry/zones.html#splitZoneModal", "id": "4.1.5", "name": "Split Zone", "description": "Modal form: split one zone into parts (per-row)." },
+    { "key": "geometry/zones.html#mergeZoneModal", "id": "4.1.6", "name": "Merge Zones", "description": "Modal form: merge two or more selected zones." },
+    { "key": "geometry/zones.html#splitZoneSelectedModal", "id": "4.1.7", "name": "Split Selected Zones", "description": "Modal form: batch-split every selected zone." },
+    { "key": "geometry/zones.html#splitSectorZonesModal", "id": "4.1.8", "name": "Split Sectors into Zones", "description": "Modal form: auto-divide a whole sector into zones." },
+    { "key": "geometry/zones.html#swapZoneModal", "id": "4.1.9", "name": "Swap Zones", "description": "Modal form: exchange two zones' identifiers." },
+    { "key": "geometry/zones.html#aiGenerateZoneModal", "id": "4.1.10", "name": "Auto Generate Zones", "description": "Modal form: AI generation of the zone layout." },
+
+    { "key": "hydrology/main_pipe.html#aiPipingModal", "id": "5.0.2", "name": "Auto Generate Main Pipe", "description": "Modal form: AI generation of the main pipe." },
+    { "key": "hydrology/second_pipe.html#aiPipingModal", "id": "5.1.2", "name": "Auto Generate Second Pipes", "description": "Modal form: AI generation of the second pipes." },
+    { "key": "hydrology/sub_pipe.html#aiPipingModal", "id": "5.2.2", "name": "Auto Generate Zone Pipes", "description": "Modal form: AI generation of the zone pipes." },
+    { "key": "hydrology/dripline.html#aiDriplineModal", "id": "5.3.1", "name": "Auto Generate Drip Lines", "description": "Modal form: AI generation of the drip lines." },
+
+    { "key": "hydrology/_pipe_editor_modals.html#addMainPipeModal", "id": "5.0.1", "name": "Add Main Pipe (MP)", "description": "Modal form: draw a new main pipe with diameter." },
+    { "key": "hydrology/_pipe_editor_modals.html#pipeRenameModal", "id": "5.0.3", "name": "Rename Pipe", "description": "Modal form: rename the pipe selected on the map; shared by 5.0, 5.1, 5.2, 5.3." },
+    { "key": "hydrology/_pipe_editor_modals.html#pipeEditModal", "id": "5.0.4", "name": "Edit / Change Pipe", "description": "Modal form: change diameter or coordinates of the selected pipe; shared by 5.0, 5.1, 5.2, 5.3." },
+    { "key": "hydrology/_pipe_editor_modals.html#pipeTraceAddModal", "id": "5.0.5", "name": "Add Pipe (Trace)", "description": "Modal form: trace a pipe on the map with diameter and zone; shared by 5.0, 5.1, 5.2, 5.3." },
+    { "key": "hydrology/_pipe_editor_modals.html#addSecondPipeModal", "id": "5.1.1", "name": "Add Second Pipe (SP)", "description": "Modal form: draw a new second pipe with diameter." },
+    { "key": "hydrology/_pipe_editor_modals.html#addZonePipeModal", "id": "5.2.1", "name": "Add Zone Pipe (ZP)", "description": "Modal form: draw a new zone pipe with diameter." },
+
+    { "key": "trees/rows.html#editRowModal", "id": "6.0.1", "name": "Edit Row", "description": "Modal form: edit one row's spacing and geometry (per-row)." },
+    { "key": "trees/rows.html#renameRowModal", "id": "6.0.2", "name": "Rename Row", "description": "Modal form: rename a row in English and Arabic (per-row)." },
+    { "key": "trees/rows.html#generateRowsModal", "id": "6.0.3", "name": "Generate Rows", "description": "Modal form: auto-generate rows from spacing and orientation." },
+    { "key": "trees/rows.html#orientationModal", "id": "6.0.4", "name": "Change Orientation", "description": "Modal form: rotate the orientation of all rows." },
+
+    { "key": "trees/trees.html#deleteAllTreesModal", "id": "6.1.1", "name": "Delete All Trees", "description": "Modal form: confirm clearing every generated tree." },
+    { "key": "trees/trees.html#addTreeModal", "id": "6.1.2", "name": "Add Tree", "description": "Modal form: add a single tree on a row." },
+    { "key": "trees/trees.html#editTreeModal", "id": "6.1.3", "name": "Edit Tree", "description": "Modal form: edit one tree's position and attributes." },
+    { "key": "trees/trees.html#treeSetupModal", "id": "6.1.4", "name": "Tree Setup", "description": "Modal wizard: configure automatic tree generation." },
+
+    { "key": "components/valves.html#addValveModal", "id": "7.0.1", "name": "Add Valve", "description": "Modal form: place a valve by type and map location." },
+    { "key": "components/valves.html#editValveModal", "id": "7.0.2", "name": "Edit Valve", "description": "Modal form: edit one valve's type, assignment, diameter (per-row)." },
+    { "key": "components/valves.html#renameValveModal", "id": "7.0.3", "name": "Rename Valve", "description": "Modal form: rename a valve in English and Arabic (per-row)." },
+    { "key": "components/valves.html#generateValvesModal", "id": "7.0.4", "name": "Generate Valves", "description": "Modal form: create valves automatically from the pipes." },
+
+    { "key": "components/component_tab.html#addComponentModal", "id": "7.1.1", "name": "Add Component", "description": "Modal form: place a component by type and location; shared by Connectors, Reductors, Air Removal, Pressure Reduction and Terminators (7.1-7.5)." },
+    { "key": "components/component_tab.html#editComponentModal", "id": "7.1.2", "name": "Edit Component", "description": "Modal form: edit one component's fields (per-row); shared by 7.1-7.5." },
+    { "key": "components/component_tab.html#renameComponentModal", "id": "7.1.3", "name": "Rename Component", "description": "Modal form: rename a component in English and Arabic (per-row); shared by 7.1-7.5." },
+    { "key": "components/component_tab.html#generateComponentModal", "id": "7.1.4", "name": "Generate Components", "description": "Modal form: create components automatically from the pipes; shared by 7.1-7.5." },
+
+    { "key": "overview/index.html#renameObjectModal", "id": "8.0.1", "name": "Rename Object", "description": "Modal form: rename any feature selected on the map." },
+    { "key": "overview/index.html#editObjectModal", "id": "8.0.2", "name": "Edit Object", "description": "Modal form: edit the attributes of the selected feature." },
+
+    { "key": "base.html#confirmActionModal", "id": "13.0", "name": "Global - Confirm Action", "description": "Modal form from base.html, shown on every page to confirm an action." },
+    { "key": "base.html#confirmDeleteModal", "id": "13.1", "name": "Global - Confirm Delete", "description": "Modal form from base.html, shown on every page to confirm a deletion." }
+  ]
+}

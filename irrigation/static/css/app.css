@@ -39,17 +39,29 @@
 }
 
 :root {
-    --font-en: 'VIP-Rawy', 'Comfortaa', 'Segoe UI', sans-serif;
-    --font-ar: 'VIP-Rawy', 'Amiri', serif;
+    /* English default: Comfortaa. Arabic glyphs fall back to VIP-Rawy. */
+    --font-en: 'Comfortaa', 'VIP-Rawy', sans-serif;
+    /* Arabic default: VIP-Rawy. */
+    --font-ar: 'VIP-Rawy', 'Comfortaa', sans-serif;
+    /* Make Bootstrap/Bootswatch use the same defaults. */
+    --bs-body-font-family: var(--font-en);
+    --bs-font-sans-serif: var(--font-en);
 }
 
-/* Prefer VIP-Rawy for Arabic glyphs and Comfortaa for Latin glyphs. */
-.en-text, body, .navbar, .btn, .card, .table, .form-control, .form-label, .badge {
+/* The two default fonts everywhere — no other fonts. */
+html, body, h1, h2, h3, h4, h5, h6, p, a, li, dl, dt, dd, td, th, label,
+small, strong, b, em, ul, ol, button, input, select, textarea,
+.en-text, .navbar, .nav-link, .btn, .card, .table, .form-control, .form-select,
+.form-label, .form-check-label, .badge, .modal, .dropdown-menu, .list-group-item,
+.card-header, .navbar-brand, .breadcrumb, .alert, .nav-item, .form-text {
     font-family: var(--font-en) !important;
 }
 
 /* Arabic text uses VIP-Rawy */
-.ar-text {
+.ar-text,
+[lang="ar"],
+.lang-ar,
+.bilingual .ar {
     font-family: var(--font-ar) !important;
     direction: rtl;
 }
@@ -70,6 +82,20 @@
 .bilingual .ar {
     font-family: var(--font-ar);
     direction: rtl;
+}
+
+/* Bilingual table-cell value: Arabic on top, English underneath */
+.cell-bilingual {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    line-height: 1.25;
+}
+
+.cell-bilingual .cell-bilingual-en {
+    font-size: 0.88em;
+    opacity: 0.85;
 }
 
 .bilingual-heading {
@@ -190,41 +216,145 @@ footer {
     font-size: 0.8rem;
 }
 
+.version-badge {
+    background-color: rgba(223, 214, 214, 0.15);
+    color: rgba(255, 255, 255, 0.85);
+    font-weight: 500;
+    font-size: 0.72rem;
+    padding: 0.35em 0.65em;
+}
+
+/* Repository name sits next to the version badge in the footer. */
+.footer-badges {
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: right;
+    gap: 0.35rem;
+    
+}
+
+.repo-badge .bi {
+    margin-right: 0.25em;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+/* Database status next to the version badge: green dot when MongoDB answers,
+   red when it does not. */
+.db-badge .db-status-icon {
+    font-size: 0.6rem;
+    vertical-align: 0.1em;
+    margin-right: 0.2em;
+}
+
+.db-badge.db-ready .db-status-icon {
+    color: #22c55e;
+}
+
+.db-badge.db-down .db-status-icon {
+    color: #ef4444;
+}
+
+/* Page id badge: the smart id of the page being shown, in the same size as
+   the other footer tags.  Clicking it toggles the ui_registry popover. */
+.page-id-badge {
+    background-color: #f5c518;
+    color: #1f2430;
+    border: 0;
+    cursor: pointer;
+    user-select: none;
+}
+
+.page-id-badge:hover,
+.page-id-badge:focus,
+.page-id-badge.show {
+    background-color: #ffd84d;
+    color: #1f2430;
+}
+
+.page-id-badge .bi {
+    margin-right: 0.2em;
+    font-size: 0.66rem;
+}
+
+/* Popover body: key, name, description and templates of the page. */
+.page-id-popover-row {
+    display: block;
+    margin-bottom: 0.4rem;
+    word-break: break-word;
+}
+
+.page-id-popover-row:last-child {
+    margin-bottom: 0;
+}
+
+.page-id-popover-label {
+    display: block;
+    font-size: 0.66rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    opacity: 0.65;
+}
+
+.page-id-popover-value {
+    display: block;
+    font-size: 0.8rem;
+}
+
 .flash-toast-container {
+    position: fixed;
+    top: 70%;
+    right: 1rem;                 /* distance from right edge */
+    transform: translateY(-70%); /* move up by 50% of its own height */
     z-index: 1090;
 }
 
 .flash-toast {
-    width: min(50rem, calc(100vw - 2rem));
+    width: min(30rem, calc(200vw - 2rem));
 }
 
 .projects-page {
-    --font-en: 'Comfortaa', 'VIP-Rawy', 'Segoe UI', sans-serif;
     font-family: var(--font-en);
 }
 
 .projects-page-header {
-    display: grid;
-    grid-template-columns: 15% 70% 15%;
+    display: flex;
     align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+/* Bilingual page header: English title | Create button | Arabic title,
+   all on a single row. */
+.projects-page-titles {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+    min-width: 0;
+}
+
+.projects-page-title-en,
+.projects-page-title-ar {
+    margin: 0;
+    white-space: nowrap;
 }
 
 .projects-page-title-en {
-    grid-column: 1;
     justify-self: start;
-    margin: 0;
-}
-
-.projects-page-create {
-    grid-column: 2;
-    justify-self: center;
 }
 
 .projects-page-title-ar {
-    grid-column: 3;
     justify-self: end;
-    margin: 0;
     text-align: right;
+    font-family: var(--font-ar) !important;
+}
+
+.projects-page-create {
+    justify-self: center;
+    flex: none;
     white-space: nowrap;
 }
 
@@ -236,6 +366,43 @@ footer {
 .projects-page .bilingual-heading-ar,
 .projects-page .bilingual-label-ar,
 .projects-page .bilingual-button-ar {
+    font-family: var(--font-ar) !important;
+}
+
+/* Project detail card header: English title (15%) | Edit action (70%) |
+   Arabic title (15%). */
+.project-info-header {
+    display: grid;
+    grid-template-columns: 15% 70% 15%;
+    align-items: center;
+}
+
+.project-info-title-en,
+.project-info-title-ar {
+    margin: 0;
+    white-space: nowrap;
+}
+
+.project-info-title-en {
+    grid-column: 1;
+    justify-self: start;
+    font-family: var(--font-en) !important;
+}
+
+.project-info-actions {
+    grid-column: 2;
+    justify-self: center;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.project-info-title-ar {
+    grid-column: 3;
+    justify-self: end;
+    text-align: right;
     font-family: var(--font-ar) !important;
 }
 
@@ -254,7 +421,7 @@ footer {
 .geometry-sectors-title-en {
     grid-column: 1;
     justify-self: start;
-    font-family: 'Comfortaa', 'Segoe UI', sans-serif !important;
+    font-family: var(--font-en) !important;
 }
 
 .geometry-sectors-icon {
@@ -268,7 +435,7 @@ footer {
     grid-column: 3;
     justify-self: end;
     text-align: right;
-    font-family: 'VIP-Rawy', 'Amiri', serif !important;
+    font-family: var(--font-ar) !important;
 }
 
 .geometry-zones-header {
@@ -286,7 +453,7 @@ footer {
 .geometry-zones-title-en {
     grid-column: 1;
     justify-self: start;
-    font-family: 'Comfortaa', 'Segoe UI', sans-serif !important;
+    font-family: var(--font-en) !important;
 }
 
 .geometry-zones-icon {
@@ -300,12 +467,45 @@ footer {
     grid-column: 3;
     justify-self: end;
     text-align: right;
-    font-family: 'VIP-Rawy', 'Amiri', serif !important;
+    font-family: var(--font-ar) !important;
+}
+
+/* Generic workflow page header (Hydrology 1: Main Pipe / Zone Pipe) */
+.wf-page-header {
+    display: grid;
+    grid-template-columns: 15% 70% 15%;
+    align-items: center;
+}
+
+.wf-title-en,
+.wf-title-ar {
+    margin: 0;
+    white-space: nowrap;
+}
+
+.wf-title-en {
+    grid-column: 1;
+    justify-self: start;
+    font-family: var(--font-en) !important;
+}
+
+.wf-icon {
+    grid-column: 2;
+    justify-self: center;
+    color: var(--bs-primary);
+    font-size: 1.5rem;
+}
+
+.wf-title-ar {
+    grid-column: 3;
+    justify-self: end;
+    text-align: right;
+    font-family: var(--font-ar) !important;
 }
 
 .latin-number,
 .projects-page .latin-number {
-    font-family: 'Comfortaa', 'Segoe UI', sans-serif !important;
+    font-family: var(--font-en) !important;
     direction: ltr;
     unicode-bidi: isolate;
 }
@@ -313,7 +513,7 @@ footer {
 .form-control,
 .form-select,
 textarea {
-    font-family: 'Comfortaa', 'VIP-Rawy', 'Segoe UI', sans-serif !important;
+    font-family: var(--font-en) !important;
 }
 
 @media (max-width: 767.98px) {
@@ -363,29 +563,75 @@ textarea {
         grid-row: 3;
     }
 
-    .projects-page-header {
+    .wf-page-header {
         grid-template-columns: minmax(0, 1fr);
-        gap: 0.75rem;
+        gap: 0.35rem;
     }
 
-    .projects-page-title-en,
-    .projects-page-create,
-    .projects-page-title-ar {
+    .wf-title-en,
+    .wf-icon,
+    .wf-title-ar {
         grid-column: 1;
     }
 
-    .projects-page-title-en {
+    .wf-title-en {
         grid-row: 1;
     }
 
-    .projects-page-create {
+    .wf-icon {
         grid-row: 2;
-        justify-self: center;
     }
 
-    .projects-page-title-ar {
+    .wf-title-ar {
         grid-row: 3;
-        justify-self: end;
+    }
+
+    /* Keep the header on one row on phones: smaller titles and a compact
+       button so the three items never wrap onto separate lines. */
+    .projects-page-header {
+        gap: 0.5rem;
+    }
+
+    .projects-page-titles {
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 0.5rem;
+    }
+
+    .projects-page-title-en,
+    .projects-page-title-ar {
+        font-size: 1.35rem;
+    }
+
+    /* Project card header stays on one row on phones: the side titles keep
+       their natural width and the edit button takes the middle. */
+    .project-info-header {
+        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+        gap: 0.35rem;
+    }
+
+    .project-info-title-en,
+    .project-info-title-ar {
+        font-size: 0.95rem;
+    }
+
+    /* Icon-only Edit / Delete so both fit beside the titles. */
+    .project-info-actions .bilingual-button-text {
+        display: none;
+    }
+
+    .project-info-actions .btn {
+        padding: 0.35rem 0.55rem;
+    }
+
+    .projects-page .projects-page-create {
+        padding: 0.3rem 0.6rem;
+        font-size: 0.8125rem;
+        line-height: 1.2;
+        white-space: normal;
+    }
+
+    .projects-page-create .bilingual-button-icon {
+        display: none;
     }
 }
 
@@ -460,6 +706,7 @@ textarea {
     justify-self: end;
     text-align: right;
     white-space: nowrap;
+    font-size: 2rem;
 }
 
 .project-workflow-nav {
@@ -467,31 +714,93 @@ textarea {
     border-bottom: 1px solid #dee2e6;
 }
 
+/* Tabs wrap onto extra rows instead of scrolling sideways. Ten bilingual
+   tabs do not fit a narrow window, and the hidden horizontal scrollbar made
+   Map Overview, Estimation and Report look as if they had been removed. */
 .project-workflow-nav .nav-tabs {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    overflow-y: hidden;
-    gap: 0.35rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(7.75rem, 1fr));
+    gap: 0.15rem;
     border-bottom: 0;
 }
 
 .project-workflow-nav .nav-item {
-    flex: 1 0 8rem;
+    min-width: 0;
+}
+
+/* Admins get the extra Users tab: a tighter gap buys the grid the room it
+   needs to keep ten tabs on a row for longer. */
+.project-workflow-nav .nav-tabs.nav-tabs-admin {
+    gap: 0.1rem;
 }
 
 .project-workflow-nav .nav-link {
     display: grid;
-    width: 100%;
-    justify-content: center;
+    grid-auto-rows: min-content;
+    justify-items: center;
     align-content: center;
-    min-height: 3.75rem;
+    row-gap: 0.05rem;
+    width: 100%;
+    min-height: 4rem;
     height: 100%;
+    padding: 0.2rem 0.2rem;
     color: #343a40;
     background-color: #e9ecef;
     border: 1px solid #adb5bd;
     border-bottom: 3px solid #adb5bd;
     border-radius: 0.375rem 0.375rem 0 0;
     font-weight: 600;
+    line-height: 1.1;
+    text-align: center;
+    text-decoration: none;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+/* Stacked tab content: icon, then English, then Arabic. The Arabic line is a
+   little smaller so both labels stay inside the tab at the narrowest width. */
+.project-workflow-nav .nav-link > .workflow-tab-icon,
+.project-workflow-subnav .nav-link > .workflow-tab-icon {
+    display: block;
+    font-size: 1rem;
+    line-height: 1;
+}
+
+.workflow-tab-en {
+    font-size: 0.86rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.workflow-tab-ar {
+    font-size: 1.2rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* From laptop width up every tab shares one row: the columns split the strip
+   evenly instead of reserving 7.75rem each, and the two label lines scale with
+   the viewport so even "Water Resource" stays inside its tab. Below this width
+   the grid keeps wrapping into extra rows rather than shrinking the labels
+   past legibility. */
+@media (min-width: 1200px) {
+    .project-workflow-nav .nav-tabs {
+        grid-template-columns: none;
+        grid-auto-flow: column;
+        grid-auto-columns: 1fr;
+    }
+
+    .project-workflow-nav .nav-link {
+        padding-left: 0.15rem;
+        padding-right: 0.15rem;
+    }
+
+    .project-workflow-nav .workflow-tab-en {
+        font-size: clamp(0.7rem, 0.5vw + 0.25rem, 0.86rem);
+    }
+
+    .project-workflow-nav .workflow-tab-ar {
+        font-size: clamp(0.92rem, 0.55vw + 0.5rem, 1.2rem);
+    }
 }
 
 .project-workflow-nav .nav-link.active {
@@ -509,6 +818,27 @@ textarea {
     cursor: not-allowed;
 }
 
+/* Hovering a tab or sub-tab paints it in the planner's brown accent; the
+   current page keeps a darker brown so it stays recognisable while hovered. */
+.project-workflow-nav .nav-link:not(.disabled):hover,
+.project-workflow-nav .nav-link:not(.disabled):focus-visible,
+.project-workflow-subnav .nav-link:not(.disabled):hover,
+.project-workflow-subnav .nav-link:not(.disabled):focus-visible {
+    color: #fff;
+    background-color: #8a5a3b;
+    border-color: #6f452a;
+    text-decoration: none;
+}
+
+.project-workflow-nav .nav-link.active:hover,
+.project-workflow-nav .nav-link.active:focus-visible,
+.project-workflow-subnav .nav-link.active:hover,
+.project-workflow-subnav .nav-link.active:focus-visible {
+    color: #fff;
+    background-color: #6f452a;
+    border-color: #5a3720;
+}
+
 .project-workflow-subnav {
     background-color: #f8f9fa;
     border-bottom: 1px solid #dee2e6;
@@ -516,20 +846,28 @@ textarea {
 
 .project-workflow-subnav .nav {
     flex-wrap: nowrap;
+    align-items: center;
     gap: 0.25rem;
     overflow-x: auto;
     padding: 0.25rem 0;
 }
 
-.project-workflow-subnav-geometry .nav {
+.project-workflow-subnav-centered .nav {
     justify-content: center;
 }
 
 .project-workflow-subnav .nav-link {
     display: inline-grid;
+    grid-auto-rows: min-content;
+    justify-items: center;
+    row-gap: 0.05rem;
     width: auto;
-    justify-content: center;
+    padding: 0.3rem 0.6rem;
     white-space: nowrap;
+    line-height: 1.15;
+    text-align: center;
+    text-decoration: none;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 @media (max-width: 991.98px) {
@@ -575,17 +913,96 @@ textarea {
     }
 }
 
-/* Map container */
+/* Map container. Leaflet ships its own Helvetica/Arial stack on the map, so
+   every map - the card maps and the full-page Map Overview - is pulled back
+   to the two app fonts. */
+.leaflet-container,
+.leaflet-container .leaflet-control,
+.leaflet-container .leaflet-popup-content,
+.leaflet-container .leaflet-tooltip,
+.leaflet-container .leaflet-control-attribution,
 .geometry-map-card .card-header h5,
-.geometry-map-card .leaflet-container,
-.geometry-map-card .leaflet-control,
-.geometry-map-card .leaflet-popup-content,
 .geometry-map-card .map-legend {
-    font-family: 'Comfortaa', 'VIP-Rawy', 'Segoe UI', sans-serif !important;
+    font-family: var(--font-en) !important;
 }
 
+.leaflet-container .ar-text,
+.leaflet-container .leaflet-popup-content .ar-text,
 .geometry-map-card .ar-text {
     font-family: var(--font-ar) !important;
+}
+
+/* Shared map card header: EN title (20%) | fullscreen button | AR title (20%) */
+.map-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.map-card-header .map-header-en {
+    flex: 0 0 20%;
+    max-width: 20%;
+    text-align: left;
+    overflow: hidden;
+}
+
+.map-card-header .map-header-ar {
+    flex: 0 0 20%;
+    max-width: 20%;
+    text-align: right;
+    direction: rtl;
+    overflow: hidden;
+}
+
+.map-card-header .map-header-actions {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.map-header-title {
+    font-weight: 700;
+    font-size: 1.05rem;
+    line-height: 1.2;
+}
+
+.map-fullscreen-btn {
+    color: var(--bs-primary, #0d6efd);
+    border-color: currentColor;
+    background: transparent;
+}
+
+.map-fullscreen-btn:hover,
+.map-fullscreen-btn:focus {
+    background-color: var(--bs-primary, #0d6efd);
+    color: #fff;
+}
+
+.map-fullscreen-btn.active {
+    background-color: var(--bs-primary, #0d6efd);
+    color: #fff;
+}
+
+/* Fullscreen map mode: the map container fills the viewport */
+.map-fullscreen-active {
+    position: fixed !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: none !important;
+    max-height: none !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    z-index: 1500 !important;
+    background: #fff;
+}
+
+body.map-fullscreen-lock {
+    overflow: hidden;
 }
 
 .geometry-map-select-button {
@@ -654,6 +1071,57 @@ textarea {
     opacity: 0.85;
 }
 
+/* The marker icon is a zero-size anchor; the label card centres itself on it,
+   so a label needs no measurement when it is added to the map. */
+.map-feature-label-anchor {
+    width: 0 !important;
+    height: 0 !important;
+    background: none;
+    border: 0;
+}
+
+.map-feature-label {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.3;
+    color: #212529;
+    white-space: nowrap;
+    text-align: center;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+.map-feature-label .map-label-ar {
+    display: block;
+    font-size: 10px;
+    font-weight: 500;
+    color: #495057;
+}
+
+/* A selected feature keeps its code on screen and stands out in the map. */
+.map-feature-label.is-selected {
+    background: #f08c00;
+    color: #fff;
+    border-color: #b35e00;
+    box-shadow: 0 0 0 2px rgba(240, 140, 0, 0.35);
+}
+
+.map-feature-label.is-selected .map-label-ar {
+    color: #fff3e0;
+}
+
+.leaflet-marker-icon.is-selected > div {
+    box-shadow: 0 0 0 3px #f08c00, 0 0 0 5px rgba(240, 140, 0, 0.3);
+}
+
 .geometry-map-actions {
     margin-top: 6px;
 }
@@ -667,8 +1135,190 @@ textarea {
     color: #fff;
 }
 
+.geometry-map-select-button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Map label categories widget (Sector / Zone / Row / Tree) */
+.map-label-toggle {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 18px;
+}
+
+.map-label-toggle-button {
+    width: 30px;
+    height: 30px;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    border-radius: 50%;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+/* Map filter widget: one circle per row, head and divider spanning the column.
+   The widget scrolls when the map is too short for the whole strip (see the
+   height cap in map.js), so every toggle stays reachable. */
+.map-filter-widget {
+    display: grid;
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 18px;
+    background: #fff;
+    scrollbar-width: thin;
+}
+
+/* A long strip scrolls when the map is short: keep the scrollbar out of the
+   30px circle column. */
+.map-filter-widget::-webkit-scrollbar {
+    width: 4px;
+}
+
+.map-filter-widget::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: 2px;
+}
+
+.map-filter-head {
+    display: grid;
+    grid-column: 1 / -1;
+    place-items: center;
+    height: 24px;
+    color: #495057;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.map-filter-divider {
+    grid-column: 1 / -1;
+    width: 22px;
+    height: 1px;
+    margin: 1px auto;
+    background: rgba(0, 0, 0, 0.18);
+}
+
+.map-filter-button {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    border-radius: 50%;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1;
+}
+
+.map-filter-button:not(.active) {
+    background: #f8f9fa;
+    color: #adb5bd;
+}
+
+/* A category fetched on demand: keep the button readable while its geometry
+   is on the way instead of looking unresponsive. */
+.map-filter-button.map-filter-loading {
+    animation: map-filter-pulse 1s ease-in-out infinite;
+    cursor: progress;
+}
+
+/* Elevation heatmap toggle: one more circle in the filter group. */
+.map-filter-elevation-button i {
+    font-size: 13px;
+}
+
+@keyframes map-filter-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+}
+
+/* Elevation heatmap toggle: one round button under the zoom / filter controls. */
+.map-elevation-widget {
+    padding: 4px;
+    border-radius: 18px;
+}
+
+.map-elevation-button {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    border-radius: 50%;
+    background: #fff;
+    color: #495057;
+    font-size: 14px;
+    line-height: 1;
+}
+
+.map-elevation-button:not(.active) {
+    background: #f8f9fa;
+    color: #adb5bd;
+}
+
+.map-elevation-button.active {
+    background: var(--pal-green);
+    color: var(--pal-ink);
+}
+
+.map-elevation-button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.map-elevation-legend .elevation-gradient {
+    width: 100%;
+    height: 10px;
+    margin: 4px 0 2px;
+    border-radius: 5px;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.map-elevation-legend .elevation-scale {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 0.75rem;
+    color: #495057;
+}
+
+.map-elevation-legend .elevation-range {
+    margin-top: 2px;
+    font-size: 0.72rem;
+    color: #6c757d;
+}
+
+/* Raster elevation surface: let the browser smooth it when zoomed in, and
+   never let it swallow clicks meant for the sectors underneath. */
+.elevation-heat-overlay {
+    image-rendering: auto;
+    pointer-events: none;
+}
+
 .geometry-map-select-mode .leaflet-interactive {
     cursor: pointer;
+}
+
+.geometry-sector-pick-mode .leaflet-interactive {
+    cursor: crosshair;
+}
+
+.geometry-sector-widget .geometry-sector-pick-button.active {
+    background: var(--pal-green, var(--bs-primary));
+    color: var(--pal-ink, #fff);
+}
+
+.geometry-sector-widget .geometry-sector-action-button i.bi-magic {
+    color: #6f42c1;
+}
+
+.geometry-sector-widget .geometry-sector-action-button:disabled i.bi-magic {
+    color: inherit;
 }
 
 #map {
@@ -710,18 +1360,363 @@ textarea {
     background-color: #f8f9fa;
 }
 
+/* Zones table: fit all columns to the table width (no horizontal scroll) */
+.geometry-zones-table {
+    table-layout: fixed;
+    width: 100%;
+}
+
+.geometry-zones-table th,
+.geometry-zones-table td {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    vertical-align: middle;
+}
+
+.zone-empty-banner {
+    background-color: #f8f9fa;
+    border: 1px dashed #ced4da;
+    border-radius: 0.5rem;
+    color: #6c757d;
+    font-weight: 600;
+    padding: 0.5rem 1.25rem;
+}
+
+/* Pipe rules info card (grey) */
+.pipe-rules-card {
+    border: 1px solid #ced4da;
+}
+
+.pipe-rules-card .rules-toggle .bi-chevron-up {
+    transition: transform .2s ease;
+    display: inline-block;
+}
+
+.pipe-rules-card .rules-toggle[aria-expanded="false"] .bi-chevron-up {
+    transform: rotate(180deg);
+}
+
 /* Badge styling */
 .badge {
     border-radius: 0.5rem;
 }
 
-/* Modal styling */
+/* ── Modal styling: one pastel shell for every confirm / action form ─────────
+   Header: soft green · Body: cream · Footer: deeper cream.
+   Kept global (not per-class) so no template can drift back to a saturated
+   Bootstrap header; `.modal-green` below only adds button/form tuning.
+   ──────────────────────────────────────────────────────────────────────────── */
 .modal-content {
+    background-color: var(--pal-cream);
+    color: var(--pal-ink);
+    border: 1px solid var(--pal-border);
     border-radius: 0.75rem;
 }
 
 .modal-header {
+    background-color: var(--pal-green);
+    color: var(--pal-ink);
+    border-bottom: 1px solid var(--pal-border);
     border-radius: 0.75rem 0.75rem 0 0;
+}
+
+.modal-header .modal-title {
+    color: var(--pal-ink);
+}
+
+/* Dark ink close glyph: white-on-pastel would vanish. */
+.modal-header .btn-close {
+    opacity: 0.65;
+    filter: invert(30%) sepia(20%) saturate(500%) hue-rotate(80deg);
+}
+
+.modal-header .btn-close:hover,
+.modal-header .btn-close:focus {
+    opacity: 1;
+}
+
+.modal-body {
+    background-color: var(--pal-cream);
+    color: var(--pal-ink);
+}
+
+.modal-footer {
+    background-color: var(--pal-cream-2);
+    border-top: 1px solid var(--pal-border);
+    border-radius: 0 0 0.75rem 0.75rem;
+}
+
+/* Bootswatch Journal hard-codes `color: #fff` on .btn-secondary/.btn-warning,
+   which leaves white text on the pastel footer buttons. Re-assert ink. */
+.modal-footer .btn-secondary,
+.modal-footer .btn-warning {
+    color: var(--pal-ink);
+}
+
+/* ── Green Action Confirmation Modal Theme ───────────────────────────────────
+   Consistent green palette for all action modals (add, edit, delete, etc.)
+   Header: --pal-green background with --pal-ink text
+   Body: --pal-cream background
+   Footer: --pal-green accent buttons
+   ──────────────────────────────────────────────────────────────────────────── */
+.modal-green .modal-header {
+    background-color: var(--pal-green);
+    color: var(--pal-ink);
+    border-bottom-color: var(--pal-border);
+}
+
+.modal-green .modal-header .modal-title {
+    color: var(--pal-ink);
+}
+
+.modal-green .modal-header .btn-close {
+    filter: invert(30%) sepia(20%) saturate(500%) hue-rotate(80deg);
+}
+
+.modal-green .modal-body {
+    background-color: var(--pal-cream);
+    color: var(--pal-ink);
+}
+
+.modal-green .modal-footer {
+    background-color: var(--pal-cream-2);
+    border-top-color: var(--pal-border);
+    border-radius: 0 0 0.75rem 0.75rem;
+}
+
+.modal-green .btn-primary,
+.modal-footer .btn-primary {
+    --bs-btn-bg: var(--pal-green);
+    --bs-btn-border-color: var(--pal-green);
+    --bs-btn-hover-bg: var(--pal-green-2);
+    --bs-btn-hover-border-color: var(--pal-green-2);
+    --bs-btn-active-bg: var(--pal-sage);
+    --bs-btn-active-border-color: var(--pal-sage);
+    --bs-btn-color: var(--pal-ink);
+    --bs-btn-hover-color: var(--pal-ink);
+}
+
+.modal-green .btn-secondary,
+.modal-footer .btn-secondary {
+    --bs-btn-bg: var(--pal-almond);
+    --bs-btn-border-color: var(--pal-almond);
+    --bs-btn-hover-bg: var(--pal-sand);
+    --bs-btn-hover-border-color: var(--pal-sand);
+    --bs-btn-active-bg: var(--pal-tan);
+    --bs-btn-active-border-color: var(--pal-tan);
+    --bs-btn-color: var(--pal-ink);
+    --bs-btn-hover-color: var(--pal-ink);
+}
+
+.modal-green .btn-success,
+.modal-footer .btn-success {
+    --bs-btn-bg: var(--pal-green-2);
+    --bs-btn-border-color: var(--pal-green-2);
+    --bs-btn-hover-bg: var(--pal-green);
+    --bs-btn-hover-border-color: var(--pal-green);
+    --bs-btn-active-bg: var(--pal-sage);
+    --bs-btn-active-border-color: var(--pal-sage);
+    --bs-btn-color: var(--pal-ink);
+    --bs-btn-hover-color: var(--pal-ink);
+}
+
+.modal-green .btn-danger,
+.modal-footer .btn-danger {
+    /* Deep terracotta: the pastel danger tone (#c98b7a) is too light for white
+       label text, and brown left the destructive action looking neutral. */
+    --bs-btn-bg: #a9583f;
+    --bs-btn-border-color: #a9583f;
+    --bs-btn-hover-bg: #944c36;
+    --bs-btn-hover-border-color: #8a4632;
+    --bs-btn-active-bg: #8a4632;
+    --bs-btn-active-border-color: #7d3f2c;
+    --bs-btn-color: #fff;
+    --bs-btn-hover-color: #fff;
+    --bs-btn-active-color: #fff;
+}
+
+.modal-green .btn-info,
+.modal-footer .btn-info {
+    --bs-btn-bg: var(--pal-sage);
+    --bs-btn-border-color: var(--pal-sage);
+    --bs-btn-hover-bg: var(--pal-olive);
+    --bs-btn-hover-border-color: var(--pal-olive);
+    --bs-btn-color: var(--pal-ink);
+    --bs-btn-hover-color: var(--pal-ink);
+}
+
+.modal-green .btn-warning,
+.modal-footer .btn-warning {
+    --bs-btn-bg: var(--pal-wheat);
+    --bs-btn-border-color: var(--pal-wheat);
+    --bs-btn-hover-bg: var(--pal-sand);
+    --bs-btn-hover-border-color: var(--pal-sand);
+    --bs-btn-color: var(--pal-ink);
+    --bs-btn-hover-color: var(--pal-ink);
+}
+
+.modal-green .form-control,
+.modal-green .form-select,
+.modal-green .form-control:focus,
+.modal-green .form-select:focus {
+    background-color: #fff;
+    border-color: var(--pal-border);
+    color: var(--pal-ink);
+}
+
+.modal-green .form-control:focus,
+.modal-green .form-select:focus {
+    box-shadow: 0 0 0 0.25rem rgba(159, 191, 141, 0.4);
+    border-color: var(--pal-green);
+}
+
+.modal-green .form-label {
+    color: var(--pal-ink);
+}
+
+.modal-green .text-muted {
+    color: var(--pal-ink-soft) !important;
+}
+
+.modal-green .badge {
+    background-color: var(--pal-green-2);
+    color: var(--pal-ink);
+}
+
+/* ── Delete confirmation modal ───────────────────────────────────────────────
+   Destructive action, but still pastel: rose header over the same cream body
+   and footer as every other confirm form. Danger is carried by the terracotta
+   icon and button instead of a saturated red bar.
+   ──────────────────────────────────────────────────────────────────────────── */
+.confirm-delete-header {
+    background-color: #e3c5b9;
+    color: var(--pal-ink);
+}
+
+.confirm-delete-header .modal-title {
+    color: var(--pal-ink);
+    font-weight: 700;
+    margin-bottom: 0;
+}
+
+.confirm-delete-icon-col {
+    color: #a9583f;
+    font-size: 1.35rem;
+}
+
+.confirm-delete-title-ar {
+    direction: rtl;
+    text-align: right;
+}
+
+.confirm-delete-body {
+    background-color: var(--pal-cream);
+    color: var(--pal-ink);
+}
+
+.confirm-delete-body .confirm-delete-en {
+    font-weight: 600;
+}
+
+.confirm-delete-body .confirm-delete-ar {
+    direction: rtl;
+    text-align: right;
+}
+
+.confirm-delete-body strong {
+    font-weight: 800;
+}
+
+.confirm-delete-footer {
+    background-color: var(--pal-cream-2);
+    border-top: 1px solid var(--pal-border);
+}
+
+.confirm-delete-btn {
+    background-color: #a9583f;
+    border-color: #a9583f;
+    color: #fff;
+    border-radius: 50px;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+}
+
+.confirm-delete-btn:hover,
+.confirm-delete-btn:focus,
+.confirm-delete-btn:active {
+    background-color: #944c36;
+    border-color: #8a4632;
+    color: #fff;
+}
+
+/* ── Edit-project modal: scrollable body, always-visible footer ───────────────
+   Bootstrap's modal-dialog-scrollable relies on height:calc(100% - margin*2)
+   which breaks when body is a flex container (100% is unresolvable).
+   Instead we target this modal explicitly:
+     • max-height caps the dialog at viewport minus navbar + footer clearance
+     • modal-content is a flex column → header/footer stick, body scrolls
+     • margin-bottom keeps the dialog above the 44px fixed footer
+   ──────────────────────────────────────────────────────────────────────────── */
+#editSpecModal .modal-dialog {
+    max-height: calc(100dvh - 120px); /* navbar≈60px + footer≈44px + 16px air */
+    margin-top: 16px;
+    margin-bottom: 60px; /* clears fixed footer */
+}
+
+#editSpecModal .modal-content {
+    max-height: calc(100dvh - 120px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#editSpecModal .modal-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+#editSpecModal .modal-footer {
+    flex-shrink: 0; /* never compress — always fully visible */
+}
+
+/* ── Tree setup modal: scrollable body, always-visible footer ─────────────────
+   The <form> wraps header/body/footer, so Bootstrap's modal-dialog-scrollable
+   (which expects body as a direct child of modal-content) cannot bound the
+   body height. Make content → form → body a flex chain and scroll the body.
+   ──────────────────────────────────────────────────────────────────────────── */
+#treeSetupModal .modal-dialog {
+    max-height: calc(100dvh - 120px); /* navbar≈60px + footer≈44px + 16px air */
+    max-width: 1200px; /* wider modal for setup cards */
+    width: 100%;
+    margin-top: 16px;
+    margin-bottom: 60px; /* clears fixed footer */
+}
+
+#treeSetupModal .modal-content {
+    max-height: calc(100dvh - 120px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#treeSetupModal .modal-content > form {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+#treeSetupModal .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+#treeSetupModal .modal-footer {
+    flex-shrink: 0; /* never compress — always fully visible */
 }
 
 /* Bilingual toggle for the whole page */
@@ -755,4 +1750,803 @@ textarea {
     height: 18px;
     border-radius: 3px;
     display: inline-block;
+}
+.ai-generate-sector-zones {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.search-input {
+  flex: 1 1 auto;
+  padding: 0.375rem 0.75rem;
+  padding-right: 6.75rem;
+  border-radius: 20px;
+}
+
+.search-zone {
+  position: relative;
+  min-width: 260px;
+  max-width: 380px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.search-field {
+  position: relative;
+  flex: 1 1 auto;
+  display: flex;
+}
+
+.search-suffix {
+  position: absolute;
+  top: 50%;
+  right: 0.5rem;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.search-row-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.search-clear {
+  border: 0;
+  background: transparent;
+  padding: 0 0.125rem;
+  line-height: 1;
+  color: var(--bs-secondary-color);
+}
+
+.search-clear:hover {
+  color: var(--bs-body-color);
+}
+
+.global-loading-overlay {
+  position: fixed;
+  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(2px);
+  z-index: 2000;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease-in-out, visibility 0.15s ease-in-out;
+  pointer-events: none;
+}
+
+.global-loading-overlay.is-visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: all;
+}
+
+.global-loading-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 32px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 12px 40px rgba(13, 110, 253, 0.18);
+}
+
+.global-loading-gif {
+  width: 96px;
+  height: 96px;
+  display: block;
+}
+
+.global-loading-text {
+  font-family: var(--font-en);
+  font-size: 0.85rem;
+  color: #0d6efd;
+  letter-spacing: 0.02em;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PASTEL THEME — gradient tendency from green to brown
+   Applied on top of the Bootswatch Journal / Bootstrap 5.3 theme.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+:root {
+    /* Ramp: green (1) → brown (9), all soft & desaturated pastels */
+    --pal-green:      #9fbf8d;
+    --pal-green-2:    #b2c795;
+    --pal-sage:       #c3cd9d;
+    --pal-olive:      #d2d2a3;
+    --pal-wheat:      #ded0a6;
+    --pal-sand:       #e2c6a3;
+    --pal-almond:     #d6b489;
+    --pal-tan:        #c19f72;
+    --pal-brown:      #a9855a;
+
+    /* Surfaces, ink (text) and borders */
+    --pal-cream:      #f8f5ec;
+    --pal-cream-2:    #f1ecdd;
+    --pal-ink:        #45402f;
+    --pal-ink-soft:   #6a6350;
+    --pal-border:     #e0d9c4;
+    --pal-olive-deep: #6b7a44;   /* accessible green for text/links */
+
+    /* Map the palette onto Bootstrap theme roles.
+       Pastel backgrounds live here; text that sits on them is forced dark
+       further down (see the .bg-*.text-white rules). */
+    --bs-primary:        #9fbf8d;
+    --bs-primary-rgb:    159, 191, 141;
+    --bs-secondary:      #c19f72;
+    --bs-secondary-rgb:  193, 159, 114;
+    --bs-success:        #8fae74;
+    --bs-success-rgb:    143, 174, 116;
+    --bs-info:           #b2c795;
+    --bs-info-rgb:       178, 199, 149;
+    --bs-warning:        #e2c6a3;
+    --bs-warning-rgb:    226, 198, 163;
+    --bs-danger:         #c98b7a;
+    --bs-danger-rgb:     201, 139, 122;
+    --bs-light:          #f8f5ec;
+    --bs-light-rgb:      248, 245, 236;
+    --bs-dark:           #7a6a4f;
+    --bs-dark-rgb:       122, 106, 79;
+
+    --bs-body-bg:        var(--pal-cream);
+    --bs-body-color:     var(--pal-ink);
+    --bs-border-color:   var(--pal-border);
+    --bs-link-color:     var(--pal-olive-deep);
+    --bs-link-color-rgb: 107, 122, 68;
+    --bs-link-hover-color: #8a6d3f;
+}
+
+body {
+    background-color: var(--pal-cream);
+    /* Site-wide trianglify backdrop. The cream veil keeps body text (headings,
+       labels and links that sit outside cards) readable over the dark facets. */
+    background-image:
+        linear-gradient(rgba(248, 245, 236, 0.8), rgba(248, 245, 236, 0.8)),
+        url("../img/trianglify9.png");
+    background-size: cover, cover;
+    background-position: center, center;
+    background-repeat: no-repeat, no-repeat;
+    background-attachment: fixed, fixed;
+    color: var(--pal-ink);
+}
+
+/* ── Navbar: soft green bar with dark ink text ───────────────────────────── */
+.navbar-dark {
+    --bs-navbar-color:          rgba(69, 64, 47, 0.85);
+    --bs-navbar-hover-color:    var(--pal-ink);
+    --bs-navbar-active-color:   var(--pal-ink);
+    --bs-navbar-brand-color:    var(--pal-ink);
+    --bs-navbar-brand-hover-color: #322f22;
+    --bs-navbar-toggler-border-color: rgba(69, 64, 47, 0.3);
+    --bs-navbar-toggler-icon-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='%2345402f' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+}
+
+.navbar.bg-primary {
+    /* The fixed header wears the same trianglify fabric as the page.  A light
+       veil keeps the dark navbar text readable over the dark facets. */
+    background-image:
+        linear-gradient(rgba(248, 245, 236, 0.72), rgba(248, 245, 236, 0.72)),
+        url("../img/trianglify10.png") !important;
+    background-size: cover, cover;
+    background-position: center, center;
+    background-repeat: no-repeat, no-repeat;
+    background-attachment: scroll, scroll;
+}
+
+/* ── Footer: green → brown gradient ──────────────────────────────────────── */
+footer {
+    background-image:
+        linear-gradient(rgba(173, 154, 95, 0.72), rgba(43, 42, 40, 0.72)),
+        url("../img/trianglify10.png") !important;
+    /* background: linear-gradient(90deg, var(--pal-green-2), var(--pal-tan));
+    color: var(--pal-ink); */
+}
+
+.version-badge {
+    background-color: rgba(186, 179, 154, 0.15);
+    color: var(--pal-ink);
+}
+
+/* ── Dark ink for text placed on pastel backgrounds ──────────────────────── */
+.bg-primary.text-white,
+.bg-secondary.text-white,
+.bg-success.text-white,
+.bg-info.text-white,
+.bg-warning.text-white,
+.bg-danger.text-white,
+.bg-primary .text-white,
+.bg-secondary .text-white,
+.bg-success .text-white,
+.bg-info .text-white,
+.bg-warning .text-white,
+.bg-danger .text-white {
+    color: var(--pal-ink) !important;
+}
+
+/* ── Badges ──────────────────────────────────────────────────────────────── */
+.badge {
+    color: var(--pal-ink);
+}
+
+.badge.bg-dark,
+.badge.bg-danger {
+    color: #fff;
+}
+
+/* ── Buttons: pastel surfaces with ink text ──────────────────────────────── */
+.btn-primary,
+.btn-secondary,
+.btn-success,
+.btn-info,
+.btn-warning,
+.btn-danger,
+.btn-light {
+    --bs-btn-color: var(--pal-ink);
+    --bs-btn-hover-color: var(--pal-ink);
+    --bs-btn-active-color: var(--pal-ink);
+    --bs-btn-disabled-color: var(--pal-ink);
+}
+
+.btn-primary {
+    --bs-btn-bg: var(--pal-green);
+    --bs-btn-border-color: var(--pal-green);
+    --bs-btn-hover-bg: var(--pal-green-2);
+    --bs-btn-hover-border-color: var(--pal-green-2);
+    --bs-btn-active-bg: var(--pal-sage);
+    --bs-btn-active-border-color: var(--pal-sage);
+    --bs-btn-disabled-bg: var(--pal-green);
+    --bs-btn-disabled-border-color: var(--pal-green);
+}
+
+.btn-secondary {
+    --bs-btn-bg: var(--pal-almond);
+    --bs-btn-border-color: var(--pal-almond);
+    --bs-btn-hover-bg: var(--pal-sand);
+    --bs-btn-hover-border-color: var(--pal-sand);
+    --bs-btn-active-bg: var(--pal-tan);
+    --bs-btn-active-border-color: var(--pal-tan);
+    --bs-btn-disabled-bg: var(--pal-almond);
+    --bs-btn-disabled-border-color: var(--pal-almond);
+}
+
+.btn-success {
+    --bs-btn-bg: var(--pal-green-2);
+    --bs-btn-border-color: var(--pal-green-2);
+    --bs-btn-hover-bg: var(--pal-green);
+    --bs-btn-hover-border-color: var(--pal-green);
+    --bs-btn-active-bg: var(--pal-sage);
+    --bs-btn-active-border-color: var(--pal-sage);
+    --bs-btn-disabled-bg: var(--pal-green-2);
+    --bs-btn-disabled-border-color: var(--pal-green-2);
+}
+
+.btn-info {
+    --bs-btn-bg: var(--pal-sage);
+    --bs-btn-border-color: var(--pal-sage);
+    --bs-btn-hover-bg: var(--pal-olive);
+    --bs-btn-hover-border-color: var(--pal-olive);
+    --bs-btn-active-bg: var(--pal-wheat);
+    --bs-btn-active-border-color: var(--pal-wheat);
+    --bs-btn-disabled-bg: var(--pal-sage);
+    --bs-btn-disabled-border-color: var(--pal-sage);
+}
+
+.btn-warning {
+    --bs-btn-bg: var(--pal-wheat);
+    --bs-btn-border-color: var(--pal-wheat);
+    --bs-btn-hover-bg: var(--pal-sand);
+    --bs-btn-hover-border-color: var(--pal-sand);
+    --bs-btn-active-bg: var(--pal-almond);
+    --bs-btn-active-border-color: var(--pal-almond);
+    --bs-btn-disabled-bg: var(--pal-wheat);
+    --bs-btn-disabled-border-color: var(--pal-wheat);
+}
+
+.btn-danger {
+    --bs-btn-bg: #c98b7a;
+    --bs-btn-border-color: #c98b7a;
+    --bs-btn-hover-bg: #bd7a68;
+    --bs-btn-hover-border-color: #bd7a68;
+    --bs-btn-active-bg: #a76b5a;
+    --bs-btn-active-border-color: #a76b5a;
+}
+
+/* ── Tables ──────────────────────────────────────────────────────────────── */
+.table th {
+    background-color: var(--pal-cream-2);
+    color: var(--pal-ink);
+}
+
+.table {
+    --bs-table-color: var(--pal-ink);
+    --bs-table-border-color: var(--pal-border);
+}
+
+table th .header-ar,
+table th .header-en {
+  display: block;
+}
+
+table th .header-ar {
+  direction: rtl;
+  font-weight: 600;
+  font-size: 1.2rem;
+}
+
+table th .header-en {
+  font-weight: 500;
+  color: #555;
+}
+
+table th {
+  text-align: center;
+  vertical-align: middle;
+}
+
+/* ── Cards ───────────────────────────────────────────────────────────────── */
+.card {
+    border-color: var(--pal-border);
+}
+
+.card-header {
+    border-bottom-color: var(--pal-border);
+}
+
+/* ── Workflow tab navigation ─────────────────────────────────────────────── */
+.project-workflow-nav {
+    background-color: var(--pal-cream);
+    border-bottom-color: var(--pal-border);
+}
+
+.project-workflow-nav .nav-link {
+    color: var(--pal-ink);
+    background-color: var(--pal-cream-2);
+    border-color: var(--pal-border);
+    border-bottom-color: var(--pal-sage);
+}
+
+.project-workflow-nav .nav-link.active {
+    color: var(--pal-ink);
+    background-color: var(--pal-green);
+    border-color: var(--pal-green);
+    border-bottom-color: var(--pal-tan);
+}
+
+.project-workflow-nav .nav-link.disabled {
+    color: var(--pal-ink-soft);
+    background-color: var(--pal-cream-2);
+    border-color: var(--pal-border);
+}
+
+.project-workflow-subnav {
+    background-color: var(--pal-cream-2);
+    border-bottom-color: var(--pal-border);
+}
+
+/* ── Text accents ────────────────────────────────────────────────────────── */
+.text-primary {
+    color: var(--pal-olive-deep) !important;
+}
+
+/* ── Map controls ────────────────────────────────────────────────────────── */
+.map-fullscreen-btn {
+    color: var(--pal-olive-deep);
+    border-color: currentColor;
+    background: transparent;
+}
+
+.map-fullscreen-btn:hover,
+.map-fullscreen-btn:focus,
+.map-fullscreen-btn.active {
+    background-color: var(--pal-green);
+    color: var(--pal-ink);
+}
+
+.geometry-map-select-button.active,
+.leaflet-draw-toolbar a.geometry-ruler-button.active {
+    background: var(--pal-green);
+    color: var(--pal-ink);
+}
+
+.map-legend {
+    background: var(--pal-cream);
+    border: 1px solid var(--pal-border);
+}
+
+/* North indicator: always-visible compass on every map */
+.leaflet-north-indicator {
+    position: relative;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--pal-cream);
+    border: 1px solid var(--pal-border);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+    margin-bottom: 6px;
+}
+
+.leaflet-north-indicator .north-needle {
+    position: absolute;
+    top: 5px;
+    left: calc(50% - 6px);
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-bottom: 15px solid var(--pal-danger, #c98b7a);
+    transform-origin: 6px 17px;
+}
+
+.leaflet-north-indicator .north-needle::after {
+    content: "";
+    position: absolute;
+    top: 15px;
+    left: -6px;
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 8px solid var(--pal-olive-deep);
+}
+
+.leaflet-north-indicator .north-label {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 2px;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--pal-olive-deep);
+}
+
+.zone-empty-banner {
+    background-color: var(--pal-cream-2);
+    border-color: var(--pal-border);
+    color: var(--pal-ink-soft);
+}
+
+/* ── Loading overlay ─────────────────────────────────────────────────────── */
+.global-loading-overlay {
+    background: rgba(248, 245, 236, 0.6);
+}
+
+.global-loading-box {
+    background: rgba(248, 245, 236, 0.95);
+    box-shadow: 0 12px 40px rgba(159, 191, 141, 0.35);
+}
+
+.global-loading-text {
+    color: var(--pal-olive-deep);
+}
+
+.input-wrapper {
+        position: relative;
+        display: inline-block;
+    }
+
+    .input-wrapper input {
+        padding-right: 40px;
+    }
+
+    .input-wrapper button {
+        position: absolute;
+        top: 0;
+        right: 0;
+        border: none;
+        background-color: transparent;
+        cursor: pointer;
+    }
+
+.fileupload-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+.fileupload-wrapper input {
+    padding-right: 40px;
+}
+
+.fileupload-wrapper button {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    border: 1px solid #9fbf8d;
+    background-color: #9fbf8d;
+    border-radius: 20px;
+    cursor: pointer;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.35),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.25),
+        0 4px 8px rgba(0, 0, 0, 0.2);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.fileupload-wrapper .btn-success:hover {
+    transform: translateY(-2px);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.45),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.25),
+        0 6px 12px rgba(0, 0, 0, 0.25);
+}
+
+.fileupload-wrapper .btn-success:active {
+    transform: translateY(1px);
+    box-shadow:
+        inset 0 2px 5px rgba(0, 0, 0, 0.35),
+        0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+/* ===== Tree Setup modal (Trees page) ===== */
+.tree-setup-scroll {
+  max-height: 62vh;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.zone-setup-sector {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.85rem 0.15rem 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--bs-secondary-color);
+}
+
+.zone-setup-sector:first-child {
+  margin-top: 0;
+}
+
+.zone-setup-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  gap: 0.75rem;
+}
+
+.zone-setup-card {
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.5rem;
+  background: var(--bs-body-bg);
+  overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.zone-setup-card.zone-setup-invalid {
+  border-color: var(--bs-danger);
+  box-shadow: 0 0 0 0.15rem rgba(var(--bs-danger-rgb), 0.12);
+}
+
+.zone-setup-head {
+  padding: 0.6rem 0.75rem;
+  background: var(--bs-tertiary-bg);
+  border-bottom: 1px solid var(--bs-border-color);
+}
+
+.zone-setup-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.zone-setup-code {
+  font-size: 0.72rem;
+  padding: 0.05rem 0.35rem;
+}
+
+.zone-setup-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.6rem;
+}
+
+.zone-setup-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.zone-setup-meta-item input {
+  width: 5.25rem;
+}
+
+.zone-setup-sum {
+  margin-left: auto;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.zone-setup-varieties th {
+  padding: 0.3rem 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--bs-secondary-color);
+}
+
+.zone-setup-varieties td {
+  padding: 0.3rem 0.5rem;
+  vertical-align: middle;
+}
+
+.zone-setup-varieties .input-group-text {
+  padding: 0 0.4rem;
+}
+
+
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   VOICE ASSISTANT — floating mic and command panel on project pages
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.voice-assistant {
+    position: fixed;
+    right: 1rem;
+    bottom: 3.4rem;
+    z-index: 1080;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.5rem;
+}
+
+.voice-assistant-fab {
+    width: 52px;
+    height: 52px;
+    border: none;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.35rem;
+    color: var(--pal-ink);
+    background: linear-gradient(135deg, var(--pal-green), var(--pal-tan));
+    box-shadow: 0 10px 24px rgba(69, 64, 47, 0.28);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.voice-assistant-fab:hover,
+.voice-assistant-fab:focus-visible {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 30px rgba(69, 64, 47, 0.34);
+}
+
+.voice-assistant-panel {
+    width: min(370px, calc(100vw - 2rem));
+    background: var(--pal-cream);
+    color: var(--pal-ink);
+    border: 1px solid rgba(69, 64, 47, 0.16);
+    border-radius: 1rem;
+    box-shadow: 0 18px 42px rgba(69, 64, 47, 0.22);
+    overflow: hidden;
+}
+
+.voice-assistant-panel[hidden] {
+    display: none;
+}
+
+.voice-assistant-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.55rem 0.7rem;
+    background: linear-gradient(90deg, var(--pal-green-2), var(--pal-almond));
+}
+
+.voice-assistant-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--pal-ink);
+}
+
+.voice-assistant-log {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    max-height: 230px;
+    overflow-y: auto;
+    padding: 0.65rem 0.7rem;
+    font-size: 0.85rem;
+}
+
+.voice-assistant-line {
+    max-width: 95%;
+    padding: 0.4rem 0.6rem;
+    border-radius: 0.8rem;
+    background: var(--pal-cream-2);
+    line-height: 1.35;
+    white-space: pre-line;
+}
+
+.voice-assistant-line.va-user {
+    align-self: flex-end;
+    background: var(--pal-sage);
+}
+
+.voice-assistant-input {
+    display: flex;
+    gap: 0.4rem;
+    padding: 0.5rem 0.6rem;
+    border-top: 1px solid rgba(69, 64, 47, 0.12);
+}
+
+.voice-assistant-foot {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0 0.6rem 0.6rem;
+}
+
+.voice-assistant-status {
+    font-size: 0.75rem;
+    color: var(--pal-ink-soft);
+}
+
+.voice-assistant-mic.is-listening {
+    animation: va-listening 1.1s infinite;
+}
+
+@keyframes va-listening {
+    0% { box-shadow: 0 0 0 0 rgba(159, 191, 141, 0.65); }
+    70% { box-shadow: 0 0 0 12px rgba(159, 191, 141, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(159, 191, 141, 0); }
+}
+
+@media (max-width: 575.98px) {
+    .voice-assistant {
+        right: 0.6rem;
+        bottom: 4rem;
+    }
+
+    .voice-assistant-fab {
+        width: 46px;
+        height: 46px;
+        font-size: 1.2rem;
+    }
+}
+
+/* ── Map control columns ─────────────────────────────────────────────────────
+   Filters and label toggles live under the layer switcher on the right; the
+   action widgets (Select / Add / Edit / Rename / Remove / Split / Merge / Swap)
+   live on the left; legends keep the bottom-right corner.  The left stack is
+   tight so every action stays visible on a short map card. */
+.leaflet-top.leaflet-left > .leaflet-control + .leaflet-control {
+    margin-top: 4px;
+}
+
+/* The split / merge panel opens beside the action toolbar (top of the map)
+   instead of taking a place in the column, so it never pushes the sector and
+   elevation widgets past the map's bottom edge. */
+.leaflet-top.leaflet-left > .map-action-panel-control {
+    position: absolute;
+    top: 10px;
+    left: 56px;
+    margin: 0;
+    z-index: 1100;
 }

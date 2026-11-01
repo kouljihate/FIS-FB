@@ -34,6 +34,7 @@
                         <option value="check_valve">Anti-Return Valve / صمام عدم رجوع</option>
                         <option value="air_release">Air Suppressor / تنفيس الهواء</option>
                         <option value="pressure_reducer">Pressure Reducer / خافض الضغط</option>
+                        <option value="reduction">Reduction / تقليل قطر</option>
                         <option value="other">Other / أخرى</option>
                     </select>
                 </div>
@@ -67,11 +68,20 @@
 </div>
 
 <!-- Elements by Type -->
+<div class="mb-3">
+    <button class="btn btn-circle btn-outline-danger" id="netRemoveBtn" type="button"
+            onclick="networkRemoveSelected()" title="Remove / إزالة">
+        <i class="bi bi-trash"></i>
+    </button>
+    <form method="POST" id="removeNetForm"
+          action="{{ url_for('hydrology.network_remove', project_id=project.id) }}" class="d-none"></form>
+</div>
 <div class="row">
     {% set type_labels = {
         'check_valve': ('Anti-Return Valves', 'صمامات عدم الرجوع', 'danger'),
         'air_release': ('Air Suppressors', 'طاردات الهواء', 'warning'),
         'pressure_reducer': ('Pressure Reducers', 'خافضات الضغط', 'info'),
+        'reduction': ('Reductions', 'تقليل الأقطار', 'success'),
         'other': ('Other Elements', 'عناصر أخرى', 'secondary')
     } %}
     {% for t, (label_en, label_ar, color) in type_labels.items() %}
@@ -85,10 +95,11 @@
             </div>
             <div class="card-body p-0">
                 <table class="table table-sm mb-0">
-                    <thead><tr><th>ID</th><th>Name</th><th>Validated</th></tr></thead>
+                    <thead><tr><th width="30"><input type="checkbox" onclick="toggleAllNet(this)"></th><th>ID</th><th>Name</th><th>Validated</th></tr></thead>
                     <tbody>
                         {% for e in elements[t] %}
                         <tr>
+                            <td><input type="checkbox" class="net-checkbox" value="{{ e.id }}" data-name-en="{{ e.name_en }}" data-name-ar="{{ e.name_ar }}"></td>
                             <td>{{ e.id }}</td>
                             <td>{{ e.name_en }} <span class="ar-text">{{ e.name_ar }}</span></td>
                             <td>
@@ -97,7 +108,7 @@
                             </td>
                         </tr>
                         {% else %}
-                        <tr><td colspan="3" class="text-center text-muted">None / لا يوجد</td></tr>
+                        <tr><td colspan="4" class="text-center text-muted">None / لا يوجد</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -118,9 +129,8 @@
 
 <!-- Map -->
 <div class="card shadow-sm mt-4">
-    <div class="card-header">
-        <h5 class="mb-0"><i class="bi bi-map"></i> Map / الخريطة</h5>
-    </div>
+    {% set map_title_en = "Map" %}{% set map_title_ar = "الخريطة" %}
+    {% include "_map_header.html" %}
     <div class="card-body">
         <div class="mb-2">
             <button class="btn btn-outline-primary btn-sm" onclick="startDrawPoint()">
@@ -140,8 +150,65 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const geojsonUrl = '{{ url_for("api.get_geometry", project_id=project.id) }}';
-    initMap('map', geojsonUrl, { center: [34.0, -6.0], zoom: 14 });
+    initMap('map', geojsonUrl, {
+        center: [34.0, -6.0], zoom: 14,
+        selectable: { type: ['check_valve', 'air_release', 'pressure_reducer', 'reduction', 'other'], checkboxSelector: '.net-checkbox', toggleOnClick: true },
+        mapDelete: { onClick: networkRemoveSelected },
+        elevationHeatmap: {
+            url: '{{ url_for("engineering.elevation_heatmap", project_id=project.id) }}',
+            ramp: 'blue-red'
+        }
+    });
+
+    document.addEventListener('change', function(event) {
+        if (event.target && event.target.matches && event.target.matches('.net-checkbox')) {
+            updateNetToolbar();
+        }
+    });
+    updateNetToolbar();
 });
+
+function updateNetToolbar() {
+    const count = document.querySelectorAll('.net-checkbox:checked').length;
+    const removeBtn = document.getElementById('netRemoveBtn');
+    if (removeBtn) removeBtn.disabled = count === 0;
+}
+
+function toggleAllNet(source) {
+    document.querySelectorAll('.net-checkbox').forEach(cb => {
+        cb.checked = source.checked;
+        cb.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+}
+
+function networkRemoveSelected() {
+    const selected = document.querySelectorAll('.net-checkbox:checked');
+    if (!selected.length) {
+        alert('Select at least one element first / اختر عنصراً واحداً على الأقل أولا');
+        return;
+    }
+    const namesEn = Array.from(selected).map(cb => cb.dataset.nameEn).filter(Boolean);
+    const namesAr = Array.from(selected).map(cb => cb.dataset.nameAr).filter(Boolean);
+    const nameEn = namesEn.join(', ') || 'element(s)';
+    const nameAr = namesAr.join('، ') || 'عنصر';
+    const doSubmit = function () {
+        const form = document.getElementById('removeNetForm');
+        form.querySelectorAll('input[name="element_ids"]').forEach(el => el.remove());
+        selected.forEach(cb => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'element_ids';
+            input.value = cb.value;
+            form.appendChild(input);
+        });
+        form.requestSubmit();
+    };
+    if (window.confirmDelete) {
+        window.confirmDelete(nameEn, nameAr, doSubmit);
+    } else if (window.confirm('Delete ' + nameEn + ' ?')) {
+        doSubmit();
+    }
+}
 
 function startDrawPoint() {
     initDrawTools('point', function(coords, coordsStr) {

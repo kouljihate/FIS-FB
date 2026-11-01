@@ -1,17 +1,382 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_required, current_user
 from irrigation.extensions import mongo
-from irrigation.models import get_next_id, serialize_doc
+from irrigation.models import get_next_id, serialize_doc, assign_short_names
 from irrigation.engineering.regeneration import regenerate_sectors, regenerate_zones
+from irrigation.engineering.projection import projected_shape, get_project_centroid
+from irrigation.engineering.elevation import (
+    get_or_build_elevation_model, aspect_for_polygon, compass_from_bearing,
+    ORIENTATION_DEGREES, ORIENTATION_OPTIONS, COMPASS_POINTS, ORIENTATION_ALIASES)
+from shapely.geometry import shape, mapping
+from shapely.ops import unary_union
+from shapely import force_2d
 import json
+import math
 
 geometry_bp = Blueprint('geometry', __name__)
 
+# Compass orientations accepted for zone/sector orientation: the 32 named
+# cardinal points of the compass rose.
+VALID_ORIENTATIONS = tuple(COMPASS_POINTS)
+
+
+def normalize_orientation(value):
+    """Return a valid 32-point compass code (e.g. 'NNE', 'SWbW') or None."""
+    if isinstance(value, str):
+        upper = value.strip().upper()
+        upper = ORIENTATION_ALIASES.get(upper, upper)
+        if upper in VALID_ORIENTATIONS:
+            return upper
+    return None
+
+
+def auto_polygon_orientation(project_id, project, polygon_geojson):
+    """Derive a polygon's compass orientation from terrain slope (None if unavailable)."""
+    try:
+        model = get_or_build_elevation_model(project_id, project)
+        if not model:
+            return None
+        lng, lat = get_project_centroid(project)
+        poly = projected_shape(polygon_geojson, lng, lat)
+        aspect = aspect_for_polygon(model, poly)
+        return aspect['compass'] if aspect else None
+    except Exception:
+        return None
+
+
+def _land_boundary_geometry(project):
+    """The project's land boundary as a valid Shapely geometry (None if unknown)."""
+    boundary = project.get('boundary') or (project.get('land') or {}).get('map')
+    if not boundary:
+        return None
+    try:
+        geom = shape(boundary)
+    except Exception:
+        return None
+    if geom.is_empty:
+        return None
+    return geom if geom.is_valid else geom.buffer(0)
+
+
+def _valid_polygon(polygon_geojson):
+    """One valid polygon from a GeoJSON polygon (self-intersections repaired)."""
+    try:
+        geom = shape(polygon_geojson)
+    except Exception:
+        return None
+    if not geom.is_valid:
+        geom = geom.buffer(0)
+    return _largest_polygon(geom)
+
+
+def _valid_geometry(polygon_geojson):
+    """The valid Polygon / MultiPolygon of a GeoJSON polygon.
+
+    Unlike ``_valid_polygon`` this keeps every part, so the caller can decide
+    what to do with a shape that clipping split in two.
+    """
+    if hasattr(polygon_geojson, 'geom_type'):
+        geom = polygon_geojson
+    else:
+        try:
+            geom = shape(polygon_geojson)
+        except Exception:
+            return None
+    if not geom.is_valid:
+        geom = geom.buffer(0)
+    if geom.is_empty or geom.geom_type not in ('Polygon', 'MultiPolygon'):
+        return None
+    return geom
+
+
+def _largest_polygon(geom):
+    """Largest polygon part of any Shapely geometry (None if it holds none)."""
+    if geom is None or geom.is_empty:
+        return None
+    if geom.geom_type == 'Polygon':
+        return geom
+    if geom.geom_type == 'MultiPolygon':
+        parts = list(geom.geoms)
+    elif geom.geom_type == 'GeometryCollection':
+        parts = [part for part in geom.geoms
+                 if part.geom_type in ('Polygon', 'MultiPolygon')]
+        parts = [p for part in parts
+                 for p in (list(part.geoms) if part.geom_type == 'MultiPolygon' else [part])]
+    else:
+        return None
+    if not parts:
+        return None
+    return max(parts, key=lambda part: part.area)
+
+
+def _same_shape(a, b, tolerance=1e-9):
+    """True when two polygons describe the same sector, ignoring float noise.
+
+    Arrange runs on its own output whenever the user presses it again; a
+    micron-wide difference left by clipping must not rewrite the polygon.
+    """
+    if a is None or b is None:
+        return a is b
+    if a.equals(b):
+        return True
+    scale = max(a.area, b.area, 1e-18)
+    return a.symmetric_difference(b).area <= scale * tolerance
+
+
+def _polygonal(geom):
+    """The polygonal part of a geometry (buffering can leave lines behind)."""
+    if geom is None or geom.is_empty:
+        return None
+    if geom.geom_type in ('Polygon', 'MultiPolygon'):
+        return geom
+    if geom.geom_type != 'GeometryCollection':
+        return None
+    parts = []
+    for part in geom.geoms:
+        if part.geom_type == 'Polygon':
+            parts.append(part)
+        elif part.geom_type == 'MultiPolygon':
+            parts.extend(part.geoms)
+    if not parts:
+        return None
+    merged = unary_union(parts)
+    return merged if merged.geom_type in ('Polygon', 'MultiPolygon') else None
+
+
+def _attached_band(body, piece, tolerance):
+    """The parts of ``piece`` that share an edge with ``body``.
+
+    A band grown around a sector can also reach land past a neighbouring
+    sector.  Keeping only the parts that share an edge with the sector stops
+    it from collecting an island on the other side of its neighbour: that land
+    is left for the sector bordering it.
+    """
+    piece = _polygonal(piece)
+    if piece is None:
+        return None
+    parts = [part for part in getattr(piece, 'geoms', [piece])
+             if part.geom_type == 'Polygon' and body.intersection(part).length > tolerance]
+    if not parts:
+        return None
+    merged = unary_union(parts)
+    return merged if merged.geom_type == 'Polygon' else _polygonal(merged)
+
+
+def _split_main_part(geom):
+    """A MultiPolygon split into its main body and the parts lying apart.
+
+    Returns ``(main_polygon, leftover_or_None)``.
+    """
+    if geom is None or geom.geom_type == 'Polygon':
+        return geom, None
+    if geom.geom_type != 'MultiPolygon':
+        return _largest_polygon(geom), None
+    parts = sorted(geom.geoms, key=lambda part: part.area, reverse=True)
+    leftover = unary_union(parts[1:]) if len(parts) > 1 else None
+    return parts[0], leftover
+
+
+def _attach_piece(body, piece, eps, others, limit=None):
+    """Join ``piece`` to ``body`` as one polygon.
+
+    Land at the very corner of the boundary can meet a sector at a single point;
+    grown without help that corner would stay a separate lobe.  Buffering the
+    piece by a few centimetres makes it overlap the sector, the union is then one
+    valid plot, and the land around the touch point is taken back from the other
+    sectors (and clipped to ``limit``) so the partition does not overlap itself
+    nor spill outside the land.
+    """
+    bridge = piece.buffer(eps, join_style='mitre')
+    if limit is not None:
+        # Trim the bridge to the land first: clipping the sector afterwards would
+        # shave the piece off again and reopen the gap this is meant to close.
+        bridge = _polygonal(bridge.intersection(limit)) or bridge
+    merged = _polygonal(unary_union([body, bridge]))
+    if merged is None:
+        return body
+    if others is not None and not others.is_empty:
+        cleaned = _polygonal(merged.difference(others))
+        if cleaned is not None and not cleaned.is_empty:
+            merged = cleaned
+    return _largest_polygon(merged)
+
+
+def _owner_for_pocket(pocket, grown, probe=0.0):
+    """Sector that should absorb an unclaimed pocket.
+
+    The longest shared edge wins.  A pocket that only touches the sectors at its
+    corners has no shared edge, so the sector whose land lies closest around it
+    is picked next: that is the one the pocket really sits beside, and the only
+    one the pocket can be joined to without crossing a neighbour.
+    """
+    best, best_length = None, 0.0
+    for sector_id, geom in grown.items():
+        shared = geom.intersection(pocket).length
+        if shared > best_length:
+            best, best_length = sector_id, shared
+    if best is not None:
+        return best
+    if probe > 0:
+        near = pocket.buffer(probe)
+        best, best_area = None, 0.0
+        for sector_id, geom in grown.items():
+            area = geom.intersection(near).area
+            if area > best_area:
+                best, best_area = sector_id, area
+        if best is not None:
+            return best
+    return min(grown, key=lambda sector_id: grown[sector_id].distance(pocket))
+
+
+def _fill_sector_gaps(boundary_geom, sector_geoms, fixed_ids=()):
+    """Expand the sectors until they cover the land side by side.
+
+    ``sector_geoms`` maps sector id -> valid Shapely polygon already clipped to
+    the boundary.  The unclaimed land is handed out by growing every sector
+    outward in small steps: a sector keeps what it reaches first, so two
+    neighbouring sectors meet halfway and a sector at the edge grows up to the
+    land boundary.  Growing (rather than carving the gaps with a Voronoi
+    diagram) hands every piece of land to a sector that already borders it, so
+    each sector stays a single plot and the result reads as plots placed side by
+    side, not shapes patched together.
+
+    Sectors listed in ``fixed_ids`` keep their shape and count as claimed: their
+    land must not be handed to a neighbour, or a sector that was kept as-is
+    would come back as a detached piece of another one.
+
+    Returns a dict of only the sectors that actually grew.
+    """
+    if boundary_geom is None or not sector_geoms:
+        return {}
+
+    grown = {sector_id: geom for sector_id, geom in sector_geoms.items()
+             if sector_id not in fixed_ids}
+    if not grown:
+        return {}
+
+    claimed = unary_union(list(sector_geoms.values()))
+    remaining = _polygonal(boundary_geom.difference(claimed))
+    # A sliver left by float arithmetic is not a gap: filling it would rewrite
+    # the sectors on every press of Arrange.
+    if remaining is None or remaining.area <= boundary_geom.area * 1e-6:
+        return {}
+    minx, miny, maxx, maxy = boundary_geom.bounds
+    diagonal = math.hypot(maxx - minx, maxy - miny)
+    # About 200 steps across the land: the frontier between two sectors lands
+    # within half a step of the middle, and the loop always terminates.
+    step = (diagonal / 200.0) or 1e-12
+    for _ in range(240):
+        if remaining is None:
+            break
+        moved = False
+        for sector_id in list(grown):
+            band = _attached_band(grown[sector_id],
+                                  grown[sector_id]
+                                  .buffer(step, join_style='mitre')
+                                  .intersection(remaining),
+                                  step * 1e-6)
+            if band is None:
+                continue
+            merged = _polygonal(unary_union([grown[sector_id], band]))
+            if merged is None:
+                continue
+            grown[sector_id] = merged
+            remaining = _polygonal(remaining.difference(band))
+            moved = True
+        if not moved:
+            break
+
+    eps = step / 10.0
+    # Land no sector could reach (a pocket enclosed by other sectors, touching
+    # them only at a corner) joins the sector it borders the most, so nothing
+    # stays unclaimed.
+    if remaining is not None and remaining.area > boundary_geom.area * 1e-9:
+        for pocket in getattr(remaining, 'geoms', [remaining]):
+            if pocket.geom_type != 'Polygon' or pocket.area <= boundary_geom.area * 1e-9:
+                continue
+            owner = _owner_for_pocket(pocket, grown, eps)
+            others = unary_union([geom for sid, geom in grown.items() if sid != owner])
+            grown[owner] = _attach_piece(grown[owner], pocket, eps, others, boundary_geom)
+
+    # The repairs can shave a sliver off a sector where the boundary is jagged
+    # (the land a sector took is clipped back to the border).  Hand those slivers
+    # over too, so the sectors really are side by side along the whole border.
+    fixed_geoms = [geom for sid, geom in sector_geoms.items() if sid in fixed_ids]
+    uncovered = _polygonal(boundary_geom.difference(unary_union(list(grown.values()) + fixed_geoms)))
+    if uncovered is not None:
+        for pocket in getattr(uncovered, 'geoms', [uncovered]):
+            if pocket.geom_type != 'Polygon' or pocket.area <= boundary_geom.area * 1e-12:
+                continue
+            owner = _owner_for_pocket(pocket, grown, eps)
+            others = unary_union(fixed_geoms + [geom for sid, geom in grown.items() if sid != owner])
+            grown[owner] = _attach_piece(grown[owner], pocket, eps, others, boundary_geom)
+
+    # Each sector is one plot: a part that stays apart from its body is handed to
+    # the sector it borders.
+    for _ in range(4):
+        leftovers = {}
+        for sector_id, geom in list(grown.items()):
+            main, extra = _split_main_part(geom)
+            grown[sector_id] = main
+            if extra is not None and not extra.is_empty:
+                leftovers[sector_id] = extra
+        if not leftovers:
+            break
+        for sector_id, extra in leftovers.items():
+            others = {k: v for k, v in grown.items() if k != sector_id}
+            if not others:
+                grown[sector_id] = _attach_piece(grown[sector_id], extra, eps, None, boundary_geom)
+                continue
+            owner = _owner_for_pocket(extra, others, eps)
+            others_union = unary_union([geom for sid, geom in grown.items() if sid != owner])
+            grown[owner] = _attach_piece(grown[owner], extra, eps, others_union, boundary_geom)
+
+    return {sector_id: geom for sector_id, geom in grown.items()
+            if not _same_shape(geom, sector_geoms[sector_id], tolerance=1e-6)}
+
+
+def _sector_geojson(geom):
+    """GeoJSON to store for a repaired sector: one valid polygon, [lng, lat] only.
+
+    The sectors page and the map read a sector as a plain GeoJSON Polygon with
+    two values per position, so a repaired shape is written flat (Z dropped) and
+    never as a MultiPolygon or a self-intersecting ring.
+    """
+    geom = _largest_polygon(geom)
+    if geom is not None and not geom.is_valid:
+        repaired = _polygonal(geom.buffer(0))
+        geom = _largest_polygon(repaired) if repaired is not None else geom
+    return mapping(force_2d(geom))
+
+
+def _polygon_area_m2(polygon):
+    """Area of a GeoJSON polygon in square meters (0 if unavailable)."""
+    if not polygon:
+        return 0.0
+    try:
+        centroid = shape(polygon).centroid
+        return round(projected_shape(polygon, centroid.x, centroid.y).area, 2)
+    except Exception:
+        return 0.0
+
+
+def _global_area_m2(project, items):
+    """Reference (global) area for percentage columns.
+
+    Uses the project land boundary area; falls back to the sum of the
+    supplied items' areas when no boundary is available.
+    """
+    area = _polygon_area_m2(project.get('boundary'))
+    if not area:
+        area = sum((i.get('area_m2') or 0) for i in items)
+    return area or 0.0
+
 
 def get_project_or_redirect(project_id):
-    project = mongo.db.projects.find_one({'id': project_id, 'user_id': int(current_user.id)})
+    from irrigation.access import require_project
+
+    project = require_project(project_id)
     if not project:
-        flash('Project not found / المشروع غير موجود', 'danger')
         return None
     project['_id'] = str(project['_id'])
     return project
@@ -26,11 +391,17 @@ def sectors_view(project_id):
     if not project:
         return redirect(url_for('project.index'))
 
-    sectors = list(mongo.db.sectors.find({'project_id': project_id}).sort('id', 1))
+    sectors = list(mongo.db.sectors.find({'project_id': project_id}).sort('name_en', 1))
     for s in sectors:
         s['_id'] = str(s['_id'])
+        s['area_m2'] = s.get('area_m2') or _polygon_area_m2(s.get('polygon'))
 
-    return render_template('geometry/sectors.html', project=project, sectors=sectors)
+    global_area_m2 = _global_area_m2(project, sectors)
+
+    return render_template('geometry/sectors.html', project=project, sectors=sectors,
+                           global_area_m2=global_area_m2,
+                           orientation_degrees=ORIENTATION_DEGREES,
+                           orientation_options=ORIENTATION_OPTIONS)
 
 
 @geometry_bp.route('/<int:project_id>/sectors/add', methods=['POST'])
@@ -54,15 +425,18 @@ def sector_add(project_id):
         flash('Invalid coordinates format / تنسيق الإحداثيات غير صالح', 'danger')
         return redirect(url_for('geometry.sectors_view', project_id=project_id))
 
+    orientation = normalize_orientation(request.form.get('orientation', ''))
+    polygon_geojson = {'type': 'Polygon', 'coordinates': [coords]}
+    if not orientation:
+        orientation = auto_polygon_orientation(project_id, project, polygon_geojson)
+
     sector = {
         'id': get_next_id('sectors'),
         'project_id': project_id,
         'name_en': name_en or f"Sector {mongo.db.sectors.count_documents({'project_id': project_id}) + 1}",
         'name_ar': name_ar or f"القطاع {mongo.db.sectors.count_documents({'project_id': project_id}) + 1}",
-        'polygon': {
-            'type': 'Polygon',
-            'coordinates': [coords]
-        },
+        'polygon': polygon_geojson,
+        'orientation': orientation,
         'validated': False
     }
     mongo.db.sectors.insert_one(sector)
@@ -97,6 +471,18 @@ def sector_edit(project_id, sector_id):
             update['polygon'] = {'type': 'Polygon', 'coordinates': [coords]}
         except Exception:
             pass
+
+    orientation_raw = request.form.get('orientation')
+    if orientation_raw is not None:
+        value = orientation_raw.strip().lower()
+        if value == 'auto':
+            poly = update.get('polygon') or sector.get('polygon')
+            if poly:
+                update['orientation'] = auto_polygon_orientation(project_id, project, poly)
+        else:
+            normalized = normalize_orientation(value)
+            if normalized:
+                update['orientation'] = normalized
 
     if update:
         mongo.db.sectors.update_one({'id': sector_id, 'project_id': project_id}, {'$set': update})
@@ -138,8 +524,8 @@ def sector_swap(project_id):
         s1 = mongo.db.sectors.find_one({'id': id1, 'project_id': project_id})
         s2 = mongo.db.sectors.find_one({'id': id2, 'project_id': project_id})
         if s1 and s2:
-            mongo.db.sectors.update_one({'id': id1, 'project_id': project_id}, {'$set': {'polygon': s2['polygon'], 'name_en': s2.get('name_en'), 'name_ar': s2.get('name_ar')}})
-            mongo.db.sectors.update_one({'id': id2, 'project_id': project_id}, {'$set': {'polygon': s1['polygon'], 'name_en': s1.get('name_en'), 'name_ar': s1.get('name_ar')}})
+            mongo.db.sectors.update_one({'id': id1, 'project_id': project_id}, {'$set': {'polygon': s2['polygon'], 'name_en': s2.get('name_en'), 'name_ar': s2.get('name_ar'), 'orientation': auto_polygon_orientation(project_id, project, s2['polygon'])}})
+            mongo.db.sectors.update_one({'id': id2, 'project_id': project_id}, {'$set': {'polygon': s1['polygon'], 'name_en': s1.get('name_en'), 'name_ar': s1.get('name_ar'), 'orientation': auto_polygon_orientation(project_id, project, s1['polygon'])}})
             flash('Sectors swapped / تم تبديل القطاعات', 'success')
     return redirect(url_for('geometry.sectors_view', project_id=project_id))
 
@@ -180,6 +566,7 @@ def sector_merge(project_id):
         'name_en': f"Merged Sector",
         'name_ar': f"قطاع مدمج",
         'polygon': merged_geojson,
+        'orientation': auto_polygon_orientation(project_id, project, merged_geojson),
         'validated': False
     }
     mongo.db.sectors.insert_one(new_sector)
@@ -195,11 +582,48 @@ def sector_merge(project_id):
     return redirect(url_for('geometry.sectors_view', project_id=project_id))
 
 
+@geometry_bp.route('/<int:project_id>/sectors/remove', methods=['POST'])
+@login_required
+def sector_remove(project_id):
+    project = get_project_or_redirect(project_id)
+    if not project:
+        return redirect(url_for('project.index'))
+
+    try:
+        sector_ids = [int(v) for v in request.form.getlist('sector_ids')]
+    except ValueError:
+        sector_ids = []
+    if not sector_ids:
+        flash('Select at least one sector to remove / اختر قطاعا واحدا على الأقل للإزالة', 'warning')
+        return redirect(url_for('geometry.sectors_view', project_id=project_id))
+
+    sectors = list(mongo.db.sectors.find(
+        {'id': {'$in': sector_ids}, 'project_id': project_id}, {'id': 1}))
+    if not sectors:
+        flash('No matching sectors found / لم يتم العثور على قطاعات مطابقة', 'warning')
+        return redirect(url_for('geometry.sectors_view', project_id=project_id))
+
+    ids = [s['id'] for s in sectors]
+    zone_ids = [z['id'] for z in mongo.db.zones.find(
+        {'project_id': project_id, 'sector_id': {'$in': ids}}, {'id': 1})]
+
+    if zone_ids:
+        mongo.db.zones.delete_many({'project_id': project_id, 'id': {'$in': zone_ids}})
+        mongo.db.tree_rows.delete_many({'project_id': project_id, 'zone_id': {'$in': zone_ids}})
+        mongo.db.trees.delete_many({'project_id': project_id, 'zone_id': {'$in': zone_ids}})
+        mongo.db.network_elements.delete_many({'project_id': project_id, 'zone_id': {'$in': zone_ids}})
+
+    removed = mongo.db.sectors.delete_many({'id': {'$in': ids}, 'project_id': project_id}).deleted_count
+    flash(f'Removed {removed} sector(s) / تمت إزالة {removed} قطاع', 'success')
+    return redirect(url_for('geometry.sectors_view', project_id=project_id))
+
+
 def _split_polygon_doc(collection, counter_name, project_id, doc, parts, default_en, default_ar):
     """Split one polygon document into `parts` vertical strips (same sector_id etc. are kept).
     Returns the number of new documents created; the original is removed only if something was created."""
     from shapely.geometry import shape as shp_shape, box, mapping
 
+    project = mongo.db.projects.find_one({'id': project_id})
     geom = shp_shape(doc['polygon'])
     minx, miny, maxx, maxy = geom.bounds
     split_w = (maxx - minx) / parts
@@ -210,12 +634,14 @@ def _split_polygon_doc(collection, counter_name, project_id, doc, parts, default
         clipped = geom.intersection(clip_box)
         if clipped.is_empty or clipped.geom_type not in ('Polygon', 'MultiPolygon'):
             continue
+        part_geojson = mapping(clipped)
         new_doc = {k: v for k, v in doc.items() if k not in ('_id', 'id', 'polygon', 'name_en', 'name_ar', 'validated')}
         new_doc.update({
             'id': get_next_id(counter_name),
             'name_en': f"{doc.get('name_en', default_en)} - {i+1}",
             'name_ar': f"{doc.get('name_ar', default_ar)} - {i+1}",
-            'polygon': mapping(clipped),
+            'polygon': part_geojson,
+            'orientation': auto_polygon_orientation(project_id, project, part_geojson) if project else None,
             'validated': False
         })
         created.append(new_doc)
@@ -288,15 +714,166 @@ def sector_ai_regenerate(project_id):
     if not project:
         return redirect(url_for('project.index'))
 
-    # Clear existing sectors
-    mongo.db.sectors.delete_many({'project_id': project_id})
-    mongo.db.zones.delete_many({'project_id': project_id})
-    mongo.db.network_elements.delete_many({'project_id': project_id})
-    mongo.db.tree_rows.delete_many({'project_id': project_id})
-    mongo.db.trees.delete_many({'project_id': project_id})
+    def _form_float(name):
+        value = request.form.get(name, '').strip()
+        if not value:
+            return None
+        try:
+            return float(value)
+        except ValueError:
+            return None
 
-    sectors = regenerate_sectors(project_id)
-    flash(f'AI generated {len(sectors)} sectors / الذكاء الاصطناعي أنشأ {len(sectors)} قطاعات', 'success')
+    config = {
+        'use_elevation': request.form.get('use_elevation') == 'on',
+        'smart': request.form.get('smart_split') == 'on',
+        'water_source_mode': request.form.get('water_source_mode', 'project'),
+        'priority': request.form.get('priority', 'balanced'),
+        'inset_m': _form_float('inset_m') or 0,
+        'min_sector_area_m2': _form_float('min_sector_area_m2'),
+        'max_sector_area_m2': _form_float('max_sector_area_m2'),
+        'name_prefix_en': request.form.get('name_prefix_en', '').strip(),
+        'name_prefix_ar': request.form.get('name_prefix_ar', '').strip(),
+    }
+    water_lat = _form_float('water_lat')
+    water_lng = _form_float('water_lng')
+    if water_lat is not None and water_lng is not None:
+        config['water_lat'] = water_lat
+        config['water_lng'] = water_lng
+    if config['water_source_mode'] == 'custom' and ('water_lat' not in config or 'water_lng' not in config):
+        config['water_source_mode'] = 'project'
+
+    n_sectors = request.form.get('n_sectors', type=int)
+    sectors = regenerate_sectors(project_id, n_sectors, config=config)
+    if sectors:
+        flash(f'Auto Generated {len(sectors)} sectors / الذكاء الاصطناعي أنشأ {len(sectors)} قطاعات', 'success')
+    else:
+        flash('AI generation failed — check that the project has a valid boundary / فشل الإنشاء — تحقق من وجود حدود صالحة للمشروع', 'danger')
+    return redirect(url_for('geometry.sectors_view', project_id=project_id))
+
+
+@geometry_bp.route('/<int:project_id>/sectors/arrange', methods=['POST'])
+@login_required
+def sector_arrange(project_id):
+    """Repair every sector polygon so the sectors tile the land side by side.
+
+    Three steps, run in this order: clip every sector to the land boundary, take
+    the overlaps away (in id order, so a contested strip stays with the lower
+    id), then grow the sectors into the land nobody claimed until they meet each
+    other and the border.  None of this is destructive on purpose: a sector the
+    repair would erase (it sits almost entirely outside the land boundary) keeps
+    its old shape and is reported in the flash message instead.
+    """
+    project = get_project_or_redirect(project_id)
+    if not project:
+        return redirect(url_for('project.index'))
+
+    sectors = list(mongo.db.sectors.find({'project_id': project_id}).sort('id', 1))
+    if not sectors:
+        flash('No sectors to arrange / لا توجد قطاعات لترتيبها', 'warning')
+        return redirect(url_for('geometry.sectors_view', project_id=project_id))
+
+    boundary_geom = _land_boundary_geometry(project)
+    claimed = None
+    changed_ids = set()
+    arrange_geoms = {}
+    kept_ids = set()
+    clipped = 0
+    deoverlapped = 0
+    skipped = []
+
+    for sector in sectors:
+        polygon = sector.get('polygon')
+        if not polygon:
+            continue
+        original = _valid_geometry(polygon)
+        if original is None:
+            skipped.append(sector.get('name_en') or str(sector.get('id')))
+            continue
+
+        geom = original
+        was_clipped = False
+        if boundary_geom is not None:
+            outside = geom.difference(boundary_geom)
+            if outside.area > original.area * 1e-9:
+                geom = _valid_geometry(geom.intersection(boundary_geom))
+                was_clipped = geom is not None
+
+        # A sector is one plot: if clipping split it, keep its main body and let
+        # the growth pass hand the stray pieces to the sector that borders them.
+        geom = _largest_polygon(geom) if geom is not None else None
+        was_deoverlapped = False
+        if geom is not None and claimed is not None:
+            covered = geom.intersection(claimed)
+            if covered.area > geom.area * 1e-9:
+                before_area = geom.area
+                geom = _largest_polygon(_polygonal(geom.difference(claimed)))
+                if geom is not None:
+                    was_deoverlapped = geom.area < before_area * (1 - 1e-9)
+
+        # Too little left to be a sector: keep the original rather than leaving
+        # a sliver (or nothing) behind without the user noticing.  The areas are
+        # compared in the polygon's own units, so the ratio holds in degrees as
+        # well as in metres.
+        kept_original = False
+        if geom is None or geom.is_empty or geom.area < original.area * 0.01:
+            skipped.append(sector.get('name_en') or str(sector.get('id')))
+            geom = original
+            kept_original = True
+
+        # Keep the whole claim build-up: sectors are often disjoint, and the
+        # union of two of them is a MultiPolygon that must not be reduced to its
+        # biggest part or the other sector's area would look unclaimed again.
+        claimed = geom if claimed is None else claimed.union(geom)
+        arrange_geoms[sector['id']] = geom
+        if kept_original:
+            kept_ids.add(sector['id'])
+
+        if _same_shape(geom, original):
+            continue
+
+        new_geojson = _sector_geojson(geom)
+        mongo.db.sectors.update_one(
+            {'id': sector['id'], 'project_id': project_id},
+            {'$set': {'polygon': new_geojson, 'area_m2': _polygon_area_m2(new_geojson)}}
+        )
+        changed_ids.add(sector['id'])
+        clipped += 1 if was_clipped else 0
+        deoverlapped += 1 if was_deoverlapped else 0
+
+    # Second pass: the sectors no longer overlap, but the land between them (and
+    # between them and the boundary) is still unclaimed.  Grow them into it so
+    # every sector ends up side by side, against another sector or against the
+    # land boundary, with no strip of empty land left between them.
+    filled = 0
+    for sector_id, geom in _fill_sector_gaps(boundary_geom, arrange_geoms, kept_ids).items():
+        new_geojson = _sector_geojson(geom)
+        mongo.db.sectors.update_one(
+            {'id': sector_id, 'project_id': project_id},
+            {'$set': {'polygon': new_geojson, 'area_m2': _polygon_area_m2(new_geojson)}}
+        )
+        changed_ids.add(sector_id)
+        filled += 1
+    arranged = len(changed_ids)
+
+    if arranged:
+        flash(
+            f'Arranged {arranged} sector(s): {clipped} clipped to the land boundary, '
+            f'{deoverlapped} overlap(s) removed, {filled} extended to the border / '
+            f'تم ترتيب {arranged} قطاع: {clipped} مقصوص على حدود الأرض، '
+            f'{deoverlapped} تداخل تمت إزالته، {filled} موسع إلى الحدود',
+            'success'
+        )
+    elif not skipped:
+        flash('Every sector already sits inside the land boundary without overlap or gap / '
+              'كل القطاعات داخل حدود الأرض دون تداخل أو فراغ', 'info')
+
+    if skipped:
+        flash(
+            'Kept as-is (nothing left inside the boundary): ' + ', '.join(skipped) +
+            ' / تم الاحتفاظ بها كما هي (لم يبق منها شيء داخل الحدود)',
+            'warning'
+        )
+
     return redirect(url_for('geometry.sectors_view', project_id=project_id))
 
 
@@ -328,10 +905,13 @@ def zones_view(project_id):
     if not project:
         return redirect(url_for('project.index'))
 
-    sectors = list(mongo.db.sectors.find({'project_id': project_id}).sort('id', 1))
-    zones = list(mongo.db.zones.find({'project_id': project_id}).sort('id', 1))
+    assign_short_names(project_id)
+
+    sectors = list(mongo.db.sectors.find({'project_id': project_id}).sort('name_en', 1))
+    zones = list(mongo.db.zones.find({'project_id': project_id}).sort('name_en', 1))
     for s in sectors + zones:
         s['_id'] = str(s['_id'])
+        s['area_m2'] = s.get('area_m2') or _polygon_area_m2(s.get('polygon'))
 
     # Build a table-friendly structure
     table_data = []
@@ -349,7 +929,10 @@ def zones_view(project_id):
                 'zone': None
             })
 
-    return render_template('geometry/zones.html', project=project, sectors=sectors, zones=zones, table_data=table_data)
+    default_zones_per_sector = (project.get('spec') or {}).get('config', {}).get('zones_per_sector', 2)
+    global_area_m2 = _global_area_m2(project, zones)
+
+    return render_template('geometry/zones.html', project=project, sectors=sectors, zones=zones, table_data=table_data, default_zones_per_sector=default_zones_per_sector, global_area_m2=global_area_m2, orientation_degrees=ORIENTATION_DEGREES, orientation_options=ORIENTATION_OPTIONS)
 
 
 @geometry_bp.route('/<int:project_id>/zones/add', methods=['POST'])
@@ -378,13 +961,20 @@ def zone_add(project_id):
         flash('Sector not found / القطاع غير موجود', 'danger')
         return redirect(url_for('geometry.zones_view', project_id=project_id))
 
+    orientation = normalize_orientation(request.form.get('orientation', ''))
+    polygon_geojson = {'type': 'Polygon', 'coordinates': [coords]}
+    if not orientation:
+        orientation = auto_polygon_orientation(project_id, project, polygon_geojson)
+
     zone = {
         'id': get_next_id('zones'),
         'project_id': project_id,
         'sector_id': sector_id,
         'name_en': name_en or f"Zone {mongo.db.zones.count_documents({'project_id': project_id}) + 1}",
         'name_ar': name_ar or f"منطقة {mongo.db.zones.count_documents({'project_id': project_id}) + 1}",
-        'polygon': {'type': 'Polygon', 'coordinates': [coords]},
+        'polygon': polygon_geojson,
+        'orientation': orientation,
+        'orientation_deg': ORIENTATION_DEGREES.get(orientation) if orientation else None,
         'validated': False
     }
     mongo.db.zones.insert_one(zone)
@@ -419,9 +1009,61 @@ def zone_edit(project_id, zone_id):
         except Exception:
             pass
 
+    orientation_raw = request.form.get('orientation')
+    if orientation_raw is not None:
+        value = orientation_raw.strip().lower()
+        if value == 'auto':
+            poly = update.get('polygon') or zone.get('polygon')
+            if poly:
+                update['orientation'] = auto_polygon_orientation(project_id, project, poly)
+                update['orientation_deg'] = ORIENTATION_DEGREES.get(update['orientation'])
+        else:
+            normalized = normalize_orientation(value)
+            if normalized:
+                update['orientation'] = normalized
+                update['orientation_deg'] = ORIENTATION_DEGREES.get(normalized)
+
     if update:
         mongo.db.zones.update_one({'id': zone_id, 'project_id': project_id}, {'$set': update})
         flash('Zone updated / تم تحديث المنطقة', 'success')
+    return redirect(url_for('geometry.zones_view', project_id=project_id))
+
+
+@geometry_bp.route('/<int:project_id>/zones/<int:zone_id>/orientation', methods=['POST'])
+@login_required
+def zone_orientation(project_id, zone_id):
+    """Set a zone's orientation from an angle in degrees.
+
+    The angle is stored exactly in ``orientation_deg`` and rounded to the
+    nearest of the 32 compass points in ``orientation``, which is what the
+    layout/regeneration code reads.
+    """
+    project = get_project_or_redirect(project_id)
+    if not project:
+        return redirect(url_for('project.index'))
+
+    zone = mongo.db.zones.find_one({'id': zone_id, 'project_id': project_id})
+    if not zone:
+        flash('Zone not found / المنطقة غير موجودة', 'danger')
+        return redirect(url_for('geometry.zones_view', project_id=project_id))
+
+    raw = request.form.get('orientation_deg', '').strip().rstrip('\u00b0').strip()
+    try:
+        value = float(raw.replace(',', '.'))
+    except ValueError:
+        flash('Orientation must be a number of degrees / يجب أن يكون الاتجاه رقماً بالدرجات', 'danger')
+        return redirect(url_for('geometry.zones_view', project_id=project_id))
+
+    if not math.isfinite(value):
+        flash('Orientation must be a number of degrees / يجب أن يكون الاتجاه رقماً بالدرجات', 'danger')
+        return redirect(url_for('geometry.zones_view', project_id=project_id))
+
+    degrees = round(value % 360.0, 1)
+    point = compass_from_bearing(degrees)
+    mongo.db.zones.update_one(
+        {'id': zone_id, 'project_id': project_id},
+        {'$set': {'orientation': point, 'orientation_deg': degrees}})
+    flash('Zone orientation set to %g\u00b0 (%s) / تم ضبط اتجاه المنطقة' % (degrees, point), 'success')
     return redirect(url_for('geometry.zones_view', project_id=project_id))
 
 
@@ -442,6 +1084,37 @@ def zone_rename(project_id, zone_id):
     if update:
         mongo.db.zones.update_one({'id': zone_id, 'project_id': project_id}, {'$set': update})
         flash('Zone renamed / تمت إعادة تسمية المنطقة', 'success')
+    return redirect(url_for('geometry.zones_view', project_id=project_id))
+
+
+@geometry_bp.route('/<int:project_id>/zones/remove', methods=['POST'])
+@login_required
+def zone_remove(project_id):
+    project = get_project_or_redirect(project_id)
+    if not project:
+        return redirect(url_for('project.index'))
+
+    try:
+        zone_ids = [int(v) for v in request.form.getlist('zone_ids')]
+    except ValueError:
+        zone_ids = []
+    if not zone_ids:
+        flash('Select at least one zone to remove / اختر منطقة واحدة على الأقل للإزالة', 'warning')
+        return redirect(url_for('geometry.zones_view', project_id=project_id))
+
+    zones = list(mongo.db.zones.find(
+        {'id': {'$in': zone_ids}, 'project_id': project_id}, {'id': 1}))
+    if not zones:
+        flash('No matching zones found / لم يتم العثور على مناطق مطابقة', 'warning')
+        return redirect(url_for('geometry.zones_view', project_id=project_id))
+
+    ids = [z['id'] for z in zones]
+    mongo.db.tree_rows.delete_many({'project_id': project_id, 'zone_id': {'$in': ids}})
+    mongo.db.trees.delete_many({'project_id': project_id, 'zone_id': {'$in': ids}})
+    mongo.db.network_elements.delete_many({'project_id': project_id, 'zone_id': {'$in': ids}})
+
+    removed = mongo.db.zones.delete_many({'id': {'$in': ids}, 'project_id': project_id}).deleted_count
+    flash(f'Removed {removed} zone(s) / تمت إزالة {removed} منطقة', 'success')
     return redirect(url_for('geometry.zones_view', project_id=project_id))
 
 
@@ -513,7 +1186,8 @@ def zone_swap(project_id):
                         'polygon': source['polygon'],
                         'name_en': source.get('name_en'),
                         'name_ar': source.get('name_ar'),
-                        'sector_id': source.get('sector_id')
+                        'sector_id': source.get('sector_id'),
+                        'orientation': auto_polygon_orientation(project_id, project, source['polygon'])
                     }}
                 )
             flash('Zones swapped / تم تبديل المناطق', 'success')
@@ -553,6 +1227,7 @@ def zone_merge(project_id):
         'name_en': 'Merged Zone',
         'name_ar': 'منطقة مدمجة',
         'polygon': mapping(merged),
+        'orientation': auto_polygon_orientation(project_id, project, mapping(merged)),
         'validated': False
     }
     old_ids = [z['id'] for z in zones]
@@ -574,11 +1249,144 @@ def zone_ai_regenerate(project_id):
     if not project:
         return redirect(url_for('project.index'))
 
-    mongo.db.zones.delete_many({'project_id': project_id})
-    zones = regenerate_zones(project_id)
-    flash(f'AI generated {len(zones)} zones / الذكاء الاصطناعي أنشأ {len(zones)} مناطق', 'success')
+    zones_per_sector = request.form.get('zones_per_sector', type=int)
+    if not zones_per_sector or zones_per_sector < 1:
+        zones_per_sector = 2
+    zones_per_sector = min(zones_per_sector, 8)
+    use_elevation = request.form.get('use_elevation') == '1'
+    orientation = request.form.get('orientation', '').strip()
+
+    # Per-sector orientation in degrees (fields named orientation_deg_<sector_id>).
+    # Empty = auto from slope. Exact degree value is stored.
+    sector_orientations = {}
+    for sector in mongo.db.sectors.find({'project_id': project_id}):
+        deg_raw = request.form.get('orientation_deg_%s' % sector['id'])
+        if deg_raw is not None and deg_raw.strip() != '':
+            try:
+                deg = float(deg_raw) % 360
+                sector_orientations[sector['id']] = round(deg, 1)
+            except ValueError:
+                pass
+
+    # Only the sectors ticked in the modal are rebuilt; the rest keep the zones
+    # they already have.  A submission with nothing ticked changes nothing.
+    selected = []
+    for raw in request.form.getlist('sector_ids'):
+        try:
+            value = int(str(raw).strip())
+        except (TypeError, ValueError):
+            continue
+        if value not in selected:
+            selected.append(value)
+
+    known = {s['id'] for s in mongo.db.sectors.find({'project_id': project_id}, {'id': 1})}
+    selected = [sid for sid in selected if sid in known]
+    if not selected:
+        flash('Select at least one sector to generate its zones / اختر قطاعاً واحداً على الأقل لإنشاء مناطقه',
+              'warning')
+        return redirect(url_for('geometry.zones_view', project_id=project_id))
+
+    mongo.db.zones.delete_many({'project_id': project_id, 'sector_id': {'$in': selected}})
+    zones = regenerate_zones(project_id, zones_per_sector=zones_per_sector,
+                             use_elevation=use_elevation, orientation=orientation or None,
+                             sector_orientations=sector_orientations or None,
+                             sector_ids=selected)
+    flash(f'Auto Generated {len(zones)} zones in {len(selected)} sector(s) / '
+          f'الذكاء الاصطناعي أنشأ {len(zones)} منطقة في {len(selected)} قطاع', 'success')
     return redirect(url_for('geometry.zones_view', project_id=project_id))
 
+
+@geometry_bp.route('/<int:project_id>/zones/generate_for_sector', methods=['POST'])
+@login_required
+def zone_generate_for_sector(project_id):
+    """Split the selected sectors into N zones each using terrain slope /
+    elevation and a per-sector orientation (Auto Generate scoped to the map
+    selection, one or several sectors)."""
+    project = get_project_or_redirect(project_id)
+    if not project:
+        return redirect(url_for('project.index'))
+
+    # The map widget posts ``sector_ids`` (repeated); the old single-sector
+    # modal posted ``sector_id``. Accept both so existing links keep working.
+    raw_ids = request.form.getlist('sector_ids')
+    single_id = request.form.get('sector_id')
+    if single_id:
+        raw_ids.append(single_id)
+
+    sector_ids = []
+    for raw in raw_ids:
+        try:
+            sector_id = int(str(raw).strip())
+        except (TypeError, ValueError):
+            continue
+        if sector_id not in sector_ids:
+            sector_ids.append(sector_id)
+
+    if not sector_ids:
+        flash('No sector selected / لم يتم تحديد قطاع', 'warning')
+        return redirect(url_for('geometry.zones_view', project_id=project_id))
+
+    found = {s['id']: s for s in mongo.db.sectors.find(
+        {'project_id': project_id, 'id': {'$in': sector_ids}})}
+    sector_ids = [sid for sid in sector_ids if sid in found]
+    if not sector_ids:
+        flash('Sector not found / القطاع غير موجود', 'danger')
+        return redirect(url_for('geometry.zones_view', project_id=project_id))
+
+    parts = request.form.get('parts', type=int) or 3
+    parts = max(2, min(parts, 8))
+    use_elevation = request.form.get('use_elevation') == '1'
+    # Legacy compass point shared by every sector without its own degrees.
+    shared_orientation = normalize_orientation(request.form.get('orientation', ''))
+    shared_deg_raw = request.form.get('orientation_deg')
+
+    total_zones = 0
+    failed = []
+    for sector_id in sector_ids:
+        # Orientation for this sector: exact degree value (new) or the legacy
+        # compass point / shared degree field.
+        sector_orientations = {}
+        orientation = shared_orientation
+        deg_raw = request.form.get('orientation_deg_%s' % sector_id)
+        if deg_raw is None:
+            deg_raw = shared_deg_raw
+        if deg_raw is not None and str(deg_raw).strip() != '':
+            try:
+                sector_orientations[sector_id] = round(float(deg_raw) % 360, 1)
+                orientation = None
+            except ValueError:
+                pass
+
+        # Remove only this sector's existing zones and their dependent data.
+        old_zone_ids = [z['id'] for z in mongo.db.zones.find(
+            {'project_id': project_id, 'sector_id': sector_id})]
+        if old_zone_ids:
+            mongo.db.tree_rows.delete_many({'project_id': project_id, 'zone_id': {'$in': old_zone_ids}})
+            mongo.db.trees.delete_many({'project_id': project_id, 'zone_id': {'$in': old_zone_ids}})
+            mongo.db.network_elements.delete_many({'project_id': project_id, 'zone_id': {'$in': old_zone_ids}})
+        mongo.db.zones.delete_many({'project_id': project_id, 'sector_id': sector_id})
+
+        zones = regenerate_zones(project_id, sector_id=sector_id,
+                                 zones_per_sector=parts,
+                                 use_elevation=use_elevation,
+                                 orientation=orientation,
+                                 sector_orientations=sector_orientations)
+        if zones:
+            total_zones += len(zones)
+        else:
+            failed.append(sector_id)
+
+    if total_zones:
+        if len(sector_ids) == 1:
+            flash(f'Sector split into {total_zones} zones / تم تقسيم القطاع إلى {total_zones} مناطق',
+                  'success')
+        else:
+            flash(f'{len(sector_ids) - len(failed)} sectors split into {total_zones} zones / '
+                  f'تم تقسيم {len(sector_ids) - len(failed)} قطاعات إلى {total_zones} مناطق',
+                  'success')
+    if failed or not total_zones:
+        flash('Could not split every sector / تعذّر تقسيم كل القطاعات', 'danger')
+    return redirect(url_for('geometry.zones_view', project_id=project_id))
 
 @geometry_bp.route('/<int:project_id>/zones/validate', methods=['POST'])
 @login_required

@@ -1,0 +1,342 @@
+{% extends "base.html" %}
+{% block title %}DPA Report Settings / إعدادات التقرير{% endblock %}
+
+{%- macro num(value, digits=2) -%}
+{{ ('%.' ~ digits ~ 'f')|format(value if value is not none else 0) }}
+{%- endmacro -%}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h4 class="mb-0"><i class="bi bi-file-earmark-medical"></i> DPA Report — Header, Footer &amp; Documents</h4>
+        <div class="text-muted small">
+            {{ project.name }} — the report prints these entries on every page.
+        </div>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('report.dpa_print', project_id=project.id) }}" target="_blank" rel="noopener"
+           class="btn btn-success">
+            <i class="bi bi-file-earmark-arrow-down"></i> Générer le rapport
+        </a>
+        <a href="{{ url_for('report.dpa_view', project_id=project.id) }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to DPA
+        </a>
+    </div>
+</div>
+
+<form method="POST" enctype="multipart/form-data"
+      action="{{ url_for('report.dpa_settings', project_id=project.id) }}">
+    <div class="row g-3">
+        <!-- Company header -->
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header"><i class="bi bi-building"></i> Header — Project Manager company</div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-md-7">
+                            <label class="form-label">Company name</label>
+                            <input type="text" name="company_name" class="form-control"
+                                   value="{{ company.name or '' }}">
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label">City</label>
+                            <input type="text" name="company_city" class="form-control"
+                                   value="{{ company.city or '' }}">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Address</label>
+                            <input type="text" name="company_address" class="form-control"
+                                   value="{{ company.address or '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Phone</label>
+                            <input type="text" name="company_phone" class="form-control"
+                                   value="{{ company.phone or '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">E-mail</label>
+                            <input type="email" name="company_email" class="form-control"
+                                   value="{{ company.email or '' }}">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Logo</label>
+                            <input type="file" name="company_logo" class="form-control" accept="image/*">
+                            {% if company.logo %}
+                            <div class="form-text">
+                                Current: <a href="{{ url_for('auth.uploaded_file', filename=company.logo) }}"
+                                            target="_blank">logo</a>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Legal footer -->
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header"><i class="bi bi-card-text"></i> Footer — legal identifiers</div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <label class="form-label">ICE</label>
+                            <input type="text" name="legal_ice" class="form-control" value="{{ legal.ice or '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">I.F.</label>
+                            <input type="text" name="legal_if" class="form-control" value="{{ legal['if'] or '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Patente</label>
+                            <input type="text" name="legal_patente" class="form-control" value="{{ legal.patente or '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">R.C.</label>
+                            <input type="text" name="legal_rc" class="form-control" value="{{ legal.rc or '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">CNSS</label>
+                            <input type="text" name="legal_cnss" class="form-control" value="{{ legal.cnss or '' }}">
+                        </div>
+                    </div>
+                    <div class="form-text mt-2">
+                        The footer prints the address and these identifiers on every page.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cover -->
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header"><i class="bi bi-file-earmark-text"></i> Cover page</div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-md-7">
+                            <label class="form-label">Title</label>
+                            <input type="text" name="meta_title" class="form-control" value="{{ meta.title or '' }}">
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label">Reference</label>
+                            <input type="text" name="meta_reference" class="form-control"
+                                   value="{{ meta.reference or '' }}" placeholder="DPA-{{ '%03d'|format(project.id) }}">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Sub-title</label>
+                            <input type="text" name="meta_subtitle" class="form-control" value="{{ meta.subtitle or '' }}">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Ministry block (one line per row)</label>
+                            <textarea name="meta_ministry" class="form-control" rows="3">{{ meta.ministry or '' }}</textarea>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Date</label>
+                            <input type="month" name="meta_date" class="form-control" value="{{ meta.date or '' }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Commune Rurale</label>
+                            <input type="text" name="meta_cr" class="form-control" value="{{ meta.cr or '' }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Province</label>
+                            <input type="text" name="meta_province" class="form-control" value="{{ meta.province or '' }}">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Irrigation perimeter</label>
+                            <input type="text" name="meta_perimeter" class="form-control" value="{{ meta.perimeter or '' }}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Exploitation -->
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header"><i class="bi bi-person-vcard"></i> Exploitation identification</div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-md-7">
+                            <label class="form-label">Client (Project Owner)</label>
+                            <input type="text" name="exp_client" class="form-control" value="{{ exploitation.client or '' }}"
+                                   placeholder="{{ client }}">
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label">C.I.N.</label>
+                            <input type="text" name="exp_cin" class="form-control" value="{{ exploitation.cin or '' }}"
+                                   placeholder="{{ client_cin }}">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Address of the farm</label>
+                            <input type="text" name="exp_address" class="form-control"
+                                   value="{{ exploitation.address or '' }}" placeholder="{{ client_address }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Total area (ha)</label>
+                            <input type="number" step="0.0001" name="exp_total_area_ha" class="form-control"
+                                   value="{{ exploitation.total_area_ha or '' }}" placeholder="{{ num(total_area_ha, 4) }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Net area to equip (ha)</label>
+                            <input type="number" step="0.0001" name="exp_net_area_ha" class="form-control"
+                                   value="{{ exploitation.net_area_ha or '' }}" placeholder="{{ num(net_area_ha, 4) }}">
+                        </div>
+                        <div class="col-md-7">
+                            <label class="form-label">Soil</label>
+                            <input type="text" name="exp_soil" class="form-control" value="{{ exploitation.soil or '' }}"
+                                   placeholder="Limono-argileux">
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label">Permeability (mm/h)</label>
+                            <input type="number" step="0.1" name="exp_permeability" class="form-control"
+                                   value="{{ exploitation.permeability_mm_h or '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Topography</label>
+                            <input type="text" name="exp_topography" class="form-control"
+                                   value="{{ exploitation.topography or '' }}" placeholder="Accidenté">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Water resource note</label>
+                            <input type="text" name="exp_water_note" class="form-control"
+                                   value="{{ exploitation.water_note or '' }}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hydraulics -->
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header"><i class="bi bi-speedometer2"></i> Hydraulics &amp; water balance</div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-md-4">
+                            <label class="form-label">Source flow (m³/h)</label>
+                            <input type="number" step="0.1" name="water_flow_m3h" class="form-control"
+                                   value="{{ settings.water.flow_m3h or '' }}" placeholder="{{ num(source_flow_m3h, 2) }}">
+                            <div class="form-text">Blank: from the water source entry.</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Head at station (mCE)</label>
+                            <input type="number" step="0.1" name="water_station_head_mce" class="form-control"
+                                   value="{{ settings.water.station_head_mce }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Min. emitter pressure (mCE)</label>
+                            <input type="number" step="0.1" name="water_min_pressure_mce" class="form-control"
+                                   value="{{ settings.water.min_pressure_mce }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Pump efficiency</label>
+                            <input type="number" step="0.01" name="water_pump_efficiency" class="form-control"
+                                   value="{{ settings.water.pump_efficiency }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Motor margin (%)</label>
+                            <input type="number" step="1" name="water_motor_margin_pct" class="form-control"
+                                   value="{{ settings.water.motor_margin_pct }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Motor efficiency</label>
+                            <input type="number" step="0.01" name="water_motor_efficiency" class="form-control"
+                                   value="{{ settings.water.motor_efficiency }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Dripline Ø (mm)</label>
+                            <input type="number" step="1" name="water_dripline_diameter_mm" class="form-control"
+                                   value="{{ settings.water.dripline_diameter_mm }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Basin slope (talus)</label>
+                            <input type="number" step="0.1" name="water_talus" class="form-control"
+                                   value="{{ settings.water.talus }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Freeboard (m)</label>
+                            <input type="number" step="0.05" name="water_revanche_m" class="form-control"
+                                   value="{{ settings.water.revanche_m }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Pumping hours / day</label>
+                            <input type="number" step="1" name="water_pumping_hours_day" class="form-control"
+                                   value="{{ settings.water.pumping_hours_day }}">
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label">Dripper test (brand / model / pressure / flow)</label>
+                            <div class="d-flex gap-1">
+                                <input type="text" name="essai_brand" class="form-control" placeholder="Brand"
+                                       value="{{ settings.essai.brand or '' }}">
+                                <input type="text" name="essai_model" class="form-control" placeholder="Model"
+                                       value="{{ settings.essai.model or '' }}">
+                                <input type="text" name="essai_pressure" class="form-control" placeholder="mCE"
+                                       value="{{ settings.essai.pressure_mce or '' }}">
+                                <input type="text" name="essai_flow" class="form-control" placeholder="l/h"
+                                       value="{{ settings.essai.flow_lph or '' }}">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Climate -->
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header"><i class="bi bi-cloud-sun"></i> Climate — water balance</div>
+                <div class="card-body">
+                    <label class="form-label">ETo (mm/day), January → December</label>
+                    <input type="text" name="climate_eto" class="form-control"
+                           value="{{ settings.climate.eto_mm_day|join(', ') }}">
+                    <label class="form-label mt-2">Effective rainfall (mm/month), January → December</label>
+                    <input type="text" name="climate_rain" class="form-control"
+                           value="{{ settings.climate.rain_mm|join(', ') }}">
+                    <div class="form-text">
+                        Twelve comma separated values; they drive the monthly water balance.
+                    </div>
+                    <label class="form-label mt-2">Notes printed in the quote</label>
+                    <textarea name="notes" class="form-control" rows="2">{{ settings.notes or '' }}</textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- Documents -->
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header"><i class="bi bi-paperclip"></i> Documents &amp; plans (images or PDF)</div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        {% for slot, label in doc_slots %}
+                        <div class="col-md-4">
+                            <label class="form-label">{{ label }}</label>
+                            <input type="file" name="doc_{{ slot }}" class="form-control form-control-sm"
+                                   accept="image/*,application/pdf">
+                            {% if documents[slot].path %}
+                            <div class="form-text">
+                                <a href="{{ url_for('auth.uploaded_file', filename=documents[slot].path) }}"
+                                   target="_blank">Current document</a>
+                            </div>
+                            {% else %}
+                            <div class="form-text text-muted">Not attached — the report shows a placeholder.</div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 mt-3 mb-4">
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-circle"></i> Save report settings
+        </button>
+        <a href="{{ url_for('report.dpa_print', project_id=project.id) }}" target="_blank" rel="noopener"
+           class="btn btn-outline-success">
+            <i class="bi bi-printer"></i> Print the report
+        </a>
+    </div>
+</form>
+{% endblock %}

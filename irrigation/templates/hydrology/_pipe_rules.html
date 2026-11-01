@@ -1,0 +1,41 @@
+{% if pipe_rules %}
+{% set rid = rules_id | default('pipeRulesCollapse') %}
+<div class="card shadow-sm mb-3 pipe-rules-card">
+    <div class="card-header bg-secondary text-white d-flex justify-content-center align-items-center gap-2">
+        <i class="bi bi-list-check"></i>
+        <span>{{ rules_title_en | default('Rules') }}</span>
+        <span class="ar-text" lang="ar">/ {{ rules_title_ar | default('قواعد') }}</span>
+        <button class="btn btn-sm btn-light py-0 px-1 rules-toggle" type="button"
+                data-bs-toggle="collapse" data-bs-target="#{{ rid }}"
+                aria-expanded="false" aria-controls="{{ rid }}"
+                title="Expand / Collapse / طي">
+            <i class="bi bi-chevron-up"></i>
+        </button>
+    </div>
+    <div class="collapse" id="{{ rid }}">
+        <div class="card-body bg-light">
+            <ol class="mb-0 ps-3 small">
+                {% for rule in pipe_rules %}
+                <li class="mb-2">
+                    
+                   <div class="row">
+                    
+                        <div class="col-12 col-md-6">
+                            <span class="fw-bold">{{ rule.id }} &mdash; {{ rule.name_en }}</span>
+                             {% if rule.description_en %}<div class="text-muted">{{ rule.description_en }}</div>{% endif %}
+                            
+                        </div>
+                        <div class="col-12 col-md-6">
+                           {% if rule.name_ar %}<div class="text-muted ar-text fw-bold fs-6" lang="ar">  {{ rule.name_ar }}</div>{% endif %}
+                            {% if rule.description_ar %}<div class="text-muted ar-text" lang="ar">{{ rule.description_ar }}</div>{% endif %}
+                        </div>
+                    </div>
+                   
+                    <br>
+                </li>
+                {% endfor %}
+            </ol>
+        </div>
+    </div>
+</div>
+{% endif %}

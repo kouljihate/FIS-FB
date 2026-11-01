@@ -1,0 +1,23 @@
+{# Shared map card header.
+   Layout: 3 columns -> English title (20%) | fullscreen circle button | Arabic title (20%)
+   Expected context vars (set before including):
+     map_title_en : English title text
+     map_title_ar : Arabic title text
+     map_id       : id of the map container (defaults to "map") #}
+{% set _map_header_id = map_id | default('map') %}
+<div class="card-header map-card-header">
+    <div class="map-header-en">
+        <span class="map-header-title">{{ map_title_en }}</span>
+    </div>
+    <div class="map-header-actions">
+        <button type="button" class="btn btn-circle map-fullscreen-btn"
+                data-map-target="{{ _map_header_id }}"
+                onclick="toggleMapFullscreen('{{ _map_header_id }}')"
+                title="Full Page / ملء الشاشة" aria-label="Full Page / ملء الشاشة">
+            <i class="bi bi-arrows-fullscreen"></i>
+        </button>
+    </div>
+    <div class="map-header-ar ar-text">
+        <span class="map-header-title">{{ map_title_ar }}</span>
+    </div>
+</div>

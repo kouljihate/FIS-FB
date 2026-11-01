@@ -11,10 +11,13 @@ def setup_logging(app):
         '%(asctime)s %(levelname)s [%(name)s] %(message)s'
     )
 
+    # UTF-8: bilingual messages (and the e-mail copy of a temporary password)
+    # must reach the file intact on every platform.
     file_handler = RotatingFileHandler(
         os.path.join(log_dir, 'irrigation.log'),
         maxBytes=10 * 1024 * 1024,
-        backupCount=5
+        backupCount=5,
+        encoding='utf-8',
     )
     file_handler.setFormatter(formatter)
     file_handler.setLevel(logging.INFO)

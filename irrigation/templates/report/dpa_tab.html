@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Report — DPA / التقرير الفني{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+        <h4 class="mb-0"><i class="bi bi-file-earmark-bar-graph"></i> Rapport Technique — DPA</h4>
+        <div class="text-muted small">
+            {{ project.name }} — {{ client or 'Client à renseigner' }}
+            {% if client_cin %} · CIN {{ client_cin }}{% endif %} · {{ month_label }}
+        </div>
+    </div>
+</div>
+
+{% set total = sheets|length %}
+<div class="row g-3">
+    <div class="col-lg-5">
+        <!-- Generate the report -->
+        <div class="card shadow-sm">
+            <div class="card-header"><i class="bi bi-magic"></i> Rapport technique</div>
+            <div class="card-body text-center">
+                <a class="btn btn-circle btn-success dpa-generate"
+                   href="{{ url_for('report.dpa_print', project_id=project.id) }}"
+                   target="_blank" rel="noopener"
+                   style="width: 58px; height: 58px; font-size: 1.5rem;"
+                   title="Générer le rapport / توليد التقرير"
+                   aria-label="Générer le rapport DPA">
+                    <i class="bi bi-file-earmark-arrow-down"></i>
+                </a>
+                <div class="fw-semibold mt-2">Générer le rapport</div>
+                <p class="text-muted small mb-3">
+                    {{ total }} chapitres au format A4. Le rapport s'ouvre dans un nouvel onglet,
+                    puis « Imprimer / PDF » pour l'enregistrer.
+                </p>
+                {% if current_user.can_edit_projects %}
+                <a class="btn btn-outline-secondary btn-sm"
+                   href="{{ url_for('report.dpa_settings', project_id=project.id) }}">
+                    <i class="bi bi-pencil-square"></i> En-tête &amp; documents
+                </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Entries the report reads -->
+        <div class="card shadow-sm mt-3">
+            <div class="card-header d-flex justify-content-between">
+                <span><i class="bi bi-clipboard-check"></i> Entrées du rapport</span>
+                <span class="text-muted">{{ ready_count }} / {{ total }}</span>
+            </div>
+            <div class="card-body">
+                <div class="progress" style="height: 6px;">
+                    <div class="progress-bar bg-success" role="progressbar"
+                         style="width: {{ (100 * ready_count / total)|round|int }}%"
+                         aria-valuenow="{{ ready_count }}" aria-valuemin="0" aria-valuemax="{{ total }}"></div>
+                </div>
+                <ul class="list-unstyled small mb-0 mt-3">
+                    {% for sheet in sheets if not sheet.ready %}
+                    <li class="d-flex gap-2 py-1 border-bottom">
+                        <i class="bi bi-exclamation-circle text-warning"></i>
+                        <span>
+                            {{ sheet.title }}
+                            <span class="text-muted d-block">{{ sheet.entry }}</span>
+                            <a href="{{ sheet.href }}">Compléter cette entrée</a>
+                        </span>
+                    </li>
+                    {% else %}
+                    <li class="text-success pt-1">
+                        <i class="bi bi-check2-circle"></i>
+                        Toutes les entrées sont disponibles / كل المدخلات متوفرة.
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        <!-- What the report already knows about the project -->
+        <div class="card shadow-sm mt-3">
+            <div class="card-header"><i class="bi bi-speedometer2"></i> Projet</div>
+            <div class="card-body">
+                <div class="row row-cols-2 g-2 small">
+                    <div><span class="text-muted d-block">Superficie nette</span>
+                        {{ '%.2f'|format(net_area_ha) }} ha</div>
+                    <div><span class="text-muted d-block">Secteurs / zones</span>
+                        {{ sectors|length }} / {{ zones|length }}</div>
+                    <div><span class="text-muted d-block">Arbres / goutteurs</span>
+                        {{ trees_count }} / {{ drippers }}</div>
+                    <div><span class="text-muted d-block">Conduites</span>
+                        {{ total_pipe_m }} m</div>
+                    <div><span class="text-muted d-block">Débit de pointe</span>
+                        {{ '%.2f'|format(total_flow_m3h) }} m³/h</div>
+                    <div><span class="text-muted d-block">Devis</span>
+                        {{ '%.2f'|format(quote.total) }} {{ quote.currency }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="card shadow-sm h-100">
+            <div class="card-header"><i class="bi bi-list-ol"></i> Contenu du rapport</div>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width: 3.5rem;">Page</th>
+                            <th>Chapitre</th>
+                            <th>Entrée</th>
+                            <th style="width: 7rem;">État</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sheet in sheets %}
+                        <tr>
+                            <td class="text-muted">{{ sheet.page }}</td>
+                            <td>{{ sheet.title }}</td>
+                            <td class="text-muted small">{{ sheet.entry }}</td>
+                            <td>
+                                {% if sheet.ready %}
+                                <span class="badge text-bg-success">Prêt</span>
+                                {% else %}
+                                <span class="badge text-bg-warning">À compléter</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

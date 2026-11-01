@@ -4,11 +4,19 @@
 {% block content %}
 <div class="projects-page">
     <div class="projects-page-header mb-4">
-        <h2 class="projects-page-title-en"><i class="bi bi-folder-fill"></i> Projects</h2>
-        <a href="{{ url_for('project.create') }}" class="btn btn-success projects-page-create">
-            <i class="bi bi-plus-circle"></i> Create Project / إنشاء مشروع
-        </a>
-        <h2 class="projects-page-title-ar ar-text" lang="ar">المشاريع</h2>
+        <div class="projects-page-titles">
+            <h2 class="projects-page-title-en"><i class="bi bi-folder-fill"></i> Projects</h2>
+            {# A Project Owner cannot create a project: theirs are created for
+               them by their Project Admin. #}
+            {% if current_user.can_edit_projects %}
+            <a href="{{ url_for('project.create') }}" class="btn btn-success projects-page-create">
+                <i class="bi bi-plus-circle"></i> Create Project / إنشاء مشروع
+            </a>
+            {% endif %}
+            <h2 class="projects-page-title-ar ar-text" lang="ar">المشاريع</h2>
+            
+        </div>
+        
     </div>
 
 {% if projects %}
@@ -19,11 +27,12 @@
                 <thead>
                     <tr>
                         <th>ID</th>
-                        <th>Name / الاسم</th>
-                        <th>Location / الموقع</th>
-                        <th>Status / الحالة</th>
-                        <th>KML / ملف</th>
-                        <th class="text-center">Actions / إجراءات</th>
+                        <th class="text-center"> الاسم  <br> Name</th>
+                        <th class="text-center">المالك<br> Owner</th>
+                        <th class="text-center">الموقع<br> Location</th>
+                        <th class="text-center">الحالة<br> Status</th>
+                        <th class="text-center">ملف <br>KML File</th>
+                        <th class="text-center">إجراءات<br>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -31,6 +40,13 @@
                     <tr>
                         <td>{{ p.id }}</td>
                         <td>{{ p.name }}</td>
+                        <td>
+                            {% if p.owner_name %}
+                            {{ p.owner_name }}
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
                         <td>{{ p.location or '-' }}</td>
                         <td>
                             <span class="badge bg-info">{{ p.status or 'created' }}</span>
@@ -47,16 +63,33 @@
                                class="btn btn-circle btn-primary" title="Open / فتح">
                                 <i class="bi bi-folder2-open"></i>
                             </a>
+                            {% if current_user.can_edit_projects %}
+                            {% if p.kml_file %}
+                            <button type="button" class="btn btn-circle btn-info" disabled
+                                    title="KML already linked / ملف KML مرتبط بالفعل">
+                                <i class="bi bi-link-45deg"></i>
+                            </button>
+                            {% else %}
+                            <button type="button" class="btn btn-circle btn-info"
+                                    data-bs-toggle="modal" data-bs-target="#linkKmlModal{{ p.id }}"
+                                    title="Link KML/KMZ / ربط ملف">
+                                <i class="bi bi-link-45deg"></i>
+                            </button>
+                            {% endif %}
+                            {% endif %}
                             <a href="{{ url_for('project.export_kml', project_id=p.id) }}"
                                class="btn btn-circle btn-success" title="Export KML / تصدير">
                                 <i class="bi bi-download"></i>
                             </a>
+                            {% if current_user.can_edit_projects %}
                             <form method="POST" action="{{ url_for('project.delete', project_id=p.id) }}"
-                                    class="d-inline" data-confirm="Delete this project? / حذف هذا المشروع؟">
+                                    class="d-inline"
+                                    data-confirm-delete="{{ p.name }}" data-confirm-delete-ar="{{ p.name }}">
                                 <button type="submit" class="btn btn-circle btn-danger" title="Delete / حذف">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </form>
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}
@@ -65,6 +98,34 @@
         </div>
     </div>
 </div>
+
+{% for p in projects %}
+{% if not p.kml_file %}
+<div class="modal fade" id="linkKmlModal{{ p.id }}" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('project.upload_kml', project_id=p.id) }}"
+                  enctype="multipart/form-data">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-link-45deg"></i> Link KML/KMZ file / ربط ملف KML/KMZ</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label">KML or KMZ file / ملف KML أو KMZ</label>
+                    <input type="file" name="kml_file" class="form-control" accept=".kml,.kmz" required>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel / إلغاء</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-upload"></i> Link / ربط
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endfor %}
 {% else %}
 <div class="text-center py-5">
     <i class="bi bi-folder-x" style="font-size: 3rem; color: #ccc;"></i>

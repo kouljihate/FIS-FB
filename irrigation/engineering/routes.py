@@ -9,6 +9,7 @@ from irrigation.engineering.validation import (
 from irrigation.engineering.regeneration import (
     regenerate_sectors, regenerate_zones, get_regeneration_report
 )
+from irrigation.engineering.corrections import apply_correction, can_auto_fix
 from irrigation.engineering.elevation import (
     get_or_build_elevation_model, build_elevation_heatmap_geojson,
     has_elevation_model, delete_elevation_model
@@ -19,9 +20,10 @@ engineering_bp = Blueprint('engineering', __name__)
 
 
 def get_project_or_redirect(project_id):
-    project = mongo.db.projects.find_one({'id': project_id, 'user_id': int(current_user.id)})
+    from irrigation.access import require_project
+
+    project = require_project(project_id)
     if not project:
-        flash('Project not found / المشروع غير موجود', 'danger')
         return None
     project['_id'] = str(project['_id'])
     return project
@@ -37,6 +39,11 @@ def validation_view(project_id):
     # Get last validation
     last_validation = get_last_validation(project_id)
     history = get_validation_history(project_id, limit=5)
+
+    # The table shows a correction button only where the app knows the fix.
+    if last_validation:
+        for check in last_validation.get('checks') or []:
+            check['can_fix'] = can_auto_fix(check)
 
     # Get regeneration report
     regen_report = get_regeneration_report(project_id)
@@ -111,6 +118,38 @@ def run_validation(project_id):
     return redirect(url_for('engineering.validation_view', project_id=project_id))
 
 
+@engineering_bp.route('/<int:project_id>/checks/<int:check_index>/fix', methods=['POST'])
+@login_required
+def fix_check(project_id, check_index):
+    """Apply the automatic correction a validation rule recommends."""
+    project = get_project_or_redirect(project_id)
+    if not project:
+        return redirect(url_for('project.index'))
+
+    last_validation = get_last_validation(project_id)
+    checks = (last_validation or {}).get('checks') or []
+    if check_index < 0 or check_index >= len(checks):
+        flash('Validation result not found - run the validation again / نتيجة التحقق غير موجودة - أعد تشغيل التحقق', 'warning')
+        return redirect(url_for('engineering.validation_view', project_id=project_id))
+
+    check = checks[check_index]
+    if check.get('severity') == 'pass':
+        flash('This check already passes / هذا الفحص ناجح بالفعل', 'info')
+        return redirect(url_for('engineering.validation_view', project_id=project_id))
+
+    # Re-run with the parameters this result was produced with, so the table
+    # shows whether the correction cleared the rule.
+    config = (last_validation or {}).get('config') or ENGINEERING_DEFAULTS.copy()
+    result = apply_correction(project_id, check, config)
+    if result.get('applied'):
+        run_full_validation(project_id, config)
+        flash(result.get('message_en', '') + ' / ' + result.get('message_ar', ''), 'success')
+    else:
+        flash(result.get('message_en', '') + ' / ' + result.get('message_ar', ''), 'warning')
+
+    return redirect(url_for('engineering.validation_view', project_id=project_id))
+
+
 @engineering_bp.route('/<int:project_id>/apply_diameters', methods=['POST'])
 @login_required
 def apply_diameters(project_id):
@@ -151,9 +190,9 @@ def ai_regenerate_sectors(project_id):
     sectors = regenerate_sectors(project_id, n_sectors)
 
     if sectors:
-        flash(f'AI regenerated {len(sectors)} sectors with optimal partitioning / الذكاء الاصطناعي أنشأ {len(sectors)} قطاعات بتقسيم أمثل', 'success')
+        flash(f'Auto regenerated {len(sectors)} sectors with optimal partitioning / الذكاء الاصطناعي أنشأ {len(sectors)} قطاعات بتقسيم أمثل', 'success')
     else:
-        flash('AI regeneration failed - check boundary / فشل إعادة الإنشاء - تحقق من الحدود', 'danger')
+        flash('Auto regeneration failed - check boundary / فشل إعادة الإنشاء - تحقق من الحدود', 'danger')
 
     return redirect(url_for('geometry.sectors_view', project_id=project_id))
 
@@ -171,9 +210,9 @@ def ai_regenerate_zones(project_id):
     zones = regenerate_zones(project_id, sector_id, zones_per_sector)
 
     if zones:
-        flash(f'AI regenerated {len(zones)} zones with optimal partitioning / الذكاء الاصطناعي أنشأ {len(zones)} مناطق بتقسيم أمثل', 'success')
+        flash(f'Auto regenerated {len(zones)} zones with optimal partitioning / الذكاء الاصطناعي أنشأ {len(zones)} مناطق بتقسيم أمثل', 'success')
     else:
-        flash('AI regeneration failed / فشل إعادة الإنشاء', 'danger')
+        flash('Auto regeneration failed / فشل إعادة الإنشاء', 'danger')
 
     return redirect(url_for('geometry.zones_view', project_id=project_id))
 
@@ -182,7 +221,9 @@ def ai_regenerate_zones(project_id):
 @login_required
 def report(project_id):
     """API endpoint returning validation as JSON."""
-    project = mongo.db.projects.find_one({'id': project_id, 'user_id': int(current_user.id)})
+    from irrigation.access import find_project
+
+    project = find_project(project_id)
     if not project:
         return jsonify({'error': 'Project not found'}), 404
 
@@ -200,9 +241,10 @@ def report(project_id):
 @login_required
 def fetch_elevation(project_id):
     """Fetch and cache terrain elevation data for a project."""
-    project = mongo.db.projects.find_one({'id': project_id, 'user_id': int(current_user.id)})
+    from irrigation.access import require_project
+
+    project = require_project(project_id)
     if not project:
-        flash('Project not found / المشروع غير موجود', 'danger')
         return redirect(url_for('engineering.validation_view', project_id=project_id))
 
     spacing = request.form.get('spacing_m', default=30, type=int)
@@ -229,7 +271,9 @@ def fetch_elevation(project_id):
 @login_required
 def elevation_heatmap(project_id):
     """Return elevation sample points as GeoJSON for map display."""
-    project = mongo.db.projects.find_one({'id': project_id, 'user_id': int(current_user.id)})
+    from irrigation.access import find_project
+
+    project = find_project(project_id)
     if not project:
         return jsonify({'error': 'Project not found'}), 404
 
@@ -247,3 +291,22 @@ def clear_elevation(project_id):
     delete_elevation_model(project_id)
     flash('Elevation data cleared / تم مسح بيانات الارتفاع', 'info')
     return redirect(url_for('engineering.validation_view', project_id=project_id))
+
+@engineering_bp.route('/<int:project_id>/report/view')
+@login_required
+def report_view(project_id):
+    """Report tab: the printable DPA technical report."""
+    project = get_project_or_redirect(project_id)
+    if not project:
+        return redirect(url_for('project.index'))
+    return redirect(url_for('report.dpa_view', project_id=project_id))
+
+
+@engineering_bp.route('/<int:project_id>/technical-report')
+@login_required
+def technical_report_view(project_id):
+    """The DPA report used to live here; it now has its own module."""
+    project = get_project_or_redirect(project_id)
+    if not project:
+        return redirect(url_for('project.index'))
+    return redirect(url_for('report.dpa_view', project_id=project_id))

@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+{% block title %}Estimation / التقدير{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">
+        <i class="bi bi-calculator"></i> Estimation / التقدير
+        <span class="text-muted fs-6">— {{ project.name }}</span>
+    </h4>
+    <a href="{{ url_for('project.detail', project_id=project.id) }}"
+        class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back / رجوع
+    </a>
+</div>
+
+<!-- KPI cards -->
+<div class="row mb-4 g-3">
+    <div class="col-md-3 col-6">
+        <div class="card shadow-sm text-center h-100">
+            <div class="card-body">
+                <div class="text-muted small">Sectors / القطاعات</div>
+                <div class="fs-4 fw-bold">{{ kpis.sector_count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="card shadow-sm text-center h-100">
+            <div class="card-body">
+                <div class="text-muted small">Total Area (m²) / المساحة الكلية</div>
+                <div class="fs-4 fw-bold">{{ '%.0f'|format(kpis.total_area_m2) }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="card shadow-sm text-center h-100">
+            <div class="card-body">
+                <div class="text-muted small">Total Pipe (m) / طول الأنابيب</div>
+                <div class="fs-4 fw-bold">{{ '%.1f'|format(kpis.total_pipe_m) }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="card shadow-sm text-center h-100">
+            <div class="card-body">
+                <div class="text-muted small">Trees / الأشجار</div>
+                <div class="fs-4 fw-bold">{{ kpis.trees_count }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<form method="POST" action="{{ url_for('estimation.quote_save', project_id=project.id) }}">
+    <div class="card shadow-sm mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-list-check"></i> Quote Lines / بنود العرض</h5>
+            <div class="d-flex align-items-center gap-2">
+                <label class="mb-0 small">Currency / العملة</label>
+                <input type="text" name="currency" class="form-control form-control-sm"
+                    style="width: 90px;" value="{{ estimation.currency }}">
+            </div>
+        </div>
+        <div class="card-body">
+            {% set groups = [
+                ('pipes', 'Pipes & Dripline / الأنابيب وخطوط التنقيط', 'bi-water'),
+                ('valves', 'Valves / الصمامات', 'bi-valve'),
+                ('fittings', 'Fittings / الملحقات', 'bi-tools'),
+                ('planting', 'Planting / الغرس', 'bi-tree'),
+            ] %}
+            {% for group_key, group_label, group_icon in groups %}
+            {% set group_lines = lines | selectattr('group', 'equalto', group_key) | list %}
+            {% if group_lines %}
+            <h6 class="text-primary mt-2"><i class="bi {{ group_icon }}"></i> {{ group_label }}</h6>
+            <table class="table table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th style="width: 40%;">Item / البند</th>
+                        <th style="width: 15%;" class="text-end">Quantity / الكمية</th>
+                        <th style="width: 10%;">Unit / الوحدة</th>
+                        <th style="width: 17%;">Unit Price / سعر الوحدة</th>
+                        <th style="width: 18%;" class="text-end">Subtotal / المجموع</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for line in group_lines %}
+                    {% set price = estimation.prices.get(line.key, 0) %}
+                    <tr>
+                        <td>{{ line.name_en }} <span class="text-muted">/ {{ line.name_ar }}</span></td>
+                        <td class="text-end">{{ '%.2f'|format(line.quantity) if line.unit == 'm' else line.quantity }}</td>
+                        <td>{{ line.unit }}</td>
+                        <td>
+                            <input type="hidden" name="price_key" value="{{ line.key }}">
+                            <input type="number" step="0.0001" min="0" class="form-control form-control-sm text-end"
+                                name="price_{{ line.key }}" value="{{ price }}"
+                                data-qty="{{ line.quantity }}"
+                                oninput="recalc()">
+                        </td>
+                        <td class="text-end line-subtotal">{{ '%.2f'|format(price * line.quantity) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+            {% endfor %}
+
+            <!-- Custom items -->
+            <h6 class="text-primary mt-3"><i class="bi bi-plus-square"></i> Additional Items / بنود إضافية</h6>
+            <table class="table table-sm align-middle" id="customItemsTable">
+                <thead>
+                    <tr>
+                        <th style="width: 34%;">Description / الوصف</th>
+                        <th style="width: 12%;">Quantity / الكمية</th>
+                        <th style="width: 12%;">Unit / الوحدة</th>
+                        <th style="width: 16%;">Unit Price / سعر الوحدة</th>
+                        <th style="width: 18%;" class="text-end">Subtotal / المجموع</th>
+                        <th style="width: 8%;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in estimation['items'] %}
+                    <tr>
+                        <td><input type="text" name="item_description" class="form-control form-control-sm"
+                                value="{{ item.description }}"></td>
+                        <td><input type="number" step="0.01" min="0" name="item_quantity"
+                                class="form-control form-control-sm text-end" value="{{ item.quantity }}"
+                                oninput="recalc()"></td>
+                        <td><input type="text" name="item_unit" class="form-control form-control-sm"
+                                value="{{ item.unit }}"></td>
+                        <td><input type="number" step="0.0001" min="0" name="item_unit_price"
+                                class="form-control form-control-sm text-end" value="{{ item.unit_price }}"
+                                oninput="recalc()"></td>
+                        <td class="text-end line-subtotal"></td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-outline-danger"
+                                onclick="this.closest('tr').remove(); recalc();">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <button type="button" class="btn btn-sm btn-outline-success" id="addCustomItem">
+                <i class="bi bi-plus-circle"></i> Add Item / إضافة بند
+            </button>
+        </div>
+    </div>
+
+    <!-- Totals -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header"><h6 class="mb-0"><i class="bi bi-journal-text"></i> Notes / ملاحظات</h6></div>
+                <div class="card-body">
+                    <textarea name="notes" class="form-control" rows="4">{{ estimation.notes }}</textarea>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <table class="table table-sm mb-0">
+                        <tr>
+                            <th>Subtotal / المجموع الفرعي</th>
+                            <td class="text-end" id="subtotalValue">0.00</td>
+                        </tr>
+                        <tr>
+                            <th style="width: 40%;">Discount % / الخصم</th>
+                            <td class="text-end" style="width: 25%;">
+                                <input type="number" step="0.1" min="0" max="100" name="discount_pct"
+                                    class="form-control form-control-sm text-end" value="{{ estimation.discount_pct }}"
+                                    oninput="recalc()">
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Tax (VAT) % / الضريبة</th>
+                            <td class="text-end">
+                                <input type="number" step="0.1" min="0" name="tax_pct"
+                                    class="form-control form-control-sm text-end" value="{{ estimation.tax_pct }}"
+                                    oninput="recalc()">
+                            </td>
+                        </tr>
+                        <tr class="table-primary">
+                            <th class="fs-5">Grand Total / الإجمالي</th>
+                            <td class="text-end fs-5 fw-bold" id="grandTotalValue">0.00</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 mb-4">
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check"></i> Save Estimation / حفظ التقدير
+        </button>
+        <button type="button" class="btn btn-outline-secondary" onclick="window.print()">
+            <i class="bi bi-printer"></i> Print / طباعة
+        </button>
+    </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function recalc() {
+    let subtotal = 0;
+    document.querySelectorAll('#customItemsTable tbody tr').forEach((tr) => {
+        const qty = parseFloat(tr.querySelector('[name="item_quantity"]')?.value) || 0;
+        const price = parseFloat(tr.querySelector('[name="item_unit_price"]')?.value) || 0;
+        const cell = tr.querySelector('.line-subtotal');
+        if (cell) cell.textContent = (qty * price).toFixed(2);
+        subtotal += qty * price;
+    });
+    document.querySelectorAll('input[name^="price_"]').forEach((input) => {
+        const qty = parseFloat(input.dataset.qty) || 0;
+        const price = parseFloat(input.value) || 0;
+        subtotal += qty * price;
+        const cell = input.closest('tr')?.querySelector('.line-subtotal');
+        if (cell) cell.textContent = (qty * price).toFixed(2);
+    });
+    const discount = parseFloat(document.querySelector('[name="discount_pct"]')?.value) || 0;
+    const tax = parseFloat(document.querySelector('[name="tax_pct"]')?.value) || 0;
+    const afterDiscount = subtotal * (1 - discount / 100);
+    const grand = afterDiscount * (1 + tax / 100);
+    document.getElementById('subtotalValue').textContent = subtotal.toFixed(2);
+    document.getElementById('grandTotalValue').textContent = grand.toFixed(2);
+}
+
+document.getElementById('addCustomItem').addEventListener('click', function() {
+    const tbody = document.querySelector('#customItemsTable tbody');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td><input type="text" name="item_description" class="form-control form-control-sm"></td>
+        <td><input type="number" step="0.01" min="0" name="item_quantity" class="form-control form-control-sm text-end" value="1" oninput="recalc()"></td>
+        <td><input type="text" name="item_unit" class="form-control form-control-sm" value="unit"></td>
+        <td><input type="number" step="0.0001" min="0" name="item_unit_price" class="form-control form-control-sm text-end" value="0" oninput="recalc()"></td>
+        <td class="text-end line-subtotal">0.00</td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove(); recalc();"><i class="bi bi-trash"></i></button></td>`;
+    tbody.appendChild(tr);
+});
+
+document.addEventListener('DOMContentLoaded', recalc);
+</script>
+{% endblock %}

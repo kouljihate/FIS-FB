@@ -5,10 +5,12 @@
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h2><i class="bi bi-folder-fill"></i> {{ project.name }}</h2>
     <div>
-        <a href="{{ url_for('project.index') }}" class="btn btn-outline-secondary">
+        <a href="{{ url_for('project.index') }}"
+            class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Back / رجوع
         </a>
-        <a href="{{ url_for('project.export_kml', project_id=project.id) }}" class="btn btn-success">
+        <a href="{{ url_for('project.export_kml', project_id=project.id) }}"
+            class="btn btn-success">
             <i class="bi bi-download"></i> Export KML / تصدير
         </a>
     </div>
@@ -17,73 +19,1012 @@
 <!-- KML Upload Section -->
 <div class="card shadow-sm mb-4">
     <div class="card-header bg-info text-white">
-        <h5 class="mb-0"><i class="bi bi-file-earmark-code"></i> KML/KMZ File / ملف KML/KMZ</h5>
+        <h5 class="mb-0"><i class="bi bi-file-earmark-code"></i> KML/KMZ File /
+            ملف KML/KMZ</h5>
     </div>
     <div class="card-body">
-        <form method="POST" action="{{ url_for('project.upload_kml', project_id=project.id) }}" enctype="multipart/form-data">
+        {# The owner reads the linked file; only an editor uploads a new one. #}
+        {% if current_user.can_edit_projects %}
+        <form method="POST"
+            action="{{ url_for('project.upload_kml', project_id=project.id) }}"
+            enctype="multipart/form-data">
             <div class="row align-items-end">
-                <div class="col-md-8">
-                    <label class="form-label">Upload KML or KMZ file / رفع ملف KML أو KMZ</label>
-                    <input type="file" name="kml_file" class="form-control" accept=".kml,.kmz">
-                </div>
-                <div class="col-md-4">
-                    <button type="submit" class="btn btn-primary w-100">
-                        <i class="bi bi-upload"></i> Upload / رفع
-                    </button>
+                  <label class="form-label">Upload KML or KMZ file / تحميل الملف 
+                        KML أو KMZ</label>
+            </div>
+            <div class="row g-2">
+                <div class="fileupload-wrapper">
+                    <input type="file" name="kml_file" class="form-control"  accept=".kml,.kmz">
+                    <button type="submit"> <i class="bi bi-upload"></i> </button>
                 </div>
             </div>
+
+            
         </form>
+        {% endif %}
         {% if project.kml_file %}
         <div class="mt-2">
-            <span class="badge bg-success"><i class="bi bi-check-circle"></i> {{ project.kml_file }}</span>
+            <button type="button" class="btn btn-success btn-sm"
+                data-bs-toggle="modal" data-bs-target="#kmlElementsModal"
+                title="View KML/KMZ elements / عرض عناصر الملف">
+                <i class="bi bi-check-circle"></i> {{ project.kml_file }}
+                <span class="badge bg-light text-dark">
+                    <i class="bi bi-diagram-3"></i>
+                    {{ (project.kml_features or [])|length }} elements /
+                    عناصر
+                </span>
+            </button>
         </div>
         {% endif %}
     </div>
 </div>
 
 <!-- Project Info -->
-<div class="row mb-4">
-    <div class="col-md-6">
-        <div class="card shadow-sm">
-            <div class="card-header"><h6 class="mb-0"><i class="bi bi-info-circle"></i> Project Info / معلومات المشروع</h6></div>
-            <div class="card-body">
-                <table class="table table-sm">
-                    <tr><th>Name / الاسم:</th><td>{{ project.name }}</td></tr>
-                    <tr><th>Location / الموقع:</th><td>{{ project.location or '-' }}</td></tr>
-                    <tr><th>Status / الحالة:</th><td><span class="badge bg-info">{{ project.status }}</span></td></tr>
-                    <tr><th>Water Source / مصدر المياه:</th>
-                        <td>
-                            {% if project.water_source and project.water_source.coordinates %}
-                            [{{ project.water_source.coordinates[1] }}, {{ project.water_source.coordinates[0] }}]
-                            {% else %}
-                            <span class="text-muted">Not set / غير محدد</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                </table>
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-info text-white">
+        <div class="project-info-header">
+            <!-- English title (15%) -->
+            <h5 class="project-info-title-en mb-0">
+                <i class="bi bi-folder-fill"></i> Project
+                <span class="badge bg-info">{{ project.status }}</span>
+            </h5>
+
+            <!-- Edit / Delete buttons (70%) -->
+            {% if current_user.can_edit_projects %}
+            <div class="project-info-actions">
+                <button class="btn btn-sm btn-outline-light"
+                    data-bs-toggle="modal"
+                    data-bs-target="#editSpecModal"
+                    title="Edit project / تعديل المشروع"
+                    aria-label="Edit project / تعديل المشروع">
+                    <i class="bi bi-pencil"></i> Edit / تعديل
+                </button>
+                <button class="btn btn-sm btn-outline-light"
+                    data-bs-toggle="modal"
+                    data-bs-target="#deleteProjectModal"
+                    title="Delete project / حذف المشروع"
+                    aria-label="Delete project / حذف المشروع">
+                    <i class="bi bi-trash"></i> Delete / حذف
+                </button>
             </div>
+            {% endif %}
+
+            <!-- Arabic title (15%) -->
+            <h5 class="project-info-title-ar ar-text mb-0" lang="ar">المشروع</h5>
         </div>
     </div>
-    <div class="col-md-6">
-        <div class="card shadow-sm">
-            <div class="card-header"><h6 class="mb-0"><i class="bi bi-diagram-3"></i> Progress / التقدم</h6></div>
-            <div class="card-body">
-                <table class="table table-sm">
-                    <tr><th>Sectors / القطاعات:</th><td>{{ sectors|length }}</td></tr>
-                    <tr><th>Zones / المناطق:</th><td>{{ zones|length }}</td></tr>
-                    <tr><th>Network Elements / عناصر الشبكة:</th><td>{{ network|length }}</td></tr>
-                    <tr><th>Tree Rows / صفوف الأشجار:</th><td>{{ tree_rows|length }}</td></tr>
-                    <tr><th>Trees / الأشجار:</th><td>{{ trees|length }}</td></tr>
-                </table>
+    <div class="card-body">
+        <div class="row mb-2">
+            <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header">
+                            <div class="row">
+                                <div class="col text-start" style="flex: 0 0 25%; max-width: 25%;">Project Admin</div>
+                                <div class="col text-center" style="flex: 0 0 50%; max-width: 50%;"><i class="bi bi-person-badge"></i></div>
+                                <div class="col text-end" style="flex: 0 0 25%; max-width: 25%;">مسؤول المشروع</div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-sm">
+                                {% if project_admin %}
+                                {% set admin_company = project_admin.get('company') or {} %}
+                                <tr>
+                                    <th style="width: 30%; text-align: left;">Name</th>
+                                    <td style="width: 40%; text-align: center;">{{ project_admin.full_name or project_admin.username or '-' }}</td>
+                                    <th style="width: 30%; text-align: right;">الاسم</th>
+                                </tr>
+                                <tr>
+                                    <th style="text-align: left;">Username</th>
+                                    <td style="text-align: center;">{{ project_admin.username or '-' }}</td>
+                                    <th style="text-align: right;">اسم المستخدم</th>
+                                </tr>
+                                <tr>
+                                    <th style="text-align: left;">E-mail</th>
+                                    <td style="text-align: center;">{{ project_admin.email or '-' }}</td>
+                                    <th style="text-align: right;">البريد</th>
+                                </tr>
+                                <tr>
+                                    <th style="text-align: left;">Phone</th>
+                                    <td style="text-align: center;">{{ project_admin.phone or '-' }}</td>
+                                    <th style="text-align: right;">الهاتف</th>
+                                </tr>
+                                <tr>
+                                    <th style="text-align: left;">Company</th>
+                                    <td style="text-align: center;">{{ admin_company.get('name') or '-' }}</td>
+                                    <th style="text-align: right;">الشركة</th>
+                                </tr>
+                                <tr>
+                                    <th style="text-align: left;">Agreement No.</th>
+                                    <td style="text-align: center;">{{ admin_company.get('agreement_number') or '-' }}</td>
+                                    <th style="text-align: right;">رقم الاتفاقية</th>
+                                </tr>
+                                <tr>
+                                    <th style="text-align: left;">Agreement Date</th>
+                                    <td style="text-align: center;">{{ admin_company.get('agreement_date') or '-' }}</td>
+                                    <th style="text-align: right;">تاريخ الاتفاقية</th>
+                                </tr>
+                                <tr>
+                                    <th style="text-align: left;">Agreement</th>
+                                    <td style="text-align: center;">
+                                        {% if admin_company.get('agreement_file') %}
+                                        <a href="{{ url_for('auth.uploaded_file', filename=admin_company.get('agreement_file')) }}"
+                                           target="_blank" rel="noopener">
+                                            <i class="bi bi-file-earmark-pdf"></i> Document / الوثيقة
+                                        </a>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <th style="text-align: right;">الوثيقة</th>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted">Not set / غير محدد</td>
+                                </tr>
+                                {% endif %}
+                            </table>
+                        </div>
+                </div>
             </div>
+            <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header">
+                            <div class="row">
+                                <div class="col text-start" style="flex: 0 0 25%; max-width: 25%;">Project Owner</div>
+                                <div class="col text-center" style="flex: 0 0 50%; max-width: 50%;"><i class="bi bi-person-check"></i></div>
+                                <div class="col text-end" style="flex: 0 0 25%; max-width: 25%;">مالك المشروع</div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-sm">
+                                <tr>
+                                    <th style="width: 30%; text-align: left;">Name</th>
+                                    <td style="width: 40%; text-align: center;">{{ spec.owner.name or (project_owner.full_name if project_owner else '') or '-' }}</td>
+                                    <th style="width: 30%; text-align: right;">الاسم</th>
+                                </tr>
+                                <tr>
+                                    <th style="text-align: left;">E-mail</th>
+                                    <td style="text-align: center;">{{ spec.owner.email or (project_owner.email if project_owner else '') or '-' }}</td>
+                                    <th style="text-align: right;">البريد</th>
+                                </tr>
+                                <tr>
+                                    <th style="text-align: left;">Phone</th>
+                                    <td style="text-align: center;">{{ spec.owner.phone or (project_owner.phone if project_owner else '') or '-' }}</td>
+                                    <th style="text-align: right;">الهاتف</th>
+                                </tr>
+                                <tr>
+                                    <th style="text-align: left;">Account</th>
+                                    <td style="text-align: center;">
+                                        {% if project_owner %}
+                                        {{ project_owner.username }}
+                                        {% else %}
+                                        <span class="text-muted">Not linked / غير مرتبط</span>
+                                        {% endif %}
+                                    </td>
+                                    <th style="text-align: right;">الحساب</th>
+                                </tr>
+                                <tr>
+                                    <th style="text-align: left;">CIN</th>
+                                    <td style="text-align: center;">{{ (project_owner.get('cin') if project_owner else '') or '-' }}</td>
+                                    <th style="text-align: right;">البطاقة الوطنية</th>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+            </div>
+            <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header">
+                            <div class="row">
+                                <div class="col text-start" style="flex: 0 0 25%; max-width: 25%;">Land Info</div>
+                                <div class="col text-center" style="flex: 0 0 50%; max-width: 50%;"><i class="bi bi-geo-alt"></i></div>
+                                <div class="col text-end" style="flex: 0 0 25%; max-width: 25%;">معلومات الأرض</div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-sm">
+                                <tr>
+                                    <th style="width: 30%; text-align: left;">Location</th>
+                                    <td style="width: 40%; text-align: center;">{{ project.location or '-' }}</td>
+                                    <th style="width: 30%; text-align: right;">الموقع</th>
+                                </tr>
+                                <tr>
+                                    <th style="text-align: left;">Area</th>
+                                    <td style="text-align: center;">
+                                        {% if land_info.area_m2 %}
+                                        {{ '{:,.0f}'.format(land_info.area_m2) }} m²
+                                        <span class="text-muted">({{ '{:.2f}'.format(land_info.area_m2 / 10000) }} ha)</span>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <th style="text-align: right;">المساحة</th>
+                                </tr>
+                                <tr>
+                                    <th style="text-align: left;">Perimeter</th>
+                                    <td style="text-align: center;">
+                                        {% if land_info.perimeter_m %}
+                                        {{ '{:,.0f}'.format(land_info.perimeter_m) }} m
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <th style="text-align: right;">المحيط</th>
+                                </tr>
+                                <tr>
+                                    <th style="text-align: left;">Sectors</th>
+                                    <td style="text-align: center;">{{ sectors|length }}</td>
+                                    <th style="text-align: right;">القطاعات</th>
+                                </tr>
+                                <tr>
+                                    <th style="text-align: left;">Water Source</th>
+                                    <td style="text-align: center;">
+                                        {% if project.water_source and project.water_source.coordinates %}
+                                        [{{ project.water_source.coordinates[1] }}, {{ project.water_source.coordinates[0] }}]
+                                        {% else %}
+                                        <span class="text-muted">Not set / غير محدد</span>
+                                        {% endif %}
+                                    </td>
+                                    <th style="text-align: right;">مصدر المياه</th>
+                                </tr>
+                                <tr>
+                                    <th style="text-align: left;">Map File</th>
+                                    <td style="text-align: center;">
+                                        {% if project.kml_file %}
+                                        {{ project.kml_file }}
+                                        <span class="badge bg-light text-dark">{{ (project.kml_features or [])|length }}</span>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <th style="text-align: right;">ملف الخريطة</th>
+                                </tr>
+                                <tr>
+                                    <th style="text-align: left;">Documents</th>
+                                    <td style="text-align: center;">{{ (spec.land_documents or [])|length }}</td>
+                                    <th style="text-align: right;">وثائق الأرض</th>
+                                </tr>
+                                <tr>
+                                    <th style="text-align: left;">Elevation</th>
+                                    <td style="text-align: center;">
+                                        {% if project.elevation_models %}
+                                        <span class="badge bg-success">Ready / جاهز</span>
+                                        {% else %}
+                                        <span class="text-muted">Not generated / غير مولّد</span>
+                                        {% endif %}
+                                    </td>
+                                    <th style="text-align: right;">الارتفاع</th>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+            </div>
+        </div>
+        <!-- WhatsApp direct message: project admin or owner -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-success text-white">
+                <div class="row">
+                    <div class="col text-start" style="flex: 0 0 25%; max-width: 25%;">
+                        <i class="bi bi-whatsapp"></i> WhatsApp
+                    </div>
+                    <div class="col text-center" style="flex: 0 0 50%; max-width: 50%;"></div>
+                    <div class="col text-end ar-text" style="flex: 0 0 25%; max-width: 25%;">واتساب</div>
+                </div>
+            </div>
+            <div class="card-body">
+                <form method="POST"
+                      action="{{ url_for('project.whatsapp_message', project_id=project.id) }}"
+                      class="row g-2 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label" for="whatsapp-target">Send to / إرسال إلى</label>
+                        <select name="target" id="whatsapp-target" class="form-select">
+                            <option value="admin"{% if not project_admin or not project_admin.phone %} disabled{% endif %}>
+                                Project Admin / مسؤول المشروع{% if project_admin %} — {{ project_admin.full_name or project_admin.username }}{% if project_admin.phone %} ({{ project_admin.phone }}){% endif %}{% endif %}
+                            </option>
+                            <option value="owner"{% if not spec.owner.phone %} disabled{% endif %}>
+                                Owner / المالك{% if spec.owner.name %} — {{ spec.owner.name }}{% endif %}{% if spec.owner.phone %} ({{ spec.owner.phone }}){% endif %}
+                            </option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="whatsapp-message">Message / الرسالة</label>
+                        <textarea name="message" id="whatsapp-message" class="form-control"
+                                  rows="2" maxlength="1000" required
+                                  placeholder="Write a direct message / اكتب رسالة مباشرة"></textarea>
+                    </div>
+                    <div class="col-md-2 d-grid">
+                        <button type="submit" class="btn btn-success"{% if not whatsapp_ready %} disabled{% endif %}>
+                            <i class="bi bi-send"></i> Send / إرسال
+                        </button>
+                    </div>
+                </form>
+                {% if not whatsapp_ready %}
+                <p class="small text-muted mb-0 mt-2">
+                    WhatsApp is not configured: set BLUETICKS_API_KEY and restart the application.
+                    <span class="ar-text" lang="ar">
+                        واتساب غير مُعدّ: اضبط BLUETICKS_API_KEY ثم أعد تشغيل التطبيق.
+                    </span>
+                </p>
+                {% elif not (project_admin and project_admin.phone) and not spec.owner.phone %}
+                <p class="small text-muted mb-0 mt-2">
+                    Add a phone number to the Project Admin or to the Owner before sending.
+                    <span class="ar-text" lang="ar">
+                        أضف رقم هاتف لمسؤول المشروع أو للمالك قبل الإرسال.
+                    </span>
+                </p>
+                {% endif %}
+            </div>
+        </div>
+        <div class="row mb-2">
+            <div class="col-md-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header">
+                        <div class="row">
+                            <div class="col text-start" style="flex: 0 0 25%; max-width: 25%;">Configuration</div>
+                            <div class="col text-center" style="flex: 0 0 50%; max-width: 50%;"><i class="bi bi-sliders"></i></div>
+                            <div class="col text-end" style="flex: 0 0 25%; max-width: 25%;">الإعدادات</div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-sm">
+                            <tr>
+                                    <th style="width: 30%; text-align: left;">Zones</th>
+                                    <td style="width: 40%; text-align: center;">{{ spec.config.zones_per_sector }}</td>
+                                    <th style="width: 30%; text-align: right;">مناطق</th>
+                            </tr>
+
+                            <tr>
+                                <th style="width: 30%; text-align: left;">Row Spacing (m)</th>
+                                <td style="width: 40%; text-align: center;">{{ spec.config.row_spacing_m }}</td>
+                                <th style="width: 30%; text-align: right;">تباعد الصفوف</th>
+                            </tr>
+
+                            <tr>
+                                <th style="width: 30%; text-align: left;">Emitter Flow (L/h)</th>
+                                <td style="width: 40%; text-align: center;">{{ spec.config.emitter_flow_lph }}</td>
+                                <th style="width: 30%; text-align: right;">تدفق النقاط</th>
+                            </tr>
+
+                            <tr>
+                                <th style="width: 30%; text-align: left;">Emitters / Tree</th>
+                                <td style="width: 40%; text-align: center;">{{ spec.config.emitters_per_tree }}</td>
+                                <th style="width: 30%; text-align: right;">نقاط/شجرة</th>
+                            </tr>
+
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header">
+                        <div class="row">
+                            <div class="col text-start" style="flex: 0 0 25%; max-width: 25%;">Rules</div>
+                            <div class="col text-center" style="flex: 0 0 50%; max-width: 50%;"><i class="bi bi-rulers"></i></div>
+                            <div class="col text-end" style="flex: 0 0 25%; max-width: 25%;">القواعد</div>
+                        </div>
+                        
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-sm">
+                            <tr>
+                                <th style="width: 35%; text-align: left;">Min Sector Area (m²)</th>
+                                <td style="width: 30%; text-align: center;">{{ spec.rules.min_sector_area_m2 }}</td>
+                                <th style="width: 35%; text-align: right;">أدنى مساحة القطاع</th>
+                            </tr>
+
+                            <tr>
+                                <th style="width: 35%; text-align: left;">Max Sector Area (m²)</th>
+                                <td style="width: 30%; text-align: center;">{{ spec.rules.max_sector_area_m2 }}</td>
+                                <th style="width: 35%; text-align: right;">أقصى مساحة القطاع</th>
+                            </tr>
+
+                            <tr>
+                                <th style="width: 35%; text-align: left;">Zones / Sector</th>
+                                <td style="width: 30%; text-align: center;">{{ spec.rules.min_zones_per_sector }} – {{ spec.rules.max_zones_per_sector }}</td>
+                                <th style="width: 35%; text-align: right;">مناطق/قطاع</th>
+                            </tr>
+
+                        </table>
+                    </div>
+                </div>
+        </div>
+        
+        </div>
+        <div class="row mb-2">
+            <div class="col-12">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header">
+                        <div class="row">
+                            <div class="col text-start" style="flex: 0 0 25%; max-width: 25%;">Water Sources</div>
+                            <div class="col text-center" style="flex: 0 0 50%; max-width: 50%;"><i class="bi bi-droplet-half"></i></div>
+                            <div class="col text-end" style="flex: 0 0 25%; max-width: 25%;">مصادر المياه</div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Type / النوع</th>
+                                    <th>Name / الاسم</th>
+                                    <th>Location / الموقع</th>
+                                    <th class="text-end">Flow (L/min) / التدفق</th>
+                                    <th>Notes / ملاحظات</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for w in spec.water_sources %}
+                                <tr>
+                                    <td>
+                                        {% if w.type == 'well' %}
+                                        <span class="badge bg-primary"><i class="bi bi-droplet"></i> Well / بئر</span>
+                                        {% elif w.type == 'basin' %}
+                                        <span class="badge bg-info"><i class="bi bi-bucket"></i> Basin / حوض</span>
+                                        {% elif w.type == 'reservoir' %}
+                                        <span class="badge bg-success"><i class="bi bi-water"></i> Reservoir / خزان</span>
+                                        {% elif w.type == 'pump' %}
+                                        <span class="badge bg-warning text-dark"><i class="bi bi-power"></i> Pump / مضخة</span>
+                                        {% elif w.type == 'canal' %}
+                                        <span class="badge bg-secondary"><i class="bi bi-signpost-split"></i> Canal / قناة</span>
+                                        {% else %}
+                                        <span class="badge bg-dark"><i class="bi bi-question-circle"></i> Other / أخرى</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ w.name or '-' }}</td>
+                                    <td>
+                                        {% if w.lat is not none and w.lng is not none %}
+                                        [{{ w.lat }}, {{ w.lng }}]
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">{{ w.flow_lpm if w.flow_lpm is not none else '-' }}</td>
+                                    <td>{{ w.notes or '-' }}</td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="5" class="text-muted text-center">No water sources / لا توجد مصادر مياه</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row mb-2">
+            <div class="col-md-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header">
+                        <div class="row">
+                            <div class="col text-start" style="flex: 0 0 25%; max-width: 25%;">Tree Plan</div>
+                            <div class="col text-center" style="flex: 0 0 50%; max-width: 50%;"><i class="bi bi-tree"></i></div>
+                            <div class="col text-end" style="flex: 0 0 25%; max-width: 25%;">خطة الأشجار</div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr><th>Variety / النوع</th><th>%</th><th>Scope /
+                                        النطاق</th></tr>
+                            </thead>
+                            <tbody>
+                                {% for t in spec.tree_plan %}
+                                <tr>
+                                    <td>{{ t.variety_en }}{% if t.variety_ar %} <span
+                                            class="ar-text">({{ t.variety_ar
+                                            }})</span>{% endif %}</td>
+                                    <td>{{ t.percentage }}{% if t.percentage %}%{% endif
+                                        %}</td>
+                                    <td>{{ t.scope }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header">
+                        <div class="row">
+                            <div class="col text-start" style="flex: 0 0 25%; max-width: 25%;">Land Documents</div>
+                            <div class="col text-center" style="flex: 0 0 50%; max-width: 50%;"><i class="bi bi-files"></i></div>
+                            <div class="col text-end" style="flex: 0 0 25%; max-width: 25%;">وثائق الأراضي</div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Name / الاسم</th>
+                                    <th>Category / التصنيف</th>
+                                    <th>Reference / المرجع</th>
+                                    <th>File / الملف</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for d in spec.land_documents %}
+                                <tr>
+                                    <td>{{ d.name }}</td>
+                                    <td>
+                                        {% if d.category == 'owner' %}
+                                        <span class="badge bg-primary">Owner / المالك</span>
+                                        {% elif d.category == 'other' %}
+                                        <span class="badge bg-secondary">Other / أخرى</span>
+                                        {% else %}
+                                        <span class="badge bg-success">Land / الأرض</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ d.reference or '-' }}</td>
+                                    <td>
+                                        {% if d.file %}
+                                        <a href="{{ url_for('project.download_land_document', project_id=project.id, doc_index=loop.index0) }}"
+                                           class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-download"></i> {{ d.file_original or 'Download' }}
+                                        </a>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="4" class="text-muted text-center">No documents / لا توجد وثائق</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6"></div>
+            
+
+        </div>
+
+        <div class="row mb-2">
+            
+            
+
+        </div>
+
+
+    </div>
+</div>
+
+
+
+<!-- Project map -->
+<div class="card shadow-sm">
+    {% set map_title_en = "Map" %}{% set map_title_ar = "الخريطة" %}{% set map_id = "projectMap" %}
+    {% include "_map_header.html" %}
+    <div class="card-body">
+        <div id="projectMap"></div>
+    </div>
+</div>
+
+<!-- Edit Project Settings Modal (an editor only: the owner reads the project) -->
+{% if current_user.can_edit_projects %}
+<div class="modal fade" id="editSpecModal" tabindex="-1" aria-hidden="true">
+    <div
+        class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable"
+        role="document">
+        <div class="modal-content modal-green">
+            <form method="POST"
+                action="{{ url_for('project.settings', project_id=project.id) }}"
+                enctype="multipart/form-data">
+                <div class="modal-header">
+                    <h5 class="modal-title w-100 mb-0">
+                        <div class="row">
+                            <div class="col text-start" style="width: 25%;">Project Settings</div>
+                            <div class="col text-center" style="width: 50%;">
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="col text-end" style="width: 25%;">إعدادات</div>
+                        </div>
+                    </h5>
+                    
+                </div>
+
+                <!-- Constrain height so scrolling works -->
+                <div class="modal-body"
+                    style="max-height: 70vh; overflow-y: auto;">
+                    <h6 class="text-primary"><i class="bi bi-person-badge"></i>
+                        Project Admin / مسؤول المشروع</h6>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <select name="admin_user_id" class="form-select">
+                                {% for admin in project_admins %}
+                                <option value="{{ admin.id }}"
+                                    {% if admin.id == project.get('admin_user_id') %}selected{% endif %}>
+                                    {{ admin.full_name or admin.username }}{% if admin.email %} — {{ admin.email }}{% endif %}
+                                </option>
+                                {% else %}
+                                <option value="">No Project Admin available / لا يوجد مسؤول مشروع</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <h6 class="text-primary"><i class="bi bi-person-check"></i>
+                        Project Owner / المالك (account / الحساب)</h6>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <select name="owner_user_id" class="form-select">
+                                <option value="">— none / بدون —</option>
+                                {% for owner in project_owners %}
+                                <option value="{{ owner.id }}"
+                                    {% if owner.id == project.get('owner_user_id') %}selected{% endif %}>
+                                    {{ owner.full_name or owner.username }}{% if owner.email %} — {{ owner.email }}{% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">
+                                This account sees the project when it signs in / هذا الحساب يرى المشروع عند تسجيل الدخول
+                            </div>
+                        </div>
+                    </div>
+
+                    <h6 class="text-primary"><i class="bi bi-person-circle"></i>
+                        Owner / المالك</h6>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Name / الاسم</label>
+                            <input type="text" name="owner_name"
+                                class="form-control"
+                                value="{{ spec.owner.name }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">E-mail / البريد</label>
+                            <input type="email" name="owner_email"
+                                class="form-control"
+                                value="{{ spec.owner.email }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Phone / الهاتف</label>
+                            <input type="text" name="owner_phone"
+                                class="form-control"
+                                value="{{ spec.owner.phone }}">
+                        </div>
+                    </div>
+
+                    <h6 class="text-primary"><i class="bi bi-sliders"></i>
+                        Configuration / Layout / الإعدادات</h6>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-3 col-6">
+                            <label class="form-label">Zones  per Sector /
+                                مناطق   قطاع</label>
+                            <input type="number" name="zones_per_sector"
+                                class="form-control" min="1"
+                                value="{{ spec.config.zones_per_sector }}">
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <label class="form-label">Row Spacing (m) / تباعد
+                                الصفوف</label>
+                            <input type="number" step="0.1" name="row_spacing_m"
+                                class="form-control"
+                                value="{{ spec.config.row_spacing_m }}">
+                        </div>
+                        
+                        <div class="col-md-3 col-6">
+                            <label class="form-label">Emitter Flow (L/h) / تدفق
+                                النقاط</label>
+                            <input type="number" step="0.1"
+                                name="emitter_flow_lph" class="form-control"
+                                value="{{ spec.config.emitter_flow_lph }}">
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <label class="form-label">Emitters per Tree /
+                                نقاط شجرة</label>
+                            <input type="number" name="emitters_per_tree"
+                                class="form-control" min="1"
+                                value="{{ spec.config.emitters_per_tree }}">
+                        </div>
+                    </div>
+
+                    <h6 class="text-primary"><i class="bi bi-rulers"></i> Rules
+                        / القواعد</h6>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-3 col-6">
+                            <label class="form-label">Min Sector Area
+                                (m²)</label>
+                            <input type="number" name="min_sector_area_m2"
+                                class="form-control" min="0"
+                                value="{{ spec.rules.min_sector_area_m2 }}">
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <label class="form-label">Max Sector Area
+                                (m²)</label>
+                            <input type="number" name="max_sector_area_m2"
+                                class="form-control" min="0"
+                                value="{{ spec.rules.max_sector_area_m2 }}">
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <label class="form-label">Min Zones per Sector</label>
+                            <input type="number" name="min_zones_per_sector"
+                                class="form-control" min="1"
+                                value="{{ spec.rules.min_zones_per_sector }}">
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <label class="form-label">Max Zones per Sector</label>
+                            <input type="number" name="max_zones_per_sector"
+                                class="form-control" min="1"
+                                value="{{ spec.rules.max_zones_per_sector }}">
+                        </div>
+                    </div>
+
+                    <h6 class="text-primary"><i class="bi bi-tree"></i> Tree
+                        Plan / خطة الأشجار</h6>
+                    <table class="table table-sm" id="treePlanTable">
+                        <thead>
+                            <tr>
+                                <th>Variety (EN) / النوع</th>
+                                <th>Variety (AR)</th>
+                                <th>%</th>
+                                <th>Scope / النطاق</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for t in spec.tree_plan %}
+                            <tr>
+                                <td><input type="text" name="tree_variety_en"
+                                        class="form-control"
+                                        value="{{ t.variety_en }}"
+                                        required></td>
+                                <td><input type="text" name="tree_variety_ar"
+                                        class="form-control"
+                                        value="{{ t.variety_ar }}"></td>
+                                <td><input type="text" inputmode="decimal"
+                                        name="tree_percentage"
+                                        class="form-control"
+                                        value="{{ t.percentage }}"></td>
+                                <td>
+                                    <select name="tree_scope"
+                                        class="form-select">
+                                        <option value="per_sector" {% if t.scope
+                                            == 'per_sector' %} selected{% endif
+                                            %}>Per Sector / لكل قطاع</option>
+                                        <option value="per_zone" {% if t.scope
+                                            == 'per_zone' %} selected{% endif
+                                            %}>Per Zone / لكل منطقة</option>
+                                        <option value="all" {% if t.scope ==
+                                            'all' %} selected{% endif %}>Whole
+                                            Project / كل المشروع</option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <button type="button"
+                                        class="btn btn-sm btn-outline-danger"
+                                        onclick="this.closest('tr').remove()">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    <button type="button" class="btn btn-sm btn-outline-success"
+                        id="addTreePlanRow">
+                        <i class="bi bi-plus-circle"></i> Add Variety / إضافة
+                        نوع
+                    </button>
+
+                    <h6 class="text-primary mt-3"><i class="bi bi-files"></i>
+                        Land Documents / وثائق الأراضي</h6>
+                    <table class="table table-sm" id="landDocsTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 22%;">Name / الاسم</th>
+                                <th style="width: 16%;">Category /
+                                    التصنيف</th>
+                                <th style="width: 18%;">Reference /
+                                    المرجع</th>
+                                <th style="width: 20%;">Notes /
+                                    ملاحظات</th>
+                                <th style="width: 18%;">File / الملف</th>
+                                <th style="width: 6%;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for d in spec.land_documents %}
+                            <tr>
+                                <td><input type="text" name="doc_name"
+                                        class="form-control"
+                                        value="{{ d.name }}" required></td>
+                                <td>
+                                    <select name="doc_category"
+                                        class="form-select">
+                                        <option value="land" {% if d.category
+                                            == 'land' %} selected{% endif
+                                            %}>Land / الأرض</option>
+                                        <option value="owner" {% if d.category
+                                            == 'owner' %} selected{% endif
+                                            %}>Owner / المالك</option>
+                                        <option value="other" {% if d.category
+                                            == 'other' %} selected{% endif
+                                            %}>Other / أخرى</option>
+                                    </select>
+                                </td>
+                                <td><input type="text" name="doc_reference"
+                                        class="form-control"
+                                        value="{{ d.reference }}"></td>
+                                <td><input type="text" name="doc_notes"
+                                        class="form-control"
+                                        value="{{ d.notes }}"></td>
+                                <td>
+                                    {% if d.file %}
+                                    <div class="small text-truncate"
+                                        title="{{ d.file_original }}">{{ d.file_original }}</div>
+                                    {% endif %}
+                                    <input type="file" name="doc_file"
+                                        class="form-control form-control-sm">
+                                </td>
+                                <td>
+                                    <button type="button"
+                                        class="btn btn-sm btn-outline-danger"
+                                        onclick="this.closest('tr').remove()">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    <button type="button" class="btn btn-sm btn-outline-success"
+                        id="addLandDocRow">
+                        <i class="bi bi-plus-circle"></i> Add Document /
+                        إضافة وثيقة
+                    </button>
+
+                    <h6 class="text-primary mt-3"><i class="bi bi-droplet-half"></i>
+                        Water Sources / مصادر المياه</h6>
+                    <table class="table table-sm" id="waterSourcesTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 16%;">Type / النوع</th>
+                                <th style="width: 18%;">Name / الاسم</th>
+                                <th style="width: 13%;">Lat / خط العرض</th>
+                                <th style="width: 13%;">Lng / خط الطول</th>
+                                <th style="width: 13%;">Flow (L/min) /
+                                    التدفق</th>
+                                <th style="width: 21%;">Notes /
+                                    ملاحظات</th>
+                                <th style="width: 6%;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for w in spec.water_sources %}
+                            <tr>
+                                <td>
+                                    <input type="hidden" name="ws_id" value="{{ w.id if w.id is defined and w.id is not none }}">
+                                    <select name="ws_type" class="form-select">
+                                        <option value="well" {% if w.type ==
+                                            'well' %} selected{% endif %}>Well
+                                            / بئر</option>
+                                        <option value="basin" {% if w.type ==
+                                            'basin' %} selected{% endif %}>Basin
+                                            / حوض</option>
+                                        <option value="reservoir" {% if w.type
+                                            == 'reservoir' %} selected{%
+                                            endif %}>Reservoir / خزان</option>
+                                        <option value="pump" {% if w.type ==
+                                            'pump' %} selected{% endif %}>Pump
+                                            / مضخة</option>
+                                        <option value="canal" {% if w.type ==
+                                            'canal' %} selected{% endif %}>Canal
+                                            / قناة</option>
+                                        <option value="other" {% if w.type ==
+                                            'other' %} selected{% endif %}>Other
+                                            / أخرى</option>
+                                    </select>
+                                </td>
+                                <td><input type="text" name="ws_name"
+                                        class="form-control" value="{{ w.name }}"></td>
+                                <td><input type="number" step="any"
+                                        name="ws_lat" class="form-control"
+                                        value="{{ w.lat if w.lat is not none }}"></td>
+                                <td><input type="number" step="any"
+                                        name="ws_lng" class="form-control"
+                                        value="{{ w.lng if w.lng is not none }}"></td>
+                                <td><input type="number" step="0.1" min="0"
+                                        name="ws_flow_lpm" class="form-control"
+                                        value="{{ w.flow_lpm if w.flow_lpm is not none }}"></td>
+                                <td><input type="text" name="ws_notes"
+                                        class="form-control" value="{{ w.notes }}"></td>
+                                <td>
+                                    <button type="button"
+                                        class="btn btn-sm btn-outline-danger"
+                                        onclick="this.closest('tr').remove()">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    <button type="button" class="btn btn-sm btn-outline-success"
+                        id="addWaterSourceRow">
+                        <i class="bi bi-plus-circle"></i> Add Source /
+                        إضافة مصدر
+                    </button>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary"
+                        data-bs-dismiss="modal">Cancel / إلغاء</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check"></i> Save / حفظ
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
 
-<!-- Project map -->
-<div class="card shadow-sm">
-    <div class="card-body">
-        <div id="projectMap"></div>
+{% endif %}
+
+<!-- KML Elements Modal -->
+<div class="modal fade" id="kmlElementsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content modal-green">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-file-earmark-code"></i> KML/KMZ Elements / عناصر الملف</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                {% set kml_features = project.kml_features or [] %}
+                {% set n_boundary = kml_features|selectattr('category', 'equalto', 'boundary')|list|length %}
+                {% set n_sector = kml_features|selectattr('category', 'equalto', 'sector')|list|length %}
+                {% set n_ws = kml_features|selectattr('category', 'equalto', 'water_source')|list|length %}
+                {% set n_overlay = kml_features|selectattr('category', 'equalto', 'overlay')|list|length %}
+                <div class="mb-2">
+                    <span class="badge bg-secondary">Total / المجموع: {{ kml_features|length }}</span>
+                    <span class="badge bg-success">{{ n_boundary }} Boundary / حدود</span>
+                    <span class="badge bg-primary">{{ n_sector }} Sectors / قطاعات</span>
+                    <span class="badge bg-info">{{ n_ws }} Water Sources / مصادر مياه</span>
+                    <span class="badge bg-dark">{{ n_overlay }} Overlays / تراكبات</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Name / الاسم</th>
+                                <th>Category / التصنيف</th>
+                                <th>Geometry / الهندسة</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for f in kml_features %}
+                            <tr>
+                                <td>{{ loop.index }}</td>
+                                <td>{{ f.name or '-' }}</td>
+                                <td>
+                                    {% if f.category == 'boundary' %}
+                                    <span class="badge bg-success">Boundary / حدود</span>
+                                    {% elif f.category == 'sector' %}
+                                    <span class="badge bg-primary">Sector / قطاع</span>
+                                    {% elif f.category == 'water_source' %}
+                                    <span class="badge bg-info">Water Source / مصدر مياه</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">Overlay / تراكب</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ f.geometry.type }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="4" class="text-center text-muted py-3">No elements / لا توجد عناصر</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close / إغلاق</button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -93,22 +1034,137 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const geojsonUrl = '{{ url_for("api.get_geometry", project_id=project.id) }}';
+    // The Project tab shows the drawing itself: the land perimeter (the KML
+    // boundary), sector outlines, water sources and the terrain.  Zones, rows,
+    // trees, pipes and fittings have their own tabs; drawing them all here buried
+    // the layout under the network.
     initMap('projectMap', geojsonUrl, {
         center: [34.0, -6.0],
-        zoom: 14
+        zoom: 16,
+        labelTypes: ['sector'],
+        mapFilters: ['boundary', 'sector', 'water_source'],
+        mapFiltersOn: ['boundary', 'sector', 'water_source'],
+        lazyFilters: true,
+        // Terrain surface from the cached elevation model: its toggle sits in
+        // the map filter group, and it stays inert until the model is fetched.
+        elevationHeatmap: {
+            url: '{{ url_for("engineering.elevation_heatmap", project_id=project.id) }}',
+            ramp: 'blue-red'
+        }
     });
 
-    // Add legend
+    // Elevation has its own gradient legend (bottom right), so this one only
+    // names the two drawn layers.
     addLegend([
-        {color: '#28a745', label: 'Boundary / الحدود'},
         {color: '#007bff', label: 'Sectors / القطاعات'},
-        {color: '#ffc107', label: 'Zones / المناطق'},
-        {color: '#dc3545', label: 'Main Pipe / الأنبوب الرئيسي'},
-        {color: '#fd7e14', label: 'Sub Pipe / أنبوب فرعي'},
-        {color: '#6c757d', label: 'Tree Rows / صفوف الأشجار'},
-        {color: '#28a745', label: 'Trees / الأشجار'},
-        {color: '#6610f2', label: 'Valves / الصمامات'}
-    ]);
+        {color: '#17a2b8', label: 'Water Sources / مصادر المياه'}
+    ], {position: 'bottomright'});
+
+    // Add a new tree plan row.  The settings modal is only rendered for an
+    // editor, so each row button is skipped when it is absent.
+    const addTreePlanRow = document.getElementById('addTreePlanRow');
+    if (addTreePlanRow) addTreePlanRow.addEventListener('click', function() {
+        const tbody = document.querySelector('#treePlanTable tbody');
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><input type="text" name="tree_variety_en" class="form-control" required></td>
+            <td><input type="text" name="tree_variety_ar" class="form-control"></td>
+            <td><input type="text" inputmode="decimal" name="tree_percentage" class="form-control"></td>
+            <td>
+                <select name="tree_scope" class="form-select">
+                    <option value="per_sector" selected>Per Sector / لكل قطاع</option>
+                    <option value="per_zone">Per Zone / لكل منطقة</option>
+                    <option value="all">Whole Project / كل المشروع</option>
+                </select>
+            </td>
+            <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()"><i class="bi bi-trash"></i></button></td>`;
+        tbody.appendChild(tr);
+    });
+
+    // Add a new land document row
+    const addLandDocRow = document.getElementById('addLandDocRow');
+    if (addLandDocRow) addLandDocRow.addEventListener('click', function() {
+        const tbody = document.querySelector('#landDocsTable tbody');
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><input type="text" name="doc_name" class="form-control" required></td>
+            <td>
+                <select name="doc_category" class="form-select">
+                    <option value="land" selected>Land / الأرض</option>
+                    <option value="owner">Owner / المالك</option>
+                    <option value="other">Other / أخرى</option>
+                </select>
+            </td>
+            <td><input type="text" name="doc_reference" class="form-control"></td>
+            <td><input type="text" name="doc_notes" class="form-control"></td>
+            <td><input type="file" name="doc_file" class="form-control form-control-sm"></td>
+            <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()"><i class="bi bi-trash"></i></button></td>`;
+        tbody.appendChild(tr);
+    });
+
+    // Add a new water source row
+    const addWaterSourceRow = document.getElementById('addWaterSourceRow');
+    if (addWaterSourceRow) addWaterSourceRow.addEventListener('click', function() {
+        const tbody = document.querySelector('#waterSourcesTable tbody');
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>
+                <input type="hidden" name="ws_id" value="">
+                <select name="ws_type" class="form-select">
+                    <option value="well" selected>Well / بئر</option>
+                    <option value="basin">Basin / حوض</option>
+                    <option value="reservoir">Reservoir / خزان</option>
+                    <option value="pump">Pump / مضخة</option>
+                    <option value="canal">Canal / قناة</option>
+                    <option value="other">Other / أخرى</option>
+                </select>
+            </td>
+            <td><input type="text" name="ws_name" class="form-control"></td>
+            <td><input type="number" step="any" name="ws_lat" class="form-control"></td>
+            <td><input type="number" step="any" name="ws_lng" class="form-control"></td>
+            <td><input type="number" step="0.1" min="0" name="ws_flow_lpm" class="form-control"></td>
+            <td><input type="text" name="ws_notes" class="form-control"></td>
+            <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()"><i class="bi bi-trash"></i></button></td>`;
+        tbody.appendChild(tr);
+    });
 });
 </script>
+
+<!-- Delete Project Modal -->
+{% if current_user.can_edit_projects %}
+<div class="modal fade" id="deleteProjectModal" tabindex="-1" aria-labelledby="deleteProjectTitle"
+    aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content modal-green">
+            <form method="POST"
+                action="{{ url_for('project.delete', project_id=project.id) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteProjectTitle">
+                        <i class="bi bi-trash"></i> Delete Project / حذف المشروع
+                    </h5>
+                    <button type="button" class="btn-close"
+                        data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">
+                        Delete <strong>{{ project.name }}</strong> and everything inside it
+                        (sectors, zones, rows, trees, pipes, components and reports)?
+                    </p>
+                    <p class="text-muted small mb-0 ar-text" lang="ar" dir="rtl">
+                        سيتم حذف هذا المشروع وكل ما يحتويه (القطاعات، المناطق، الصفوف،
+                        الأشجار، الأنابيب، المكونات والتقارير). لا يمكن التراجع.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary"
+                        data-bs-dismiss="modal">Cancel / إلغاء</button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash"></i> Delete / حذف
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}

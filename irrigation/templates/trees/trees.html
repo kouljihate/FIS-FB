@@ -3,10 +3,9 @@
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <h2><i class="bi bi-tree"></i> Trees / الأشجار</h2>
-    <a href="{{ url_for('project.detail', project_id=project.id) }}" class="btn btn-outline-secondary">
-        <i class="bi bi-arrow-left"></i> Back / رجوع
-    </a>
+    <h2 class="wf-title-en">Trees</h2>
+    <i class="bi bi-tree wf-icon fs-1" aria-hidden="true"></i>
+    <h2 class="wf-title-ar" lang="ar">الأشجار</h2>
 </div>
 
 <div class="mb-3">
@@ -21,65 +20,80 @@
     الأشجار تتبع مسار الصفوف. حدد المسافة بين الأشجار ونوع الشجرة. سيكون لكل شجرة قطاعتان.
 </div>
 
-<!-- Generate Trees -->
-<div class="card shadow-sm mb-4">
-    <div class="card-header bg-success text-white">
-        <h5 class="mb-0"><i class="bi bi-magic"></i> Generate Trees from Rows / إنشاء الأشجار من الصفوف</h5>
-    </div>
-    <div class="card-body">
-        <form method="POST" action="{{ url_for('trees.trees_generate', project_id=project.id) }}">
-            <div class="row align-items-end">
-                <div class="col-md-3">
-                    <label class="form-label">Spacing (m) / المسافة بين الأشجار</label>
-                    <input type="number" step="0.5" name="spacing" class="form-control" value="4" min="1">
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">Tree Variety (EN) / نوع الشجرة</label>
-                    <input type="text" name="variety" class="form-control" value="Olive">
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">Tree Variety (AR) / نوع الشجرة</label>
-                    <input type="text" name="variety_ar" class="form-control" value="زيتون">
-                </div>
-                <div class="col-md-3">
-                        <button type="submit" class="btn btn-success w-100"
-                            data-confirm="This will replace all existing trees. Continue? / سيستبدل هذا جميع الأشجار الموجودة. متابعة؟">
-                        <i class="bi bi-magic"></i> Generate / إنشاء
-                    </button>
-                </div>
-            </div>
-        </form>
-    </div>
-</div>
-
 <!-- Trees Table -->
 <div class="card shadow-sm">
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover table-sm mb-0">
-                <thead>
+            <table class="table table-hover table-sm mb-0" id="treesTable">
+<thead>
+                    <tr class="table-light">
+                        <th colspan="9" class="text-center">
+                            <button class="btn btn-circle btn-outline-success" id="treeSetupBtn" type="button"
+                                    data-bs-toggle="modal" data-bs-target="#treeSetupModal" title="Tree Setup / إعداد الشجرة">
+                                <i class="bi bi-tree"></i>
+                            </button>
+                            <button class="btn btn-circle btn-outline-primary" id="treeAddBtn" type="button" title="Add / إضافة" onclick="openAddTreeModal()">
+                                <i class="bi bi-plus"></i>
+                            </button>
+                            <button class="btn btn-circle btn-outline-primary" id="treeEditBtn" type="button" title="Edit / تعديل" onclick="openEditTreeModal()">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-circle btn-outline-danger" id="treeRemoveBtnHeader" type="button"
+                                    onclick="treesRemoveSelected()" title="Remove / إزالة">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                            <button class="btn btn-circle btn-outline-danger" id="treeDeleteAllBtn" type="button"
+                                    onclick="treesDeleteAllConfirm()" title="Delete All / حذف الكل">
+                                <i class="bi bi-trash2"></i>
+                            </button>
+                            <button class="btn btn-circle btn-primary" id="treeValidateBtn" type="button"
+                                    title="Validate / التحقق">
+                                <i class="bi bi-check-circle"></i>
+                            </button>
+                        </th>
+                    </tr>
+                    <tr class="table-light">
+                        <th colspan="9" class="text-center align-middle">
+                            <div class="input-group input-group-sm search-zone">
+                                <div class="search-field">
+                                    <input type="text" id="treeSearch" class="form-control search-input"
+                                           placeholder="Filter trees / تصفية الأشجار" autocomplete="off">
+                                    <div class="search-suffix">
+                                        <span class="badge rounded-pill text-bg-secondary tree-row-count" id="treeRowCount"
+                                              title="Selected / found trees / الأشجار المحددة من إجمالي النتائج">0/0</span>
+                                        <button type="button" class="search-clear d-none" id="treeSearchClear"
+                                                aria-label="Clear / مسح"><i class="bi bi-x-lg"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                        </th>
+                    </tr>
                     <tr>
-                        <th>ID</th>
-                        <th>Name</th>
-                        <th>Row</th>
-                        <th>Variety (EN)</th>
-                        <th>Variety (AR)</th>
-                        <th>Spacing (m)</th>
-                        <th>Drips/Tree</th>
-                        <th>Validated</th>
+                        <th width="40"><input type="checkbox" id="selectAllTrees" onclick="toggleAllTrees(this)"></th>
+                        <th class="text-center">ID</th>
+                        <th class="text-center">Name</th>
+                        <th class="text-center">Row</th>
+                        <th class="text-center cursor-pointer" onclick="sortTreesByShortName()" title="Sort by Short Name / ترتيب حسب الاسم المختصر">
+                            <span class="ar-text">الاسم المختصر</span><br>Short Name <span id="treeSortIcon" class="ms-1">▼</span>
+                        </th>
+                        <th class="text-center">Variety (EN)</th>
+                        <th class="text-center">Spacing (m)</th>
+                        <th class="text-center">Drips/Tree</th>
+                        <th class="text-center">Validated</th>
                     </tr>
                 </thead>
-                <tbody>
-                    {% for t in trees[:100] %}
-                    <tr>
-                        <td>{{ t.id }}</td>
-                        <td>{{ t.name_en }}</td>
-                        <td>{{ t.row_id }}</td>
-                        <td>{{ t.variety_en }}</td>
-                        <td class="ar-text">{{ t.variety_ar }}</td>
-                        <td>{{ t.spacing_m }} m</td>
-                        <td>{{ t.drips_per_tree }}</td>
-                        <td>
+                <tbody id="treesTableBody">
+                    {% for t in trees %}
+                    <tr data-short-name="{{ t.short_name }}">
+                        <td><input type="checkbox" class="tree-checkbox" value="{{ t.id }}" data-name-en="{{ t.name_en }}" data-name-ar="{{ t.name_ar }}"></td>
+                        <td class="text-center">{{ t.id }}</td>
+                        <td class="text-center">{{ t.name_en }}</td>
+                        <td class="text-center">{{ t.row_id }}</td>
+                        <td class="text-center"><code>{{ t.short_name }}</code></td>
+                        <td class="text-center">{{ t.variety_en }}</td>
+                        <td class="text-center">{{ t.spacing_m }} m</td>
+                        <td class="text-center">{{ t.drips_per_tree }}</td>
+                        <td class="text-center">
                             {% if t.validated %}
                             <span class="badge bg-success"><i class="bi bi-check"></i></span>
                             {% else %}
@@ -88,32 +102,360 @@
                         </td>
                     </tr>
                     {% else %}
-                    <tr><td colspan="8" class="text-center text-muted py-3">No trees yet / لا توجد أشجار</td></tr>
+                    <tr><td colspan="9" class="text-center text-muted text-warning py-3 fs-2">No trees yet  - لا توجد أشجار</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
+            
+            <!-- Pagination Controls -->
+            <div class="d-flex justify-content-between align-items-center mt-3" id="treesPagination" style="display: none;">
+                <div>
+                    <span class="me-2 small" id="treePageInfo">Showing 0 of 0 trees</span>
+                    <select class="form-select form-select-sm d-inline-block w-auto ms-2" id="treePageSize" onchange="changeTreePageSize()">
+                        <option value="25">25 per page</option>
+                        <option value="50" selected>50 per page</option>
+                        <option value="100">100 per page</option>
+                        <option value="0">All</option>
+                    </select>
+                </div>
+                <nav aria-label="Tree pagination">
+                    <ul class="pagination pagination-sm mb-0" id="treePaginationControls">
+                        <li class="page-item disabled"><a class="page-link" href="#" id="treePagePrev">« Previous</a></li>
+                        <li class="page-item"><a class="page-link" href="#" id="treePageNext">Next »</a></li>
+                    </ul>
+                </nav>
+            </div>
         </div>
     </div>
 </div>
 
-{% if trees|length > 100 %}
-<p class="text-muted small mt-2">Showing first 100 of {{ trees|length }} trees / عرض أول 100 من {{ trees|length }} شجرة</p>
-{% endif %}
-
-<!-- Validate -->
-<div class="mt-3">
-    <form method="POST" action="{{ url_for('trees.trees_validate', project_id=project.id) }}">
-        <button type="submit" class="btn btn-primary">
-            <i class="bi bi-check-circle"></i> Validate & Continue / التحقق والمتابعة
-        </button>
-    </form>
+<!-- Delete All Trees Modal -->
+<div class="modal fade" id="deleteAllTreesModal" tabindex="-1" aria-labelledby="deleteAllTreesTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="POST" id="deleteAllTreesForm" action="{{ url_for('trees.trees_remove', project_id=project.id) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteAllTreesTitle"><i class="bi bi-trash2-fill"></i> Delete All Trees / حذف جميع الأشجار</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-3">Are you sure you want to delete all trees? This action cannot be undone.</p>
+                    <p class="mb-0">هل أنت متأكد أنك تريد حذف جميع الأشجار؟ لا يمكن التراجع عن هذا الإجراء.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel / إلغاء</button>
+                    <button type="submit" class="btn btn-danger"><i class="bi bi-trash2-fill"></i> Delete All / حذف الكل</button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
+
+<!-- Add Tree Modal -->
+<div class="modal fade" id="addTreeModal" tabindex="-1" aria-labelledby="addTreeModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="POST" id="addTreeForm" action="{{ url_for('trees.tree_add', project_id=project.id) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addTreeModalTitle"><i class="bi bi-plus-circle"></i> Add Tree / إضافة شجرة</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Zone / المنطقة</label>
+                        <select name="zone_id" id="addTreeZone" class="form-select" required onchange="updateAddTreeRows()">
+                            <option value="">Select zone / اختر منطقة</option>
+                            {% for z in zones %}
+                            <option value="{{ z.id }}">{{ z.short_name }} - {{ z.name_en }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Row / الصف</label>
+                        <select name="row_id" id="addTreeRow" class="form-select" required>
+                            <option value="">Select row / اختر صف</option>
+                        </select>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Name (EN)</label>
+                            <input type="text" name="name_en" class="form-control" placeholder="e.g. T6576-1">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Name (AR)</label>
+                            <input type="text" name="name_ar" class="form-control" placeholder="مثال: شجرة ٦٥٧٦-١">
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Longitude</label>
+                            <input type="number" name="lng" step="any" class="form-control" placeholder="Lng">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Latitude</label>
+                            <input type="number" name="lat" step="any" class="form-control" placeholder="Lat">
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Variety (EN)</label>
+                            <input type="text" name="variety_en" class="form-control" value="Olive">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Variety (AR)</label>
+                            <input type="text" name="variety_ar" class="form-control" value="زيتون">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Drips/Tree</label>
+                            <input type="number" name="drips_per_tree" step="1" min="1" class="form-control" value="2">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Spacing (m)</label>
+                        <input type="number" name="spacing_m" step="0.5" min="1" class="form-control" value="4">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel / إلغاء</button>
+                    <button type="submit" class="btn btn-success"><i class="bi bi-check"></i> Add / إضافة</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Tree Modal -->
+<div class="modal fade" id="editTreeModal" tabindex="-1" aria-labelledby="editTreeModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="POST" id="editTreeForm" action="{{ url_for('trees.tree_edit', project_id=project.id) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editTreeModalTitle"><i class="bi bi-pencil"></i> Edit Tree / تعديل الشجرة</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="tree_id" id="editTreeId">
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Name (EN)</label>
+                            <input type="text" name="name_en" id="editTreeNameEn" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Name (AR)</label>
+                            <input type="text" name="name_ar" id="editTreeNameAr" class="form-control">
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Variety (EN)</label>
+                            <input type="text" name="variety_en" id="editTreeVarietyEn" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Variety (AR)</label>
+                            <input type="text" name="variety_ar" id="editTreeVarietyAr" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Drips/Tree</label>
+                            <input type="number" name="drips_per_tree" id="editTreeDrips" step="1" min="1" class="form-control" value="2">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Spacing (m)</label>
+                        <input type="number" name="spacing_m" id="editTreeSpacing" step="0.5" min="1" class="form-control" value="4">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel / إلغاء</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check"></i> Save / حفظ</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Tree Setup Modal -->
+<div class="modal fade bd-example-modal-xl" id="treeSetupModal" tabindex="-1" aria-labelledby="treeSetupModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-xl">
+        <div class="modal-content">
+            <form id="treeSetupForm" method="POST" action="{{ url_for('trees.trees_generate', project_id=project.id) }}">
+                <div class="modal-header">
+                    <h2 class="wf-title-en">Tree Setup</h2>
+                    <i class="bi bi-tree fs-1" aria-hidden="true"></i>
+                    <h2 class="wf-title-ar" lang="ar">إعداد الأشجار</h2>
+                </div>
+                <div class="modal-body">
+                    <!-- All Sectors / Zones shared setup -->
+                    <div class="card mb-3">
+                        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                            <strong>All Sectors / Zones / جميع القطاعات والمناطق</strong>
+                            <span class="text-muted small">(applies to zones without their own setup / تُطبَّق على المناطق التي لا لديها إعداد)</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-2 mb-2">
+                                <div class="col-md-3">
+                                    <label class="form-label small mb-0">Spacing (m) / المسافة</label>
+                                    <input type="number" name="spacing_all" step="0.5" min="1" class="form-control form-control-sm" value="4">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small mb-0">Drips/Tree / القطاعات لكل شجرة</label>
+                                    <input type="number" name="drips_all" step="1" min="1" class="form-control form-control-sm" value="2">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small mb-0">Offset Tree Space (m) / إزاحة أول شجرة</label>
+                                    <input type="number" name="offset_all" step="0.5" min="0" class="form-control form-control-sm" value="0"
+                                           title="Distance from the start of each row to its first tree / المسافة من بداية الصف إلى أول شجرة">
+                                </div>
+                            </div>
+                            <div class="row g-2">
+                                <div class="col-md-2">
+                                    <label class="form-label small mb-0">Variety 1  / النوع 1</label>
+                                    <input type="text" name="variety_all_1" class="form-control form-control-sm" value="Olive">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label small mb-0">Pct 1 (%) / النسبة 1</label>
+                                    <input type="number" name="pct_all_1" step="1" min="0" max="100" class="form-control form-control-sm" value="100">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label small mb-0">Variety 2 / النوع 2</label>
+                                    <input type="text" name="variety_all_2" class="form-control form-control-sm">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label small mb-0">Pct 2 (%) / النسبة 2</label>
+                                    <input type="number" name="pct_all_2" step="1" min="0" max="100" class="form-control form-control-sm">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label small mb-0">Variety 3  / النوع 3</label>
+                                    <input type="text" name="variety_all_3" class="form-control form-control-sm">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label small mb-0">Pct 3 (%) / النسبة 3</label>
+                                    <input type="number" name="pct_all_3" step="1" min="0" max="100" class="form-control form-control-sm">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Per-zone setup cards grouped by sector -->
+                    {% for group in zone_groups %}
+                    <div class="card mb-3 sector-card">
+                        <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                            <div>
+                                {% if group.sector %}
+                                {{ group.sector.name_en }} / {{ group.sector.name_ar }}
+                                {% else %}
+                                Ungrouped / غير مصنف
+                                {% endif %}
+                            </div>
+                            <button class="btn btn-sm btn-outline-light collapse-sector" type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#sectorBody{{ loop.index }}"
+                                    aria-expanded="true" aria-controls="sectorBody{{ loop.index }}"
+                                    title="Collapse / expand / طي / توسيع">
+                                <i class="bi bi-chevron-down"></i>
+                            </button>
+                        </div>
+                        <div class="card-body collapse show" id="sectorBody{{ loop.index }}">
+                            <div class="row g-3">
+                                {% for zone in group.zones %}
+                                <div class="col-md-4">
+                                    <div class="card border-primary zone-card">
+                                        <div class="card-header bg-primary text-white small d-flex align-items-center" data-zone-id="{{ zone.id }}">
+                                            <div class="text-light small">{{ zone.short_name }}</div>
+                                            <div class="text-light small zone-pct-total flex-fill text-center" data-zone-id="{{ zone.id }}">0%</div>
+                                            <span class="text-light small">Rows: {{ zone.row_count|default(0) }}</span>
+                                        </div>
+                                        <div class="card-body p-2">
+                                            <div class="row g-2 mb-1">
+                                                <div class="col-md-5">
+                                                    <label class="form-label small mb-0">Spacing (m)</label>
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <input type="number" name="spacing_{{ zone.id }}" step="0.5" min="1" class="form-control form-control-sm" value="4">
+                                                </div>
+                                                <div class="col-md-5">
+                                                    <label class="form-label small mb-0 bilingual-label">
+                                                        <span class="bilingual-label-ar">تباعد</span>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="row g-2 mb-1">
+                                                <div class="col-md-4">
+                                                    <label class="form-label small mb-0">Variety 1 </label>
+                                                    <input type="text" name="variety_{{ zone.id }}_1" class="form-control form-control-sm" value="Olive">
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="form-label small mb-0 align-text-center">Pct 1 (%)</label>
+                                                    <input type="number" name="pct_{{ zone.id }}_1" step="1" min="0" max="100" class="form-control form-control-sm" value="100">
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="form-label small mb-0 bilingual-label">
+                                                        <span class="bilingual-label-ar">نوع</span>
+                                                    </label>
+                                                    <input type="text" name="variety_ar{{ zone.id }}_1" class="form-control form-control-sm" value="زيتون">
+
+                                                </div>
+                                            </div>
+                                            <div class="row g-2 mb-1">
+                                                <div class="col-md-4">
+                                                    <label class="form-label small mb-0">Variety 2 </label>
+                                                    <input type="text" name="variety_{{ zone.id }}_2" class="form-control form-control-sm">
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="form-label small mb-0 align-text-center">Pct 2 (%)</label>
+                                                    <input type="number" name="pct_{{ zone.id }}_2" step="1" min="0" max="100" class="form-control form-control-sm">
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="form-label small mb-0 bilingual-label">
+                                                        <span class="bilingual-label-ar">نوع</span>
+                                                    </label>
+                                                    <input type="text" name="variety_ar{{ zone.id }}_2" class="form-control form-control-sm">
+
+                                                </div>
+                                            </div>
+                                            <div class="row g-2 mb-1">
+                                                    <div class="col-md-4">
+                                                        <label class="form-label small mb-0">Variety 3 </label>
+                                                        <input type="text" name="variety_{{ zone.id }}_3" class="form-control form-control-sm">
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <label class="form-label small mb-0 align-text-center">Pct 3 (%)</label>
+                                                        <input type="number" name="pct_{{ zone.id }}_3" step="1" min="0" max="100" class="form-control form-control-sm">
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <label class="form-label small mb-0 bilingual-label">
+                                                            <span class="bilingual-label-ar">نوع</span>
+                                                        </label>
+                                                        <input type="text" name="variety_ar{{ zone.id }}_3" class="form-control form-control-sm">
+                                                    </div>
+                                            </div>
+                                            
+
+                                            
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel / إلغاء</button>
+                    <button type="submit" id="treeGenerateBtn" class="btn btn-success"><i class="bi bi-magic"></i> Generate Trees / إنشاء الأشجار</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+
 
 <!-- Map -->
 <div class="card shadow-sm mt-4">
-    <div class="card-header">
-        <h5 class="mb-0"><i class="bi bi-map"></i> Map / الخريطة</h5>
-    </div>
+    {% set map_title_en = "Map" %}{% set map_title_ar = "الخريطة" %}
+    {% include "_map_header.html" %}
     <div class="card-body">
         <div id="map"></div>
     </div>
@@ -123,9 +465,548 @@
 
 {% block extra_js %}
 <script>
+// Tree pagination state
+let treePaginationState = {
+    currentPage: 1,
+    pageSize: 50,
+    allRows: [],
+    filteredRows: [],
+    totalTrees: 0,
+    selectedCount: 0
+};
+
 document.addEventListener('DOMContentLoaded', function() {
     const geojsonUrl = '{{ url_for("api.get_geometry", project_id=project.id) }}';
-    initMap('map', geojsonUrl, { center: [34.0, -6.0], zoom: 14 });
+    initMap('map', geojsonUrl, {
+        center: [34.0, -6.0], zoom: 14,
+        selectable: { type: 'tree', checkboxSelector: '.tree-checkbox', toggleOnClick: true },
+        mapDelete: { onClick: treesRemoveSelected },
+        elevationHeatmap: {
+            url: '{{ url_for("engineering.elevation_heatmap", project_id=project.id) }}',
+            ramp: 'blue-red'
+        }
+    });
+
+    // Initialize tree pagination
+    initTreePagination();
+
+    document.addEventListener('change', function(event) {
+        if (event.target && event.target.matches && event.target.matches('.tree-checkbox')) {
+            updateTreesToolbar();
+        }
+    });
+    updateTreesToolbar();
+    setupTreeSearch();
+    
+    // Fallback: ensure badge updates on full load
+    window.addEventListener('load', function() {
+        updateTreesToolbar();
+    });
 });
+
+function initTreePagination() {
+    const tbody = document.querySelector('#treesTableBody');
+    if (!tbody) {
+        console.warn('initTreePagination: tbody not found');
+        return;
+    }
+    
+    // Collect all rows
+    const rows = Array.from(tbody.querySelectorAll('tr[data-short-name]'));
+    treePaginationState.allRows = rows;
+    treePaginationState.filteredRows = rows;
+    treePaginationState.totalTrees = rows.length;
+    
+    // Set page size from selector
+    const pageSizeSelect = document.getElementById('treePageSize');
+    if (pageSizeSelect) {
+        treePaginationState.pageSize = parseInt(pageSizeSelect.value) || 50;
+        pageSizeSelect.addEventListener('change', function() {
+            treePaginationState.pageSize = parseInt(this.value) || 50;
+            treePaginationState.currentPage = 1;
+            renderTreePage();
+        });
+    }
+    
+    // Initial render - always call even if 0 rows
+    console.log('initTreePagination: totalTrees=', treePaginationState.totalTrees);
+    renderTreePage();
+}
+
+function renderTreePage() {
+    const { filteredRows, currentPage, pageSize } = treePaginationState;
+    const tbody = document.querySelector('#treesTableBody');
+    const paginationEl = document.getElementById('treesPagination');
+    const pageInfo = document.getElementById('treePageInfo');
+    const prevBtn = document.getElementById('treePagePrev');
+    const nextBtn = document.getElementById('treePageNext');
+    
+    console.log('renderTreePage: totalTrees=', treePaginationState.totalTrees, 'pageSize=', pageSize, 'filteredRows=', filteredRows.length);
+    
+    if (!tbody || !paginationEl) {
+        console.warn('renderTreePage: missing elements', { tbody: !!tbody, paginationEl: !!paginationEl });
+        return;
+    }
+    
+    // Show/hide pagination
+    if (treePaginationState.pageSize === 0 || treePaginationState.totalTrees <= treePaginationState.pageSize) {
+        console.log('renderTreePage: hiding pagination - totalTrees:', treePaginationState.totalTrees, 'pageSize:', pageSize);
+        paginationEl.style.display = 'none';
+        treePaginationState.filteredRows.forEach(r => r.style.display = '');
+        updateTreesToolbar();
+        return;
+    }
+    
+    paginationEl.style.display = 'flex';
+    
+    // Calculate pagination
+    const totalPages = Math.ceil(treePaginationState.filteredRows.length / treePaginationState.pageSize);
+    treePaginationState.currentPage = Math.max(1, Math.min(treePaginationState.currentPage, totalPages));
+    
+    const startIdx = (treePaginationState.currentPage - 1) * treePaginationState.pageSize;
+    const endIdx = startIdx + treePaginationState.pageSize;
+    
+    // Show/hide rows
+    treePaginationState.filteredRows.forEach((row, idx) => {
+        row.style.display = (idx >= startIdx && idx < endIdx) ? '' : 'none';
+    });
+    
+    // Update pagination controls
+    if (pageInfo) {
+        const visibleCount = treePaginationState.filteredRows.length;
+        const start = visibleCount > 0 ? startIdx + 1 : 0;
+        const end = Math.min(endIdx, visibleCount);
+        pageInfo.textContent = `Showing ${start}-${end} of ${visibleCount} trees (${treePaginationState.totalTrees} total)`;
+    }
+    
+    if (prevBtn) {
+        prevBtn.parentElement.classList.toggle('disabled', treePaginationState.currentPage === 1);
+        prevBtn.onclick = (e) => { e.preventDefault(); if (treePaginationState.currentPage > 1) { treePaginationState.currentPage--; renderTreePage(); }};
+    }
+    
+    if (nextBtn) {
+        nextBtn.parentElement.classList.toggle('disabled', treePaginationState.currentPage >= totalPages);
+        nextBtn.onclick = (e) => { e.preventDefault(); if (treePaginationState.currentPage < totalPages) { treePaginationState.currentPage++; renderTreePage(); }};
+    }
+}
+
+function changeTreePageSize() {
+    const select = document.getElementById('treePageSize');
+    treePaginationState.pageSize = parseInt(select.value) || 50;
+    treePaginationState.currentPage = 1;
+    renderTreePage();
+}
+
+function updateTreesToolbar() {
+    const count = document.querySelectorAll('.tree-checkbox:checked').length;
+    const editBtn = document.getElementById('treeEditBtn');
+    const removeBtnHeader = document.getElementById('treeRemoveBtnHeader');
+    const selectAll = document.getElementById('selectAllTrees');
+    const totalCount = document.querySelectorAll('#treesTable tbody tr .tree-checkbox').length;
+    if (editBtn) editBtn.disabled = count !== 1;
+    if (removeBtnHeader) removeBtnHeader.disabled = count === 0;
+    if (selectAll) selectAll.checked = (count > 0 && count === totalCount);
+    updateTreeBadge();
+}
+
+let treeSelectAllClickTime = 0;
+let treeSelectAllLastCheckState = false;
+
+function toggleAllTrees(source) {
+    const isChecked = source.checked;
+    const now = Date.now();
+    const isDoubleClick = (now - treeSelectAllClickTime) < 300;
+    treeSelectAllClickTime = now;
+
+    // If previously checked and now unchecking (regardless of click type) -> uncheck ALL pages
+    if (treeSelectAllLastCheckState && !isChecked) {
+        uncheckAllTreesAllPages();
+        treeSelectAllLastCheckState = isChecked;
+        return;
+    }
+
+    if (isDoubleClick && isChecked) {
+        // Double click + checking -> select ALL trees across ALL pages
+        selectAllTreesAllPages();
+    } else if (isChecked) {
+        // Single click + checking -> select only visible page
+        selectVisiblePageTrees();
+    } else {
+        // Single click + unchecking -> uncheck visible page only
+        uncheckVisiblePageTrees();
+    }
+    treeSelectAllLastCheckState = isChecked;
+}
+
+function selectVisiblePageTrees() {
+    const visibleRows = treePaginationState.filteredRows.filter(r => r.style.display !== 'none');
+    visibleRows.forEach(function(tr) {
+        const cb = tr.querySelector('.tree-checkbox');
+        if (cb && !cb.checked) {
+            cb.checked = true;
+            cb.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    });
+}
+
+function uncheckVisiblePageTrees() {
+    const visibleRows = treePaginationState.filteredRows.filter(r => r.style.display !== 'none');
+    visibleRows.forEach(function(tr) {
+        const cb = tr.querySelector('.tree-checkbox');
+        if (cb && cb.checked) {
+            cb.checked = false;
+            cb.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    });
+}
+
+function selectAllTreesAllPages() {
+    const allRows = treePaginationState.filteredRows;
+    allRows.forEach(function(tr) {
+        const cb = tr.querySelector('.tree-checkbox');
+        if (cb && !cb.checked) {
+            cb.checked = true;
+            cb.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    });
+}
+
+function uncheckAllTreesAllPages() {
+    const allRows = treePaginationState.filteredRows;
+    allRows.forEach(function(tr) {
+        const cb = tr.querySelector('.tree-checkbox');
+        if (cb && cb.checked) {
+            cb.checked = false;
+            cb.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    });
+}
+
+function treesRemoveSelected() {
+    const selected = document.querySelectorAll('.tree-checkbox:checked');
+    if (!selected.length) {
+        alert('Select at least one tree first / اختر شجرة واحدة على الأقل أولا');
+        return;
+    }
+    const namesEn = Array.from(selected).map(cb => cb.dataset.nameEn).filter(Boolean);
+    const nameEn = namesEn.slice(0, 5).join(', ') + (namesEn.length > 5 ? '…' : '') || 'tree(s)';
+    const nameAr = 'شجرة';
+    const doSubmit = function () {
+        const form = document.getElementById('removeTreesForm');
+        form.querySelectorAll('input[name="tree_ids"]').forEach(el => el.remove());
+        selected.forEach(cb => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'tree_ids';
+            input.value = cb.value;
+            form.appendChild(input);
+        });
+        form.requestSubmit();
+    };
+    if (window.confirmDelete) {
+        window.confirmDelete(nameEn, nameAr, doSubmit);
+    } else if (window.confirm('Delete ' + nameEn + ' ?')) {
+        doSubmit();
+    }
+}
+
+function updateTreeBadge() {
+    const badge = document.getElementById('treeRowCount');
+    if (!badge) return;
+    let total = 0;
+    let selected = 0;
+    const rows = document.querySelectorAll('#treesTableBody tr[data-short-name]');
+    rows.forEach(function (tr) {
+        if (!tr.querySelector('.tree-checkbox')) return;
+        total += 1;
+        if (tr.style.display !== 'none' && tr.querySelector('.tree-checkbox').checked) selected += 1;
+    });
+    if (badge) {
+        badge.textContent = selected + '/' + total;
+        badge.classList.toggle('text-bg-primary', selected > 0);
+        badge.classList.toggle('text-bg-secondary', selected === 0);
+    }
+    console.log('updateTreeBadge: total=', total, 'selected=', selected);
+}
+
+let treeSortDesc = false;
+
+function sortTreesByShortName() {
+    // Show busy cursor
+    document.body.style.cursor = 'wait';
+    document.querySelector('#treesTableBody').style.cursor = 'wait';
+    const sortIcon = document.getElementById('treeSortIcon');
+    if (sortIcon) sortIcon.textContent = '⏳';
+    
+    // Use setTimeout to allow UI to update cursor before sorting
+    setTimeout(function() {
+        try {
+            treeSortDesc = !treeSortDesc;
+            const sortIcon = document.getElementById('treeSortIcon');
+            if (sortIcon) sortIcon.textContent = treeSortDesc ? '▲' : '▼';
+            const tbody = document.querySelector('#treesTableBody');
+            const rows = Array.from(tbody.querySelectorAll('tr[data-short-name]'));
+            rows.sort(function (a, b) {
+                const sa = (a.getAttribute('data-short-name') || '').toLowerCase();
+                const sb = (b.getAttribute('data-short-name') || '').toLowerCase();
+                if (treeSortDesc) return sb.localeCompare(sa);
+                return sa.localeCompare(sb);
+            });
+            rows.forEach(function (row) { tbody.appendChild(row); });
+            // Re-filter after sort
+            applyTreeFilter();
+            updateTreesToolbar();
+        } finally {
+            // Restore cursor
+            document.body.style.cursor = '';
+            document.querySelector('#treesTableBody').style.cursor = '';
+            if (sortIcon) sortIcon.textContent = treeSortDesc ? '▲' : '▼';
+        }
+    }, 0);
+}
+
+function setupTreeSearch() {
+    const input = document.getElementById('treeSearch');
+    if (!input) return;
+    const clearBtn = document.getElementById('treeSearchClear');
+
+    function applyFilter() {
+        const q = input.value.trim().toLowerCase();
+        if (clearBtn) clearBtn.classList.toggle('d-none', !q);
+        
+        const rows = treePaginationState.allRows;
+        let visibleCount = 0;
+        
+        rows.forEach(function (tr) {
+            if (!tr.querySelector('.tree-checkbox')) return;
+            const shortName = (tr.getAttribute('data-short-name') || '').toLowerCase();
+            const nameCell = tr.querySelector('td:nth-child(3)');
+            const nameText = (nameCell ? nameCell.textContent : '').toLowerCase();
+            const visible = q === '' || (shortName.indexOf(q) !== -1) || (nameText.indexOf(q) !== -1);
+            tr.style.display = visible ? '' : 'none';
+            if (visible) visibleCount++;
+        });
+        
+        // Update filtered rows for pagination
+        treePaginationState.filteredRows = rows.filter(r => r.style.display !== 'none');
+        treePaginationState.currentPage = 1;
+        renderTreePage();
+    }
+    
+    // Expose globally for other functions
+    window.applyTreeFilter = applyFilter;
+    
+    input.addEventListener('input', applyFilter);
+    input.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+            input.value = '';
+            applyFilter();
+        }
+    });
+    if (clearBtn) {
+        clearBtn.addEventListener('click', function () {
+            input.value = '';
+            applyFilter();
+            input.focus();
+        });
+    }
+    
+    // Initial filter
+    applyFilter();
+}
+
+function treesDeleteAll() {
+    treesDeleteAllConfirm();
+}
+
+function treesDeleteAllConfirm() {
+    const modal = new bootstrap.Modal(document.getElementById('deleteAllTreesModal'));
+    modal.show();
+}
+
+// Sector card collapse/expand: toggle chevron icon direction
+document.querySelectorAll('.collapse-sector').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        const icon = btn.querySelector('i');
+        if (icon) {
+            const expanded = btn.getAttribute('aria-expanded') === 'true';
+            btn.setAttribute('aria-expanded', String(!expanded));
+            icon.classList.toggle('bi-chevron-down');
+            icon.classList.toggle('bi-chevron-up');
+        }
+    });
+});
+
+function treeSetupPercentagesValid() {
+    // All Sectors / Zones card
+    const allTotal = [1, 2, 3].reduce(function (sum, slot) {
+        const el = document.querySelector('input[name="pct_all_' + slot + '"]');
+        return sum + (el ? parseFloat(el.value || 0) : 0);
+    }, 0);
+    if (allTotal > 100) return false;
+
+    // Per-zone cards (exclude "all")
+    const zoneTotals = {};
+    document.querySelectorAll('input[name^="pct_"]').forEach(function (input) {
+        const name = input.getAttribute('name');
+        const match = name.match(/^pct_(.+)_([123])$/);
+        if (match && match[1] !== 'all') {
+            const zoneId = match[1];
+            zoneTotals[zoneId] = (zoneTotals[zoneId] || 0) + parseFloat(input.value || 0);
+        }
+    });
+    for (const zoneId in zoneTotals) {
+        if (zoneTotals[zoneId] > 100) return false;
+    }
+
+    return true;
+}
+
+function updateZonePctDisplays() {
+    const zoneTotals = {};
+    document.querySelectorAll('input[name^="pct_"]').forEach(function (input) {
+        const name = input.getAttribute('name');
+        const match = name.match(/^pct_(.+)_([123])$/);
+        if (match && match[1] !== 'all') {
+            const zoneId = match[1];
+            zoneTotals[zoneId] = (zoneTotals[zoneId] || 0) + parseFloat(input.value || 0);
+        }
+    });
+    document.querySelectorAll('.zone-pct-total').forEach(function (el) {
+        const zoneId = el.getAttribute('data-zone-id');
+        const total = zoneTotals[zoneId] || 0;
+        el.textContent = total + '%';
+        if (total > 100) {
+            el.classList.add('text-danger');
+        } else {
+            el.classList.remove('text-danger');
+        }
+    });
+}
+
+function syncAllSectorsToZones() {
+    const spacingAll = document.querySelector('input[name="spacing_all"]');
+    if (spacingAll) {
+        document.querySelectorAll('input[name^="spacing_"]').forEach(function (el) {
+            if (el.name !== 'spacing_all' && el.name.match(/^spacing_\d+$/)) {
+                el.value = spacingAll.value;
+            }
+        });
+    }
+    [1, 2, 3].forEach(function (slot) {
+        const vAll = document.querySelector('input[name="variety_all_' + slot + '"]');
+        const pAll = document.querySelector('input[name="pct_all_' + slot + '"]');
+        if (!vAll && !pAll) return;
+        var slotRe = new RegExp('^(variety|pct)_(\\d+)_' + slot + '$');
+        document.querySelectorAll('input').forEach(function (el) {
+            var m = el.name.match(slotRe);
+            if (m) {
+                if (m[1] === 'variety' && vAll) el.value = vAll.value;
+                if (m[1] === 'pct' && pAll) el.value = pAll.value;
+            }
+        });
+    });
+}
+
+function updateGenerateButtonState() {
+    const btn = document.getElementById('treeGenerateBtn');
+    if (!btn) return;
+    btn.disabled = !treeSetupPercentagesValid();
+}
+
+document.getElementById('treeSetupForm').addEventListener('input', function(event) {
+    if (event.target && event.target.matches && event.target.matches('input[name^="pct_"]')) {
+        updateGenerateButtonState();
+        updateZonePctDisplays();
+    }
+    if (event.target && event.target.matches && (event.target.name === 'spacing_all'
+            || event.target.name.match(/^(variety|pct)_all_[123]$/))) {
+        syncAllSectorsToZones();
+        updateGenerateButtonState();
+        updateZonePctDisplays();
+    }
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    updateGenerateButtonState();
+    updateZonePctDisplays();
+});
+
+document.getElementById('treeSetupForm').addEventListener('submit', function(event) {
+    if (!treeSetupPercentagesValid()) {
+        event.preventDefault();
+    }
+});
+
+// Trees Validate button
+const treeValidateBtn = document.getElementById('treeValidateBtn');
+if (treeValidateBtn) {
+    treeValidateBtn.addEventListener('click', function() {
+        const form = document.createElement('form');
+form.method = 'POST';
+        form.action = '{{ url_for("trees.trees_validate", project_id=project.id) }}';
+        document.body.appendChild(form);
+        form.submit();
+    });
+}
+
+function openAddTreeModal() {
+    const modal = new bootstrap.Modal(document.getElementById('addTreeModal'));
+    modal.show();
+}
+
+function openEditTreeModal() {
+    const selected = document.querySelectorAll('.tree-checkbox:checked');
+    if (selected.length !== 1) return;
+    const checkbox = selected[0];
+    const tr = checkbox.closest('tr');
+    if (!tr) return;
+
+    const treeId = checkbox.value;
+    const nameEn = tr.querySelector('td:nth-child(3)').textContent.trim();
+    const nameAr = checkbox.dataset.nameAr || '';
+    const rowId = tr.querySelector('td:nth-child(4)').textContent.trim();
+    const shortName = tr.querySelector('td:nth-child(5) code').textContent.trim();
+    const varietyEn = tr.querySelector('td:nth-child(6)').textContent.trim();
+    const dripsText = tr.querySelector('td:nth-child(8)').textContent.trim();
+    const spacingText = tr.querySelector('td:nth-child(7)').textContent.trim();
+
+    document.getElementById('editTreeId').value = treeId;
+    document.getElementById('editTreeNameEn').value = nameEn;
+    document.getElementById('editTreeNameAr').value = nameAr;
+    document.getElementById('editTreeVarietyEn').value = varietyEn;
+    document.getElementById('editTreeVarietyAr').value = '';
+    document.getElementById('editTreeDrips').value = dripsText || 2;
+    document.getElementById('editTreeSpacing').value = spacingText.replace(' m', '') || 4;
+
+    const modal = new bootstrap.Modal(document.getElementById('editTreeModal'));
+    modal.show();
+}
+
+const treeEditBtn = document.getElementById('treeEditBtn');
+if (treeEditBtn) {
+    treeEditBtn.addEventListener('click', openEditTreeModal);
+}
+
+function updateAddTreeRows() {
+    const zoneSelect = document.getElementById('addTreeZone');
+    const rowSelect = document.getElementById('addTreeRow');
+    const zoneId = zoneSelect.value;
+    rowSelect.innerHTML = '<option value="">Select row / اختر صف</option>';
+    if (!zoneId) return;
+    fetch('{{ url_for("api.get_geometry", project_id=project.id) }}')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            const rows = (data.features || []).filter(function(f) {
+                return f.properties && f.properties.type === 'tree_row' && String(f.properties.zone_id) === zoneId;
+            });
+            rows.forEach(function(r) {
+                const opt = document.createElement('option');
+                opt.value = r.properties.id;
+                opt.textContent = r.properties.name_en || ('Row ' + r.properties.id);
+                rowSelect.appendChild(opt);
+            });
+        });
+}
 </script>
 {% endblock %}

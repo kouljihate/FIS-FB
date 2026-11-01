@@ -1,0 +1,1006 @@
+{% extends "base.html" %}
+{% block title %}Map Overview / نظرة عامة على الخريطة{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* The overview is one edge-to-edge map: no page cards, no scrolling. */
+    body.map-overview-page {
+        overflow: hidden;
+    }
+
+    /* No page padding or spacing behind the map; modals keep working. */
+    body.map-overview-page .main-content {
+        margin: 0 !important;
+        padding: 0;
+        min-height: 0;
+    }
+
+    /* The fixed footer would sit on top of the map's bottom edge. */
+    body.map-overview-page footer {
+        display: none;
+    }
+
+    .map-overview-fill {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        top: 0;
+        z-index: 500;
+        visibility: hidden;
+    }
+
+    body.map-overview-ready .map-overview-fill {
+        visibility: visible;
+    }
+
+    .map-overview-fill #map {
+        width: 100%;
+        height: 100%;
+    }
+
+    /* Floating widgets drawn inside the map. */
+    .map-overview-panel {
+        background: rgba(255, 255, 255, 0.97);
+        border: 1px solid #cfd4d9;
+        border-radius: 0.5rem;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+        padding: 0.3rem;
+    }
+
+    .map-overview-panel .panel-title {
+        display: block;
+        padding: 0.1rem 0.25rem 0.25rem;
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #6c757d;
+        white-space: nowrap;
+    }
+
+    .map-overview-sectors {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        /* The Select and object buttons sit above this panel in the same corner:
+           keep the list short enough that they stay inside the map. */
+        max-height: min(56vh, calc(100vh - 600px));
+        min-height: 3.5rem;
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    .map-overview-sector-btn {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        max-width: 13rem;
+        padding: 0.18rem 0.35rem;
+        border: 1px solid #cfd4d9;
+        border-radius: 0.35rem;
+        background: #fff;
+        color: #212529;
+        font-size: 0.78rem;
+        line-height: 1.15;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .map-overview-sector-btn:hover {
+        background: #eef5ea;
+    }
+
+    .map-overview-sector-btn.active {
+        background: #a9cf9b;
+        border-color: #6a9e5c;
+        font-weight: 600;
+    }
+
+    .map-overview-sector-btn .code {
+        flex: 0 0 auto;
+        padding: 0 0.28rem;
+        border-radius: 0.25rem;
+        background: #495057;
+        color: #fff;
+        font-size: 0.72rem;
+        font-weight: 700;
+    }
+
+    .map-overview-sector-btn .name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .map-overview-objects {
+        display: flex;
+        align-items: center;
+        gap: 0.22rem;
+    }
+
+    .map-overview-objects button {
+        display: grid;
+        place-items: center;
+        width: 2.05rem;
+        height: 2.05rem;
+        border: 1px solid #cfd4d9;
+        border-radius: 0.35rem;
+        background: #fff;
+        color: #212529;
+        cursor: pointer;
+    }
+
+    .map-overview-objects button:hover:not(:disabled) {
+        background: #eef5ea;
+    }
+
+    .map-overview-objects button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+
+    .map-overview-objects .count {
+        min-width: 1.6rem;
+        padding: 0 0.3rem;
+        border-radius: 999px;
+        background: #6c757d;
+        color: #fff;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-align: center;
+    }
+
+    .map-overview-objects .count.has-selection {
+        background: #2f6f3e;
+    }
+
+    /* Statistics panel: how many marks the map is showing right now, with a
+       per-type breakdown under the grand total. */
+    .map-overview-stats {
+        display: flex;
+        flex-direction: column;
+        gap: 0.22rem;
+        width: 11rem;
+        padding: 0 0.25rem 0.15rem;
+    }
+
+    .map-overview-stats .stats-total {
+        display: flex;
+        align-items: baseline;
+        gap: 0.3rem;
+    }
+
+    .map-overview-stats .stats-value {
+        font-size: 1.15rem;
+        font-weight: 700;
+        line-height: 1;
+        color: #212529;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .map-overview-stats .stats-label {
+        font-size: 0.72rem;
+        color: #6c757d;
+        white-space: nowrap;
+    }
+
+    /* One row per mark type: badge, name, sum.  The list scrolls so the panel
+       keeps its corner however many types the map draws. */
+    .map-overview-stats .stats-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.05rem;
+        max-height: min(24vh, 12rem);
+        overflow-y: auto;
+        overflow-x: hidden;
+        /* Reserve the scrollbar lane so the sums are never drawn under it. */
+        scrollbar-gutter: stable;
+        padding-right: 0.15rem;
+    }
+
+    .map-overview-stats .stats-row {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.05rem 0.1rem;
+        border-radius: 0.25rem;
+        font-size: 0.72rem;
+        line-height: 1.25;
+        color: #212529;
+    }
+
+    .map-overview-stats .stats-row.is-empty {
+        color: #adb5bd;
+    }
+
+    .map-overview-stats .stats-row .stats-badge {
+        flex: 0 0 auto;
+        min-width: 1.5rem;
+        padding: 0 0.18rem;
+        border-radius: 0.25rem;
+        background: #e9ecef;
+        color: #495057;
+        font-size: 0.64rem;
+        font-weight: 700;
+        text-align: center;
+    }
+
+    .map-overview-stats .stats-row.has-marks .stats-badge {
+        background: #2f6f3e;
+        color: #fff;
+    }
+
+    .map-overview-stats .stats-row .stats-name {
+        flex: 1 1 auto;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .map-overview-stats .stats-row .stats-count {
+        flex: 0 0 auto;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+    }
+
+    @media (max-width: 575.98px) {
+        .map-overview-sector-btn {
+            max-width: 9rem;
+        }
+
+        .map-overview-stats {
+            width: 9.5rem;
+        }
+    }
+
+    /* No land coordinate and no imported map file: the map area stays empty
+       and a banner says so instead of showing an unrelated part of the world. */
+    body.map-overview-empty #map {
+        background: #eef1f3;
+    }
+
+    .map-no-land-banner {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        pointer-events: none;
+    }
+
+    .map-no-land-banner .banner-card {
+        background: rgba(255, 255, 255, 0.97);
+        border: 1px dashed #adb5bd;
+        border-radius: 0.6rem;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+        padding: 1rem 1.8rem;
+        max-width: 32rem;
+        text-align: center;
+    }
+
+    .map-no-land-banner .banner-title {
+        font-size: 1.05rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #6c757d;
+    }
+
+    .map-no-land-banner .banner-title-ar {
+        font-size: 1rem;
+        font-weight: 700;
+        color: #6c757d;
+    }
+
+    .map-no-land-banner .banner-hint {
+        margin-top: 0.35rem;
+        font-size: 0.78rem;
+        color: #adb5bd;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- The map is the page; the widgets live inside it. -->
+<div class="map-overview-fill">
+    <div id="map"></div>
+    {% if not has_land %}
+    {# No land shape and no KML/KMZ/CSV: no Leaflet map is built, so the
+       wrapper only reveals itself for the banner below. #}
+    <script>
+        document.body.classList.add('map-overview-page', 'map-overview-ready', 'map-overview-empty');
+    </script>
+    <div class="map-no-land-banner" role="status">
+        <div class="banner-card">
+            <div class="banner-title">No Land</div>
+            <div class="banner-title-ar ar-text" lang="ar">لا توجد أرض</div>
+            <div class="banner-hint">
+                No land coordinate and no map file (KML, KMZ, CSV) / لا توجد إحداثيات أرض ولا ملف خريطة
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Rename modal -->
+<div class="modal fade" id="renameObjectModal" tabindex="-1" aria-labelledby="renameObjectTitle" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content modal-green">
+            <form method="POST" id="renameObjectForm"
+                  action="{{ url_for('overview.rename_object', project_id=project.id) }}">
+                <input type="hidden" name="element_type">
+                <input type="hidden" name="element_id">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="renameObjectTitle">
+                        <i class="bi bi-input-cursor-text"></i> Rename / إعادة تسمية
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small" data-role="object-label"></p>
+                    <div class="mb-3">
+                        <label class="form-label">Name (EN)</label>
+                        <input type="text" name="name_en" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Name (AR)</label>
+                        <input type="text" name="name_ar" class="form-control">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel / إلغاء</button>
+                    <button type="submit" class="btn btn-info">
+                        <i class="bi bi-check"></i> Rename / إعادة تسمية
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit modal -->
+<div class="modal fade" id="editObjectModal" tabindex="-1" aria-labelledby="editObjectTitle" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content modal-green">
+            <form method="POST" id="editObjectForm"
+                  action="{{ url_for('overview.edit_object', project_id=project.id) }}">
+                <input type="hidden" name="element_type">
+                <input type="hidden" name="element_id">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editObjectTitle">
+                        <i class="bi bi-pencil"></i> Edit / تعديل
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small" data-role="object-label"></p>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Name (EN)</label>
+                            <input type="text" name="name_en" class="form-control">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Name (AR)</label>
+                            <input type="text" name="name_ar" class="form-control">
+                        </div>
+                    </div>
+                    <div id="editObjectFields"></div>
+                    <p class="text-muted small mb-0" data-role="edit-hint"></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel / إلغاء</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check"></i> Save / حفظ
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete form (filled by the toolbar) -->
+<form method="POST" id="deleteObjectsForm" class="d-none"
+      action="{{ url_for('overview.delete_objects', project_id=project.id) }}"></form>
+{% endblock %}
+
+{% block extra_js %}
+{% if has_land %}
+<script>
+const EDIT_SPECS = {{ edit_specs|tojson }};
+const SELECTABLE_TYPES = {{ selectable_types|tojson }};
+const SECTORS = {{ sectors|tojson }};
+// Filter categories offered by the map's funnel widget (see FILTER_CATEGORIES in map.js).
+const ELEMENT_FILTER_KEYS = [
+    'sector', 'zone', 'tree_row', 'tree', 'pipe',
+    'master_valve', 'sector_valve', 'zone_valve', 'check_valve',
+    'connector', 'reduction', 'air_release', 'pressure_reduction', 'terminator',
+    'boundary', 'water_source'
+];
+const OBJECT_URL = "{{ url_for('overview.object_values', project_id=project.id, element_type='__type__', element_id=0) }}";
+
+document.addEventListener('DOMContentLoaded', function () {
+    document.body.classList.add('map-overview-page');
+
+    // The map starts under the workflow tabs and fills the rest of the page.
+    placeFullPageMap();
+
+    const geojsonUrl = '{{ url_for("api.get_geometry", project_id=project.id) }}';
+    initMap('map', geojsonUrl, {
+        center: [34.0, -6.0], zoom: 13,
+        height: '100%',
+        selectable: { type: SELECTABLE_TYPES, toggleOnClick: true, onSelectionChange: onMapSelectionChange },
+        labelTypes: ['sector', 'zone', 'tree_row', 'tree'],
+        // Every element type the API can draw is filterable from the funnel widget.
+        mapFilters: ELEMENT_FILTER_KEYS,
+        // First visit draws the land perimeter (the KML boundary), the sector
+        // outlines and the water sources (well, basin, ...), which are context for
+        // the whole project.  The other categories are fetched the first time their
+        // filter button is switched on: drawing a whole orchard (thousands of trees
+        // and driplines) froze the browser.  The perimeter is a single polygon, so
+        // leaving it out of the first request made every imported map open without
+        // its own boundary on screen.
+        mapFiltersOn: ['boundary', 'sector', 'water_source'],
+        lazyFilters: true,
+        // The elevation surface belongs to the funnel widget too: its header
+        // toggle draws the heatmap on first press (see map.js).
+        elevationHeatmap: {
+            url: '{{ url_for("engineering.elevation_heatmap", project_id=project.id) }}',
+            ramp: 'blue-red'
+        }
+    });
+
+    // Action widgets first on the left column (Select, then Edit / Rename /
+    // Delete), so the long sector list never pushes them out of reach.
+    buildObjectControl();
+    buildSectorControl();
+    buildStatisticsControl();
+    setupObjectToolbar();
+    document.body.classList.add('map-overview-ready');
+
+    // The map was created before the wrapper settled; sync its size again.
+    placeFullPageMap();
+});
+
+// Keep the fixed map under the project tabs, whatever height they take.
+function placeFullPageMap() {
+    const wrapper = document.querySelector('.map-overview-fill');
+    if (!wrapper) return;
+    const nav = document.querySelector('.project-workflow-nav');
+    const subnav = document.querySelector('.project-workflow-subnav');
+    let top = nav ? nav.getBoundingClientRect().bottom : 0;
+    if (subnav) top = Math.max(top, subnav.getBoundingClientRect().bottom);
+    wrapper.style.top = Math.max(0, Math.round(top)) + 'px';
+    syncMapSize();
+}
+
+// "map" is the Leaflet instance declared by map.js, not window.map.
+function syncMapSize() {
+    if (typeof map === 'undefined' || !map || typeof map.invalidateSize !== 'function') return;
+    map.invalidateSize({ pan: false });
+    // Once more after the browser has applied the new box, so tiles cover it.
+    requestAnimationFrame(function () {
+        if (map && map.invalidateSize) map.invalidateSize({ pan: false });
+    });
+}
+
+window.addEventListener('resize', placeFullPageMap);
+window.addEventListener('orientationchange', placeFullPageMap);
+
+// The bilingual tab labels use a webfont that lands after the first layout;
+// measure again once it is ready so the fixed map never tucks under the tabs.
+if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(placeFullPageMap);
+}
+
+// ---------- Widget inside the map: sector-by-sector zoom ----------
+let pendingSectorZoom = null;
+
+function sectorButtonLabel(sector) {
+    const name = sector.name_en || sector.name_ar || '';
+    return name ? sector.code + ' – ' + name : sector.code;
+}
+
+function buildSectorControl() {
+    const control = L.control({ position: 'topleft' });
+    control.onAdd = function () {
+        const panel = L.DomUtil.create('div', 'map-overview-panel');
+        L.DomEvent.disableClickPropagation(panel);
+        L.DomEvent.disableScrollPropagation(panel);
+
+        const title = L.DomUtil.create('span', 'panel-title', panel);
+        title.textContent = 'Sectors / القطاعات';
+
+        const list = L.DomUtil.create('div', 'map-overview-sectors', panel);
+
+        const allButton = L.DomUtil.create('button', 'map-overview-sector-btn active', list);
+        allButton.type = 'button';
+        allButton.title = 'Whole project / المشروع كامل';
+        allButton.innerHTML = '<i class="bi bi-arrows-fullscreen"></i>' +
+            '<span class="name">All / الكل</span>';
+        allButton.addEventListener('click', function () {
+            setActiveSectorButton(allButton);
+            // Back to the whole project: only the sector outlines, as on arrival.
+            clearSelection();
+            if (typeof setSectorScope === 'function') {
+                setSectorScope(null);
+            } else {
+                fitAllFeatures();
+            }
+        });
+
+        SECTORS.forEach(function (sector) {
+            if (!sector.has_polygon) return;
+            const button = L.DomUtil.create('button', 'map-overview-sector-btn', list);
+            button.type = 'button';
+            button.title = sectorButtonLabel(sector);
+            button.dataset.sectorId = sector.id;
+            button.innerHTML = '<span class="code">' + escapeSectorText(sector.code) + '</span>' +
+                '<span class="name">' + escapeSectorText(sector.name_en || sector.name_ar || '') + '</span>';
+            button.addEventListener('click', function () {
+                setActiveSectorButton(button);
+                // One sector at a time: the funnel switches to Sector + Zones
+                // only, so the map shows this sector's layout and the other
+                // sectors as dashed boundaries.
+                clearSelection();
+                if (typeof setSectorScope === 'function') {
+                    setSectorScope(sector.id);
+                } else if (!zoomToFeature('sector', sector.id)) {
+                    pendingSectorZoom = sector.id;
+                }
+            });
+        });
+
+        return panel;
+    };
+    control.addTo(map);
+
+    document.addEventListener('mapgeometryloaded', function () {
+        if (pendingSectorZoom !== null) {
+            zoomToFeature('sector', pendingSectorZoom);
+            pendingSectorZoom = null;
+        }
+    });
+}
+
+function setActiveSectorButton(active) {
+    document.querySelectorAll('.map-overview-sector-btn').forEach(function (button) {
+        button.classList.toggle('active', button === active);
+    });
+}
+
+function escapeSectorText(value) {
+    return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+// ---------- Widget inside the map: select an object, then Edit / Rename / Delete ----------
+const selectedObjects = new Map();
+
+function objectKey(properties) {
+    return properties.type + ':' + properties.id;
+}
+
+function typeLabel(type) {
+    const spec = EDIT_SPECS[type];
+    return spec ? spec.label_en + ' / ' + spec.label_ar : type;
+}
+
+function describeObject(properties) {
+    const code = properties.short_name || '';
+    const name = properties.name || '';
+    const nameAr = properties.name_ar || '';
+    let text = typeLabel(properties.type);
+    if (code) text += ' ' + code;
+    if (name) text += ' – ' + name;
+    if (nameAr && nameAr !== name) text += ' / ' + nameAr;
+    return text;
+}
+
+function buildObjectControl() {
+    // Action buttons (Edit / Rename / Delete): left side, with the map's Select
+    // button.  The right column keeps the filters and the bottom right the
+    // legends.
+    const control = L.control({ position: 'topleft' });
+    control.onAdd = function () {
+        const panel = L.DomUtil.create('div', 'map-overview-panel');
+        L.DomEvent.disableClickPropagation(panel);
+        L.DomEvent.disableScrollPropagation(panel);
+
+        const title = L.DomUtil.create('span', 'panel-title', panel);
+        title.textContent = 'Selected object / العنصر المحدد';
+
+        const row = L.DomUtil.create('div', 'map-overview-objects', panel);
+
+        const count = L.DomUtil.create('span', 'count', row);
+        count.id = 'objectSelectionCount';
+        count.title = 'Selected objects / العناصر المحددة';
+        count.textContent = '0';
+
+        const actions = [
+            { id: 'objectEditBtn', icon: 'bi-pencil', title: 'Edit / تعديل', onClick: openEditModal },
+            { id: 'objectRenameBtn', icon: 'bi-input-cursor-text', title: 'Rename / إعادة تسمية', onClick: openRenameModal },
+            { id: 'objectDeleteBtn', icon: 'bi-trash', title: 'Delete / حذف', onClick: deleteSelected },
+            { id: 'objectClearBtn', icon: 'bi-x-lg', title: 'Clear selection / إلغاء التحديد', onClick: clearSelection }
+        ];
+        actions.forEach(function (action) {
+            const button = L.DomUtil.create('button', '', row);
+            button.type = 'button';
+            button.id = action.id;
+            button.title = action.title;
+            button.setAttribute('aria-label', action.title);
+            button.innerHTML = '<i class="bi ' + action.icon + '"></i>';
+            button.addEventListener('click', action.onClick);
+        });
+
+        return panel;
+    };
+    control.addTo(map);
+}
+
+// ---------- Widget inside the map: how many marks are displayed ----------
+// Counts the geometry layers the map is showing at this moment, so hiding a
+// category with the funnel (or loading one on demand) updates the total.  The
+// panel also breaks the total down per mark type, one row per type.
+let marksRefreshTimer = null;
+
+// One entry per mark type the GeoJSON endpoint can emit.  A type the map draws
+// but this catalogue does not know about still gets a row: refreshDisplayedMarks
+// appends it the first time it appears.
+const MARK_TYPE_SPECS = [
+    { type: 'sector', letter: 'S', name: 'Sectors', nameAr: 'القطاعات' },
+    { type: 'zone', letter: 'Z', name: 'Zones', nameAr: 'المناطق' },
+    { type: 'tree_row', letter: 'R', name: 'Tree Rows', nameAr: 'الصفوف' },
+    { type: 'tree', letter: 'T', name: 'Trees', nameAr: 'الأشجار' },
+    { type: 'main_pipe', letter: 'MP', name: 'Main Pipes', nameAr: 'الأنابيب الرئيسية' },
+    { type: 'second_pipe', letter: 'SP', name: 'Second Pipes', nameAr: 'الأنابيب الثانوية' },
+    { type: 'sub_pipe', letter: 'SB', name: 'Sub Pipes', nameAr: 'الأنابيب الفرعية' },
+    { type: 'dripline', letter: 'DL', name: 'Driplines', nameAr: 'خطوط التنقيط' },
+    { type: 'master_valve', letter: 'VM', name: 'Main Valves', nameAr: 'الصمامات الرئيسية' },
+    { type: 'sector_valve', letter: 'VS', name: 'Sector Valves', nameAr: 'صمامات القطاعات' },
+    { type: 'zone_valve', letter: 'VZ', name: 'Zone Valves', nameAr: 'صمامات المناطق' },
+    { type: 'check_valve', letter: 'VC', name: 'Check Valves', nameAr: 'صمامات عدم الرجوع' },
+    { type: 'connector', letter: 'CN', name: 'Connectors', nameAr: 'الوصلات' },
+    { type: 'reduction', letter: 'RD', name: 'Reductors', nameAr: 'المخفضات' },
+    { type: 'air_release', letter: 'AR', name: 'Air Removal', nameAr: 'إزالة الهواء' },
+    { type: 'pressure_reduction', letter: 'PR', name: 'Pressure Reduction', nameAr: 'خفض الضغط' },
+    { type: 'terminator', letter: 'TM', name: 'Terminators', nameAr: 'النهايات' },
+    { type: 'boundary', letter: 'B', name: 'Land Boundary', nameAr: 'حدود الأرض' },
+    // Water sources are one GeoJSON type but several kinds; each kind gets its
+    // own row so a basin is listed (and summed) even when the project also has
+    // a well, as on the map, where each marker carries its kind.
+    { type: 'water_source:well', letter: 'W', name: 'Wells', nameAr: 'الآبار' },
+    { type: 'water_source:basin', letter: 'B', name: 'Basins', nameAr: 'الأحواض' },
+    { type: 'water_source:reservoir', letter: 'R', name: 'Reservoirs', nameAr: 'الخزانات' },
+    { type: 'water_source:pump', letter: 'P', name: 'Pumps', nameAr: 'المضخات' },
+    { type: 'water_source:canal', letter: 'C', name: 'Canals', nameAr: 'القنوات' },
+    { type: 'water_source:other', letter: 'WS', name: 'Other Sources', nameAr: 'مصادر أخرى' },
+    { type: 'kml_feature', letter: 'KML', name: 'KML Overlays', nameAr: 'طبقات KML' }
+];
+
+// type -> { row, count } for the rows already in the panel.
+const marksTypeRows = new Map();
+
+function markTypeSpec(type) {
+    const known = MARK_TYPE_SPECS.find(function (spec) { return spec.type === type; });
+    if (known) return known;
+    // A source kind the catalogue does not list (new API value) still reads as
+    // a proper row instead of the raw "water_source:xyz" key.
+    if (type.indexOf('water_source:') === 0) {
+        const kind = type.slice('water_source:'.length) || 'other';
+        const label = kind.charAt(0).toUpperCase() + kind.slice(1) + 's';
+        return { type: type, letter: kind.charAt(0).toUpperCase() || 'S',
+                 name: label, nameAr: 'مصادر المياه' };
+    }
+    return null;
+}
+
+function countDisplayedMarksByType() {
+    const counts = {};
+    if (typeof featureLayer === 'undefined' || !featureLayer) return counts;
+    featureLayer.eachLayer(function (layer) {
+        if (!map.hasLayer(layer)) return;
+        const properties = layer.feature ? layer.feature.properties : null;
+        const type = (properties && properties.type) || 'other';
+        // One row per water source kind (well, basin, ...), matching the marker
+        // each feature is drawn with.
+        if (type === 'water_source') {
+            const kind = String((properties && properties.source_type) || 'other').toLowerCase();
+            const key = 'water_source:' + kind;
+            counts[key] = (counts[key] || 0) + 1;
+            return;
+        }
+        counts[type] = (counts[type] || 0) + 1;
+    });
+    return counts;
+}
+
+function countDisplayedMarks() {
+    const counts = countDisplayedMarksByType();
+    return Object.keys(counts).reduce(function (sum, type) { return sum + counts[type]; }, 0);
+}
+
+window.countDisplayedMarks = countDisplayedMarks;
+
+function buildMarkTypeRow(spec) {
+    const row = document.createElement('div');
+    row.className = 'stats-row is-empty';
+    row.dataset.markType = spec.type;
+    row.title = spec.name + ' / ' + spec.nameAr;
+
+    const badge = document.createElement('span');
+    badge.className = 'stats-badge';
+    badge.textContent = spec.letter;
+    row.appendChild(badge);
+
+    const name = document.createElement('span');
+    name.className = 'stats-name';
+    name.textContent = spec.name;
+    row.appendChild(name);
+
+    const count = document.createElement('span');
+    count.className = 'stats-count';
+    count.textContent = '0';
+    row.appendChild(count);
+
+    marksTypeRows.set(spec.type, { row: row, count: count });
+    return row;
+}
+
+function buildStatisticsControl() {
+    const control = L.control({ position: 'topright' });
+    control.onAdd = function () {
+        const panel = L.DomUtil.create('div', 'map-overview-panel');
+        L.DomEvent.disableClickPropagation(panel);
+        L.DomEvent.disableScrollPropagation(panel);
+
+        const title = L.DomUtil.create('span', 'panel-title', panel);
+        title.textContent = 'Displayed marks / العلامات المعروضة';
+
+        const stats = L.DomUtil.create('div', 'map-overview-stats', panel);
+
+        const totalRow = L.DomUtil.create('div', 'stats-total', stats);
+        const value = L.DomUtil.create('span', 'stats-value', totalRow);
+        value.id = 'displayedMarksCount';
+        value.textContent = '0';
+        const label = L.DomUtil.create('span', 'stats-label', totalRow);
+        label.textContent = 'marks / علامة';
+
+        // Every type keeps its row, zeros included, so the list never
+        // re-orders itself while the map loads category after category.
+        const list = L.DomUtil.create('div', 'stats-list', stats);
+        list.id = 'displayedMarksByType';
+        MARK_TYPE_SPECS.forEach(function (spec) {
+            list.appendChild(buildMarkTypeRow(spec));
+        });
+
+        // Scrolling the list must not pan or zoom the map underneath.
+        L.DomEvent.on(list, 'mousedown wheel', L.DomEvent.stopPropagation);
+
+        return panel;
+    };
+    control.addTo(map);
+
+    refreshDisplayedMarks();
+
+    // Every feature add/remove changes the total; recount once per frame so a
+    // whole category (thousands of markers) costs one recount, not one each.
+    // Geometry layers carry `.feature`; labels and tiles do not.
+    map.on('layeradd layerremove', function (event) {
+        if (!event.layer || !event.layer.feature) return;
+        scheduleMarksRefresh();
+    });
+}
+
+// A timer, not requestAnimationFrame: a hidden or throttled tab never runs
+// frames, and the counter would then stay on its old value.
+function scheduleMarksRefresh() {
+    if (marksRefreshTimer) return;
+    marksRefreshTimer = setTimeout(function () {
+        marksRefreshTimer = null;
+        refreshDisplayedMarks();
+    }, 60);
+}
+
+function refreshDisplayedMarks() {
+    const value = document.getElementById('displayedMarksCount');
+    if (!value) return;
+    const counts = countDisplayedMarksByType();
+    const list = document.getElementById('displayedMarksByType');
+
+    // A type the map draws but the catalogue does not list still gets a row.
+    if (list) {
+        Object.keys(counts).sort().forEach(function (type) {
+            if (marksTypeRows.has(type)) return;
+            const spec = markTypeSpec(type) || { type: type, letter: '?', name: type, nameAr: type };
+            list.appendChild(buildMarkTypeRow(spec));
+        });
+    }
+
+    let total = 0;
+    Object.keys(counts).forEach(function (type) { total += counts[type]; });
+
+    marksTypeRows.forEach(function (entry, type) {
+        const shown = counts[type] || 0;
+        entry.count.textContent = shown.toLocaleString('en-US');
+        entry.row.classList.toggle('is-empty', shown === 0);
+        entry.row.classList.toggle('has-marks', shown > 0);
+    });
+
+    value.textContent = total.toLocaleString('en-US');
+    value.title = total + ' marks displayed / علامة معروضة';
+}
+
+function onMapSelectionChange(layer, properties, selected) {
+    if (!properties || properties.id === undefined) return;
+    const key = objectKey(properties);
+    if (selected) selectedObjects.set(key, { layer: layer, properties: properties });
+    else selectedObjects.delete(key);
+    refreshObjectToolbar();
+}
+
+function selectedList() {
+    return Array.from(selectedObjects.values());
+}
+
+function refreshObjectToolbar() {
+    const count = selectedObjects.size;
+    const single = count === 1;
+    const countBadge = document.getElementById('objectSelectionCount');
+    if (countBadge) {
+        countBadge.textContent = count;
+        countBadge.classList.toggle('has-selection', count > 0);
+        countBadge.title = single
+            ? describeObject(selectedList()[0].properties)
+            : count + ' selected / عنصر محدد';
+    }
+    document.getElementById('objectEditBtn').disabled = !single;
+    document.getElementById('objectRenameBtn').disabled = !single;
+    document.getElementById('objectDeleteBtn').disabled = count === 0;
+    document.getElementById('objectClearBtn').disabled = count === 0;
+}
+
+function setupObjectToolbar() {
+    refreshObjectToolbar();
+}
+
+function clearSelection() {
+    if (typeof clearMapSelection === 'function') clearMapSelection();
+    selectedObjects.clear();
+    refreshObjectToolbar();
+}
+
+function objectJsonUrl(type, id) {
+    return OBJECT_URL.replace('/__type__/0', '/' + encodeURIComponent(type) + '/' + id);
+}
+
+function setModalLabel(modal, properties) {
+    const label = modal.querySelector('[data-role="object-label"]');
+    if (label) label.textContent = describeObject(properties);
+}
+
+async function openEditModal() {
+    const items = selectedList();
+    if (items.length !== 1) return;
+    const properties = items[0].properties;
+    const form = document.getElementById('editObjectForm');
+    const modalElement = document.getElementById('editObjectModal');
+    const spec = EDIT_SPECS[properties.type] || { fields: [] };
+
+    form.elements['element_type'].value = properties.type;
+    form.elements['element_id'].value = properties.id;
+    form.elements['name_en'].value = properties.name || '';
+    form.elements['name_ar'].value = properties.name_ar || '';
+    setModalLabel(modalElement, properties);
+
+    const container = document.getElementById('editObjectFields');
+    container.innerHTML = '';
+    const hint = modalElement.querySelector('[data-role="edit-hint"]');
+    if (hint) {
+        hint.textContent = spec.fields.length
+            ? 'Shape and geometry are edited on the section page / يُعدل الشكل الهندسي في صفحة القسم'
+            : 'This kind has no map-editable attributes, only its name / لا توجد خصائص قابلة للتعديل سوى الاسم';
+    }
+
+    let values = {};
+    try {
+        const response = await fetch(objectJsonUrl(properties.type, properties.id),
+                                     { headers: { 'Accept': 'application/json' } });
+        if (response.ok) {
+            const data = await response.json();
+            values = data.values || {};
+            if (data.name_en) form.elements['name_en'].value = data.name_en;
+            if (data.name_ar) form.elements['name_ar'].value = data.name_ar;
+        }
+    } catch (error) {
+        console.warn('Could not load the object values', error);
+    }
+
+    spec.fields.forEach(function (field) {
+        container.appendChild(buildField(field, values[field.name]));
+    });
+
+    bootstrap.Modal.getOrCreateInstance(modalElement).show();
+}
+
+function buildField(field, value) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'mb-3';
+    const label = document.createElement('label');
+    label.className = 'form-label';
+    label.textContent = field.label_en + ' / ' + field.label_ar;
+    wrapper.appendChild(label);
+
+    if (field.kind === 'select') {
+        const select = document.createElement('select');
+        select.className = 'form-select';
+        select.name = field.name;
+        (field.options || []).forEach(function (option) {
+            const item = document.createElement('option');
+            item.value = option.value;
+            item.textContent = option.en + ' / ' + option.ar;
+            if (value !== undefined && String(value) === option.value) item.selected = true;
+            select.appendChild(item);
+        });
+        wrapper.appendChild(select);
+        return wrapper;
+    }
+
+    const input = document.createElement('input');
+    input.type = field.kind === 'number' ? 'number' : 'text';
+    input.className = 'form-control';
+    input.name = field.name;
+    if (field.min !== undefined) input.min = field.min;
+    if (field.step !== undefined) input.step = field.step;
+    if (value !== undefined && value !== null) input.value = value;
+    wrapper.appendChild(input);
+    return wrapper;
+}
+
+function openRenameModal() {
+    const items = selectedList();
+    if (items.length !== 1) return;
+    const properties = items[0].properties;
+    const form = document.getElementById('renameObjectForm');
+    const modalElement = document.getElementById('renameObjectModal');
+    form.elements['element_type'].value = properties.type;
+    form.elements['element_id'].value = properties.id;
+    form.elements['name_en'].value = properties.name || '';
+    form.elements['name_ar'].value = properties.name_ar || '';
+    setModalLabel(modalElement, properties);
+    bootstrap.Modal.getOrCreateInstance(modalElement).show();
+}
+
+function deleteSelected() {
+    const items = selectedList();
+    if (!items.length) return;
+
+    const namesEn = items.map(item => item.properties.name || item.properties.short_name)
+        .filter(Boolean).join(', ') || 'object(s)';
+    const namesAr = items.map(item => item.properties.name_ar)
+        .filter(Boolean).join('، ') || 'عنصر';
+
+    const doSubmit = function () {
+        const form = document.getElementById('deleteObjectsForm');
+        form.querySelectorAll('input[name="elements"]').forEach(el => el.remove());
+        items.forEach(function (item) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'elements';
+            input.value = item.properties.type + ':' + item.properties.id;
+            form.appendChild(input);
+        });
+        form.requestSubmit();
+    };
+
+    if (window.confirmDelete) {
+        window.confirmDelete(namesEn, namesAr, doSubmit);
+    } else if (window.confirm('Delete ' + namesEn + ' ?')) {
+        doSubmit();
+    }
+}
+</script>
+{% endif %}
+{% endblock %}

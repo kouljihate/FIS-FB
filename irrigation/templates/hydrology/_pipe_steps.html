@@ -1,0 +1,23 @@
+{# Hydrology 1 step tabs: Main Pipe -> Second Pipe -> Zone Pipe.
+   Expects `project` in context and `active_step` in ('main','second','zone'). #}
+{% set _step = active_step | default('main') %}
+<ul class="nav nav-pills wf-step-tabs mb-3">
+    <li class="nav-item">
+        <a class="nav-link{% if _step == 'main' %} active{% endif %}"
+           href="{{ url_for('hydrology.main_pipe', project_id=project.id) }}">
+            <i class="bi bi-water"></i> Main Pipe / أنبوب رئيسي
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link{% if _step == 'second' %} active{% endif %}"
+           href="{{ url_for('hydrology.second_pipe', project_id=project.id) }}">
+            <i class="bi bi-signpost-split"></i> Second Pipe / أنبوب ثانوي
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link{% if _step == 'zone' %} active{% endif %}"
+           href="{{ url_for('hydrology.sub_pipe', project_id=project.id) }}">
+            <i class="bi bi-droplet"></i> Zone Pipe / أنبوب منطقة
+        </a>
+    </li>
+</ul>

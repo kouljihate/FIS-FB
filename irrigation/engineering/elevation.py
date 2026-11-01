@@ -23,12 +23,13 @@ import urllib.request
 import urllib.parse
 from datetime import datetime
 from shapely.geometry import shape, Point, Polygon, MultiPolygon
+from shapely.prepared import prep
 from shapely.ops import unary_union
 
 from irrigation.extensions import mongo
 from irrigation.engineering.projection import (
-    projected_shape, unproject_shape, get_project_centroid,
-    project_geometry, haversine_length_meters
+    projected_shape, unproject_shape, get_project_centroid, project_geometry,
+    haversine_length_meters
 )
 
 
@@ -208,31 +209,20 @@ def fetch_open_meteo_elevations(points):
     return elevations
 
 
+# The two-collection model has no elevation_samples collection.  Raw samples
+# are only a short-lived lookup cache (the per-project elevation model is
+# persisted inside the project), so keep them in process memory.
+_ELEVATION_SAMPLE_CACHE = {}
+
+
 def get_cached_elevation(lat, lng):
     """Check if elevation for a coordinate is already cached."""
-    rounded_lat = round(lat, 5)
-    rounded_lng = round(lng, 5)
-    cached = mongo.db.elevation_samples.find_one({
-        'lat_round': rounded_lat,
-        'lng_round': rounded_lng,
-        'source': 'open-meteo'
-    })
-    if cached:
-        return cached.get('elevation_m')
-    return None
+    return _ELEVATION_SAMPLE_CACHE.get((round(lat, 5), round(lng, 5)))
 
 
 def cache_elevation(lat, lng, elevation_m):
-    """Cache a single elevation sample."""
-    mongo.db.elevation_samples.insert_one({
-        'lat_round': round(lat, 5),
-        'lng_round': round(lng, 5),
-        'lat': lat,
-        'lng': lng,
-        'elevation_m': elevation_m,
-        'source': 'open-meteo',
-        'fetched_at': datetime.utcnow()
-    })
+    """Cache a single elevation sample for the life of the process."""
+    _ELEVATION_SAMPLE_CACHE[(round(lat, 5), round(lng, 5))] = elevation_m
 
 
 def get_or_build_elevation_model(project_id, project_doc, spacing_m=None, max_points=None):
@@ -263,8 +253,17 @@ def get_or_build_elevation_model(project_id, project_doc, spacing_m=None, max_po
     })
 
     if cached_model:
-        cached_model['_id'] = str(cached_model['_id'])
-        return cached_model
+        # Discard a stale cached model that has no usable elevation values
+        # (e.g. an earlier API failure) so it is rebuilt instead of forcing
+        # all terrain-aware scoring to stay neutral.
+        if cached_model.get('stats'):
+            cached_model['_id'] = str(cached_model['_id'])
+            return cached_model
+        mongo.db.project_elevation_models.delete_one({
+            'project_id': project_id,
+            'boundary_hash': boundary_hash,
+            'spacing_m': spacing_m
+        })
 
     # Build new elevation model
     lng, lat = get_project_centroid(project_doc)
@@ -277,12 +276,12 @@ def get_or_build_elevation_model(project_id, project_doc, spacing_m=None, max_po
     water_source = project_doc.get('water_source')
     if water_source and water_source.get('coordinates'):
         ws_lng, ws_lat = water_source['coordinates'][0], water_source['coordinates'][1]
-        ws_projected = project_geometry(water_source, lng, lat)
+        ws_projected, _ = project_geometry(water_source, lng, lat)
         sample_points.append({
             'lng': ws_lng,
             'lat': ws_lat,
-            'x': ws_projected['coordinates'][0] if ws_projected else 0,
-            'y': ws_projected['coordinates'][1] if ws_projected else 0,
+            'x': ws_projected.x if ws_projected else 0,
+            'y': ws_projected.y if ws_projected else 0,
             'is_water_source': True
         })
 
@@ -363,11 +362,12 @@ def get_or_build_elevation_model(project_id, project_doc, spacing_m=None, max_po
         'created_at': datetime.utcnow()
     }
 
-    # Save to database
-    try:
-        mongo.db.project_elevation_models.insert_one(dict(model))
-    except Exception:
-        pass
+    # Save to database (only cache models that actually contain elevation data)
+    if stats:
+        try:
+            mongo.db.project_elevation_models.insert_one(dict(model))
+        except Exception:
+            pass
 
     model['_id'] = str(model.get('_id', ''))
 
@@ -432,11 +432,15 @@ def elevation_metrics_for_polygon(model, polygon_projected):
     samples = model['samples']
     elev_values = []
 
+    # Prepared + covers: identical to contains-or-touches for a point, but
+    # the index is built once per polygon instead of testing every sample
+    # twice. Scoring calls this once per sector per candidate, so on a
+    # 100+ sector plot the unprepared version costs minutes.
+    prepared = prep(polygon_projected)
     for s in samples:
         if s.get('elevation_m') is None:
             continue
-        pt = Point(s['x'], s['y'])
-        if polygon_projected.contains(pt) or polygon_projected.touches(pt):
+        if prepared.covers(Point(s['x'], s['y'])):
             elev_values.append(s['elevation_m'])
 
     if not elev_values:
@@ -461,6 +465,158 @@ def elevation_metrics_for_polygon(model, polygon_projected):
         'range_m': max(elev_values) - min(elev_values),
         'std_elevation_m': _std_dev(elev_values),
         'sample_count': len(elev_values)
+    }
+
+
+# 32 named cardinal points of the compass (clockwise from North), at 11.25°
+# steps. The abbreviations are the traditional 32-wind compass-rose names.
+COMPASS_POINTS = [
+    'N', 'NbE', 'NNE', 'NEbN', 'NE', 'NEbE', 'ENE', 'EbN',
+    'E', 'EbS', 'ESE', 'SEbE', 'SE', 'SEbS', 'SSE', 'SbE',
+    'S', 'SbW', 'SSW', 'SWbS', 'SW', 'SWbW', 'WSW', 'WbS',
+    'W', 'WbN', 'WNW', 'NWbW', 'NW', 'NWbN', 'NNW', 'NbW',
+]
+
+# Human-readable names for each of the 32 points (for the Orientation lists).
+COMPASS_NAMES_EN = {
+    'N': 'North', 'NbE': 'North by East', 'NNE': 'North-Northeast',
+    'NEbN': 'Northeast by North', 'NE': 'Northeast', 'NEbE': 'Northeast by East',
+    'ENE': 'East-Northeast', 'EbN': 'East by North', 'E': 'East',
+    'EbS': 'East by South', 'ESE': 'East-Southeast', 'SEbE': 'Southeast by East',
+    'SE': 'Southeast', 'SEbS': 'Southeast by South', 'SSE': 'South-Southeast',
+    'SbE': 'South by East', 'S': 'South', 'SbW': 'South by West',
+    'SSW': 'South-Southwest', 'SWbS': 'Southwest by South', 'SW': 'Southwest',
+    'SWbW': 'Southwest by West', 'WSW': 'West-Southwest', 'WbS': 'West by South',
+    'W': 'West', 'WbN': 'West by North', 'WNW': 'West-Northwest',
+    'NWbW': 'Northwest by West', 'NW': 'Northwest', 'NWbN': 'Northwest by North',
+    'NNW': 'North-Northwest', 'NbW': 'North by West',
+}
+
+COMPASS_NAMES_AR = {
+    'N': 'شمال', 'NbE': 'شمال نحو الشرق', 'NNE': 'شمال-شمال شرق',
+    'NEbN': 'شمال شرق نحو الشمال', 'NE': 'شمال شرق', 'NEbE': 'شمال شرق نحو الشرق',
+    'ENE': 'شرق-شمال شرق', 'EbN': 'شرق نحو الشمال', 'E': 'شرق',
+    'EbS': 'شرق نحو الجنوب', 'ESE': 'شرق-جنوب شرق', 'SEbE': 'جنوب شرق نحو الشرق',
+    'SE': 'جنوب شرق', 'SEbS': 'جنوب شرق نحو الجنوب', 'SSE': 'جنوب-جنوب شرق',
+    'SbE': 'جنوب نحو الشرق', 'S': 'جنوب', 'SbW': 'جنوب نحو الغرب',
+    'SSW': 'جنوب-جنوب غرب', 'SWbS': 'جنوب غرب نحو الجنوب', 'SW': 'جنوب غرب',
+    'SWbW': 'جنوب غرب نحو الغرب', 'WSW': 'غرب-جنوب غرب', 'WbS': 'غرب نحو الجنوب',
+    'W': 'غرب', 'WbN': 'غرب نحو الشمال', 'WNW': 'غرب-شمال غرب',
+    'NWbW': 'شمال غرب نحو الغرب', 'NW': 'شمال غرب', 'NWbN': 'شمال غرب نحو الشمال',
+    'NNW': 'شمال-شمال غرب', 'NbW': 'شمال نحو الغرب',
+}
+
+# Legacy 8-point codes that predate the 32-point rose, mapped to their new code.
+ORIENTATION_ALIASES = {'ES': 'SE', 'WN': 'NW'}
+
+
+def compass_from_bearing(bearing_deg):
+    """Map a bearing (0-360, clockwise from North) to the nearest of the 32 points."""
+    if bearing_deg is None:
+        return None
+    step = 360.0 / len(COMPASS_POINTS)
+    index = int(round((bearing_deg % 360.0) / step)) % len(COMPASS_POINTS)
+    return COMPASS_POINTS[index]
+
+
+# Canonical bearing (degrees, clockwise from North) for each compass point, so
+# the label and its numeric orientation stay linked (N=0, NbE=11.25, NNE=22.5, ...).
+ORIENTATION_DEGREES = {
+    point: round(i * (360.0 / len(COMPASS_POINTS)), 2)
+    for i, point in enumerate(COMPASS_POINTS)
+}
+
+# Ordered options for the Orientation dropdown lists in templates.
+ORIENTATION_OPTIONS = [
+    {
+        'code': point,
+        'en': COMPASS_NAMES_EN.get(point, point),
+        'ar': COMPASS_NAMES_AR.get(point, point),
+        'deg': ORIENTATION_DEGREES[point],
+    }
+    for point in COMPASS_POINTS
+]
+
+
+def aspect_for_polygon(model, polygon_projected):
+    """Compute the terrain aspect (downhill direction) of a projected polygon.
+
+    Fits a plane (z = a*x + b*y + c) to the elevation samples inside the
+    polygon, then derives the downhill bearing and slope.
+
+    Returns a dict:
+        {
+            'bearing_deg': float,   # downhill direction, clockwise from North
+            'compass': one of the 32 named compass points (see COMPASS_POINTS),
+            'slope_percent': float, # gradient magnitude * 100
+            'slope_deg': float,
+            'sample_count': int,
+        }
+    or ``None`` when there is not enough data (or terrain is flat).
+    """
+    if not model or not model.get('samples'):
+        return None
+
+    poly = polygon_projected
+    if isinstance(poly, MultiPolygon):
+        poly = max(poly.geoms, key=lambda g: g.area)
+
+    samples = [s for s in model['samples'] if s.get('elevation_m') is not None]
+    if len(samples) < 3:
+        return None
+
+    inside = [
+        s for s in samples
+        if poly.contains(Point(s['x'], s['y'])) or poly.touches(Point(s['x'], s['y']))
+    ]
+    if len(inside) < 3:
+        # Fall back to the nearest samples to the polygon centroid.
+        centroid = poly.centroid
+        inside = sorted(
+            samples,
+            key=lambda s: (s['x'] - centroid.x) ** 2 + (s['y'] - centroid.y) ** 2
+        )[:12]
+    if len(inside) < 3:
+        return None
+
+    n = float(len(inside))
+    xm = sum(s['x'] for s in inside) / n
+    ym = sum(s['y'] for s in inside) / n
+
+    sxx = sxy = syy = sxz = syz = 0.0
+    for s in inside:
+        x = s['x'] - xm
+        y = s['y'] - ym
+        z = s['elevation_m']
+        sxx += x * x
+        sxy += x * y
+        syy += y * y
+        sxz += x * z
+        syz += y * z
+
+    det = sxx * syy - sxy * sxy
+    if abs(det) < 1e-9:
+        return None  # degenerate / collinear samples
+
+    # Gradient of the fitted plane: steepest ascent = (a, b).
+    a = (sxz * syy - syz * sxy) / det
+    b = (syz * sxx - sxz * sxy) / det
+
+    # Downhill direction points opposite the gradient (east = -a, north = -b).
+    east, north = -a, -b
+    magnitude = math.hypot(a, b)
+    if magnitude < 1e-9:
+        return None  # flat terrain — no meaningful orientation
+
+    bearing = math.degrees(math.atan2(east, north)) % 360.0
+    slope_deg = math.degrees(math.atan(magnitude))
+
+    return {
+        'bearing_deg': bearing,
+        'compass': compass_from_bearing(bearing),
+        'slope_percent': magnitude * 100.0,
+        'slope_deg': slope_deg,
+        'sample_count': len(inside),
     }
 
 

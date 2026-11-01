@@ -4,107 +4,379 @@
 {% block content %}
 <div class="geometry-zones-header mb-3">
     <h2 class="geometry-zones-title-en">Zones</h2>
-    <i class="bi bi-bounding-box geometry-zones-icon" aria-hidden="true"></i>
+    <i class="bi bi-grid geometry-zones-icon" aria-hidden="true"></i>
     <h2 class="geometry-zones-title-ar" lang="ar">المناطق</h2>
 </div>
 
 <div class="mb-3">
-    <span class="badge bg-primary"><i class="bi bi-folder"></i> {{ project.name }}</span>
-</div>
-
-<!-- Action buttons -->
-<div class="d-flex gap-2 mb-3 flex-wrap">
-    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addZoneModal">
-        <i class="bi bi-plus-circle"></i> Add Zone / إضافة منطقة
-    </button>
-    <form method="POST" action="{{ url_for('geometry.zone_ai_regenerate', project_id=project.id) }}" class="d-inline">
-        <button type="submit" class="btn btn-warning"
-            data-confirm="AI will rebuild all zones. Continue? / سيعيد الذكاء الاصطناعي بناء المناطق. متابعة؟">
-            <i class="bi bi-robot"></i> AI Generate Zones / إنشاء المناطق بالذكاء الاصطناعي
-        </button>
-    </form>
-    {% if zones|length >= 2 %}
-    <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#mergeZoneModal">
-        <i class="bi bi-union"></i> Merge Selected / دمج المحدد
-    </button>
-    {% endif %}
-    <form method="POST" action="{{ url_for('geometry.zone_validate', project_id=project.id) }}" class="d-inline">
-        <button type="submit" class="btn btn-primary">
-            <i class="bi bi-check-circle"></i> Validate All / التحقق من الكل
-        </button>
-    </form>
+    <span class="badge bg-primary"><i class="bi bi-folder"></i> {{ project.name
+        }}</span>
 </div>
 
 <!-- Zones Table -->
 <div class="card shadow-sm">
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover mb-0">
+            <table class="table table-hover mb-0 geometry-zones-table">
+                <colgroup>
+                    <col style="width: 48px">
+                    <col style="width: 70px">
+                    <col style="width: 70px">
+                    <col>
+                    <col style="width: 90px">
+                    <col style="width: 110px">
+                    <col style="width: 120px">
+                    <col style="width: 120px">
+                    <col style="width: 120px">
+                    <col style="width: 210px">
+                </colgroup>
                 <thead>
-                    <tr>
-                        <th width="40"><input type="checkbox" id="selectAllZones" onclick="toggleAllZones(this)"></th>
-                        <th>ID</th>
-                        <th>Sector / القطاع</th>
-                        <th>Zone Name (EN) / اسم المنطقة</th>
-                        <th>Zone Name (AR) / اسم المنطقة</th>
-                        <th>Validated / تم التحقق</th>
-                        <th class="text-center">Actions / إجراءات</th>
+                    <tr class="table-light">
+                        <th colspan="10" class="text-center"
+                            style="width: 100%;">
+                            <button class="btn btn-circle btn-sm btn-success"
+                                id="zoneAddBtn" data-bs-toggle="modal"
+                                data-bs-target="#addZoneModal"
+                                title="Add / إضافة">
+                                <i class="bi bi-plus-circle"></i>
+                            </button>
+                            <button class="btn btn-circle btn-sm btn-info"
+                                id="zoneRenameBtn" type="button"
+                                onclick="zoneRenameSelected()"
+                                title="Rename / إعادة تسمية">
+                                <i class="bi bi-input-cursor-text"></i>
+                            </button>
+                            <button
+                                class="btn btn-circle btn-sm btn-outline-primary"
+                                id="zoneEditBtn" type="button"
+                                onclick="zoneEditSelected()"
+                                title="Edit / تعديل">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <form method="POST" id="removeZonesForm"
+                                action="{{ url_for('geometry.zone_remove', project_id=project.id) }}"
+                                class="d-inline">
+                                <button
+                                    class="btn btn-circle btn-sm btn-outline-danger"
+                                    id="zoneRemoveBtn" type="button"
+                                    onclick="zoneRemoveSelected()"
+                                    title="Remove / إزالة">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                            {% if zones|length >= 1 %}
+                            <button
+                                class="btn btn-circle btn-sm btn-outline-warning"
+                                type="button"
+                                onclick="openSplitZoneSelected()"
+                                title="Split / تقسيم">
+                                <i class="bi bi-scissors"></i>
+                            </button>
+                            {% endif %}
+                            {% if zones|length >= 2 %}
+                            <button
+                                class="btn btn-circle btn-sm btn-outline-primary"
+                                data-bs-toggle="modal"
+                                data-bs-target="#mergeZoneModal"
+                                title="Merge / دمج">
+                                <i class="bi bi-union"></i>
+                            </button>
+                            <button
+                                class="btn btn-circle btn-sm btn-outline-primary"
+                                data-bs-toggle="modal"
+                                data-bs-target="#swapZoneModal"
+                                title="Swap / تبديل">
+                                <i class="bi bi-arrow-left-right"></i>
+                            </button>
+                            {% endif %}
+                            <button class="btn btn-circle btn-sm btn-warning"
+                                data-bs-toggle="modal"
+                                data-bs-target="#aiGenerateZoneModal"
+                                title="Auto Generate / توليد تلقائي">
+                                <i class="bi bi-magic"></i>
+                            </button>
+                            <form method="POST"
+                                action="{{ url_for('geometry.zone_validate', project_id=project.id) }}"
+                                class="d-inline">
+                                <button type="submit"
+                                    class="btn btn-circle btn-primary"
+                                    title="Validate / التحقق">
+                                    <i class="bi bi-check-circle"></i>
+                                </button>
+                            </form>
+                        </th>
                     </tr>
+                    <tr class="table-light">
+                        <th colspan="10" class="text-center align-middle">
+                            <div class="input-group input-group-sm search-zone">
+                                <div class="search-field">
+                                    <input type="text" id="zoneNameFilter"
+                                        class="form-control form-control-sm search-input"
+                                        style="min-width: 220px;"
+                                        placeholder="Search names / بحث بالاسم"
+                                        oninput="filterZonesByName(this.value)">
+                                </div>
+                            </div>
+                        </th>
+                    </tr>
+                    <tr class="align-middle">
+                        <th><input type="checkbox" id="selectAllZones"
+                                onclick="toggleAllZones(this)"></th>
+                        <th>ID</th>
+                        <th style="text-align: center; vertical-align: middle;"
+                            aria-label="Short Name"><span
+                                class="ar-text">الاسم المختصر</span><br>Short
+                            Name</th>
+                        <th style="text-align: left; vertical-align: middle;"
+                            aria-label="Name ar top / Name en bottom"><span
+                                class="ar-text">الاسم</span><br>Name</th>
+                        <th style="text-align: center; vertical-align: middle;"
+                            aria-label="Valid ar top / Valid en top"><span
+                                class="ar-text">مثبت</span><br>Valid</th>
+                        <th style="text-align: center; vertical-align: middle;"
+                            aria-label="Area ar top / Area en top"><span
+                                class="ar-text">المساحة</span><br>Area (m²)</th>
+                        <th style="text-align: center; vertical-align: middle;"
+                            aria-label="Percentage ar top / Percentage en top"><span
+                                class="ar-text">النسبة
+                                المئوية</span><br>Percentage (%)</th>
+                        <th style="text-align: center; vertical-align: middle;"
+                            aria-label="Orientation ar top / Orientation en top"><span
+                                class="ar-text">الاتجاه</span><br>Orientation</th>
+                        <th style="text-align: center; vertical-align: middle;"
+                            aria-label="Orientation ar top / Orientation en top"><span
+                                class="ar-text">درجات
+                                الاتجاه</span><br>Orientation (°)</th>
+                        <th style="text-align: center; vertical-align: middle;"
+                            aria-label="Actions ar top / Actions en top"><span
+                                class="ar-text">إجراءات</span><br>Actions</th>
+                    </tr>
+
                 </thead>
                 <tbody>
                     {% for item in table_data %}
                     {% if item.zone %}
-                    <tr>
-                        <td><input type="checkbox" class="zone-checkbox" value="{{ item.zone.id }}"></td>
+                    <tr
+                        data-name="{{ (item.zone.name_en ~ ' ' ~ (item.zone.name_ar or '')) | lower }}">
+                        <td><input type="checkbox" class="zone-checkbox"
+                                value="{{ item.zone.id }}"
+                                data-name-en="{{ item.zone.name_en }}"
+                                data-name-ar="{{ item.zone.name_ar }}"></td>
                         <td>{{ item.zone.id }}</td>
-                        <td>{{ item.sector.name_en }} ({{ item.sector.name_ar }})</td>
-                        <td>{{ item.zone.name_en }}</td>
-                        <td class="ar-text">{{ item.zone.name_ar }}</td>
+                        <td class="text-center"><code>{{
+                            item.zone.short_name }}</code></td>
                         <td>
+                            {{ item.zone.name_en }}
+                            {% if item.zone.name_ar %}<span
+                                class="ar-text text-muted"> / {{
+                                item.zone.name_ar }}</span>{% endif %}
+                        </td>
+                        <td class="text-center">
                             {% if item.zone.validated %}
-                            <span class="badge bg-success"><i class="bi bi-check"></i></span>
+                            <span class="badge bg-success"><i
+                                    class="bi bi-check"></i></span>
                             {% else %}
-                            <span class="badge bg-warning"><i class="bi bi-clock"></i></span>
+                            <span class="badge bg-warning"><i
+                                    class="bi bi-clock"></i></span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">{{
+                            '{:,.0f}'.format(item.zone.area_m2 or 0) }}</td>
+                        <td class="text-center">
+                            {% if global_area_m2 %}{{
+                            '{:.1f}'.format((item.zone.area_m2 or 0) /
+                            global_area_m2 * 100) }}%{% else %}&mdash;{% endif
+                            %}
+                        </td>
+                        <td class="text-center">
+                            {% if item.zone.orientation %}
+                            <span class="badge bg-secondary"
+                                title="Downhill direction / اتجاه الانحدار">
+                                <i class="bi bi-compass"></i> {{
+                                item.zone.orientation }}
+                            </span>
+                            {% else %}
+                            <span class="text-muted">&mdash;</span>
                             {% endif %}
                         </td>
                         <td class="text-center">
-                            <button class="btn btn-circle btn-primary" data-bs-toggle="modal"
-                                    data-bs-target="#editZoneModal{{ item.zone.id }}" title="Edit / تعديل">
+                            {% set _zone_deg = item.zone.get('orientation_deg') %}
+                            {% set _deg = _zone_deg if _zone_deg is not none else orientation_degrees.get(item.zone.orientation) %}
+                            {% if _deg is not none %}{{ _deg }}°{% else %}<span
+                                class="text-muted">&mdash;</span>{% endif %}
+                        </td>
+                        <td class="text-center">
+                            <button class="btn btn-circle btn-primary"
+                                data-bs-toggle="modal"
+                                data-bs-target="#editZoneModal{{ item.zone.id }}"
+                                title="Edit / تعديل">
                                 <i class="bi bi-pencil"></i>
                             </button>
-                            <button class="btn btn-circle btn-info" data-bs-toggle="modal"
-                                    data-bs-target="#renameZoneModal{{ item.zone.id }}" title="Rename / إعادة تسمية">
+                            <button class="btn btn-circle btn-sm btn-secondary"
+                                data-bs-toggle="modal"
+                                data-bs-target="#orientationZoneModal{{ item.zone.id }}"
+                                title="Edit orientation in degrees / تعديل الاتجاه بالدرجات">
+                                <i class="bi bi-compass"></i>
+                            </button>
+                            <button class="btn btn-circle btn-sm btn-info"
+                                data-bs-toggle="modal"
+                                data-bs-target="#renameZoneModal{{ item.zone.id }}"
+                                title="Rename / إعادة تسمية">
                                 <i class="bi bi-input-cursor-text"></i>
                             </button>
-                            <button class="btn btn-circle btn-warning" data-bs-toggle="modal"
-                                    data-bs-target="#splitZoneModal{{ item.zone.id }}" title="Split / تقسيم">
+                            <button class="btn btn-circle btn-sm btn-warning"
+                                data-bs-toggle="modal"
+                                data-bs-target="#splitZoneModal{{ item.zone.id }}"
+                                title="Split / تقسيم">
                                 <i class="bi bi-scissors"></i>
                             </button>
                         </td>
                     </tr>
 
-                    <!-- Edit Zone Modal -->
-                    <div class="modal fade" id="editZoneModal{{ item.zone.id }}" tabindex="-1">
+                    {% else %}
+                    <tr class="table-secondary">
+                        <td></td>
+                        <td>-</td>
+                        <td></td>
+                        <td>{{ item.sector.name_en }} ({{ item.sector.name_ar
+                            }})</td>
+                        <td colspan="6" class="text-muted text-center">No zones
+                            / لا توجد مناطق</td>
+                    </tr>
+                    {% endif %}
+                    {% else %}
+                    <tr>
+                        <td colspan="10" class="text-center py-4">
+                            <span
+                                class="zone-empty-banner d-inline-flex align-items-center gap-2">
+                                <i class="bi bi-grid"></i> No Zone Yet / لا توجد
+                                مناطق بعد
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Per-row modals: kept outside <tbody> so the browser does not
+     foster-parent them away from their <form> elements. -->
+{% for item in table_data %}
+{% if item.zone %}
+<!-- Edit Zone Modal -->
+                    <div class="modal fade" id="editZoneModal{{ item.zone.id }}"
+                        tabindex="-1">
                         <div class="modal-dialog">
-                            <div class="modal-content">
-                                <form method="POST" action="{{ url_for('geometry.zone_edit', project_id=project.id, zone_id=item.zone.id) }}">
-                                    <div class="modal-header bg-primary text-white">
-                                        <h5 class="modal-title"><i class="bi bi-pencil"></i> Edit Zone / تعديل المنطقة</h5>
-                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            <div class="modal-content modal-green">
+                                <form method="POST"
+                                    action="{{ url_for('geometry.zone_edit', project_id=project.id, zone_id=item.zone.id) }}">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title"><i
+                                                class="bi bi-pencil"></i> Edit
+                                            Zone / تعديل المنطقة</h5>
+                                        <button type="button"
+                                            class="btn-close"
+                                            data-bs-dismiss="modal"></button>
                                     </div>
                                     <div class="modal-body">
-                                        <div class="mb-3">
-                                            <label class="form-label">Name (EN)</label>
-                                            <input type="text" name="name_en" class="form-control" value="{{ item.zone.name_en }}">
+                                        <div class="row g-2 mb-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Name
+                                                    (EN)</label>
+                                                <input type="text"
+                                                    name="name_en"
+                                                    class="form-control"
+                                                    value="{{ item.zone.name_en }}">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Name
+                                                    (AR)</label>
+                                                <input type="text"
+                                                    name="name_ar"
+                                                    class="form-control"
+                                                    value="{{ item.zone.name_ar }}">
+                                            </div>
+                                        </div>
+                                        {% set z_orient = {'ES': 'SE', 'WN': 'NW'}.get(item.zone.orientation, item.zone.orientation) %}
+                                        {% set z_stored_deg = item.zone.get('orientation_deg') %}
+                                        {% set z_deg = z_stored_deg if z_stored_deg is not none else orientation_degrees.get(z_orient) %}
+                                        <div class="row g-2 mb-3">
+                                            <div class="col-md-8">
+                                                <label
+                                                    class="form-label">Orientation /
+                                                    الاتجاه</label>
+                                                <select name="orientation"
+                                                    class="form-select zone-orientation-select">
+                                                    <option value="auto" {% if not
+                                                        item.zone.orientation %}
+                                                        selected{% endif %}>Auto
+                                                        (from slope) / تلقائي (من
+                                                        الميل)</option>
+                                                    {% for opt in orientation_options %}
+                                                    <option value="{{ opt.code }}" {% if z_orient == opt.code %} selected{% endif %}>{{ opt.en }} / {{ opt.ar }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label
+                                                    class="form-label">Orientation
+                                                    (°)</label>
+                                                <input type="text"
+                                                    class="form-control zone-orientation-deg"
+                                                    value="{{ z_deg ~ '°' if z_deg is not none else '' }}"
+                                                    readonly tabindex="-1">
+                                            </div>
                                         </div>
                                         <div class="mb-3">
-                                            <label class="form-label">Name (AR)</label>
-                                            <input type="text" name="name_ar" class="form-control" value="{{ item.zone.name_ar }}">
+                                            <label class="form-label">Polygon
+                                                Coordinates (JSON)</label>
+                                            <textarea name="polygon_coords"
+                                                class="form-control" rows="4"
+                                                placeholder='[[lng,lat],...]'>{{ item.zone.polygon.coordinates[0] | tojson | safe if item.zone.polygon else '' }}</textarea>
                                         </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button"
+                                            class="btn btn-secondary"
+                                            data-bs-dismiss="modal">Close /
+                                            إغلاق</button>
+                                        <button type="submit"
+                                            class="btn btn-primary"><i
+                                                class="bi bi-check"></i> Save /
+                                            حفظ</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Orientation (degrees) Modal -->
+                    <div class="modal fade" id="orientationZoneModal{{ item.zone.id }}" tabindex="-1">
+                        <div class="modal-dialog">
+                            <div class="modal-content modal-green">
+                                <form method="POST"
+                                    action="{{ url_for('geometry.zone_orientation', project_id=project.id, zone_id=item.zone.id) }}">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title"><i class="bi bi-compass"></i> Edit Orientation (°) / تعديل الاتجاه</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        {% set _zone_odeg = item.zone.get('orientation_deg') %}
+                                        {% set _odeg = _zone_odeg if _zone_odeg is not none else orientation_degrees.get(z_orient) %}
                                         <div class="mb-3">
-                                            <label class="form-label">Polygon Coordinates (JSON)</label>
-                                            <textarea name="polygon_coords" class="form-control" rows="4"
-                                                      placeholder='[[lng,lat],...]'>{{ item.zone.polygon.coordinates[0] | tojson | safe if item.zone.polygon else '' }}</textarea>
+                                            <label class="form-label" for="orientationZoneDeg{{ item.zone.id }}">Orientation (°) / الاتجاه (درجة)</label>
+                                            <input type="number" class="form-control zone-orientation-input"
+                                                   id="orientationZoneDeg{{ item.zone.id }}" name="orientation_deg"
+                                                   data-hint="orientationZoneHint{{ item.zone.id }}"
+                                                   min="0" max="359.9" step="0.1" required
+                                                   value="{{ _odeg|round(1) if _odeg is not none else 0 }}">
+                                            <div class="form-text">
+                                                0° = North, clockwise. Saved as the nearest of the 32 compass points.
+                                                / 0° = الشمال، مع عقارب الساعة، ويُحفظ كأقرب نقطة من 32 نقطة.
+                                            </div>
+                                            <div class="fw-semibold mt-2" id="orientationZoneHint{{ item.zone.id }}"></div>
                                         </div>
                                     </div>
                                     <div class="modal-footer">
@@ -117,27 +389,47 @@
                     </div>
 
                     <!-- Rename Zone Modal -->
-                    <div class="modal fade" id="renameZoneModal{{ item.zone.id }}" tabindex="-1">
+                    <div class="modal fade"
+                        id="renameZoneModal{{ item.zone.id }}" tabindex="-1">
                         <div class="modal-dialog">
-                            <div class="modal-content">
-                                <form method="POST" action="{{ url_for('geometry.zone_rename', project_id=project.id, zone_id=item.zone.id) }}">
-                                    <div class="modal-header bg-info text-white">
-                                        <h5 class="modal-title"><i class="bi bi-input-cursor-text"></i> Rename Zone / إعادة تسمية المنطقة</h5>
-                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            <div class="modal-content modal-green">
+                                <form method="POST"
+                                    action="{{ url_for('geometry.zone_rename', project_id=project.id, zone_id=item.zone.id) }}">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title"><i
+                                                class="bi bi-input-cursor-text"></i>
+                                            Rename Zone / إعادة تسمية
+                                            المنطقة</h5>
+                                        <button type="button"
+                                            class="btn-close"
+                                            data-bs-dismiss="modal"></button>
                                     </div>
                                     <div class="modal-body">
                                         <div class="mb-3">
-                                            <label class="form-label">Name (EN)</label>
-                                            <input type="text" name="name_en" class="form-control" value="{{ item.zone.name_en }}" required>
+                                            <label class="form-label">Name
+                                                (EN)</label>
+                                            <input type="text" name="name_en"
+                                                class="form-control"
+                                                value="{{ item.zone.name_en }}"
+                                                required>
                                         </div>
                                         <div class="mb-3">
-                                            <label class="form-label">Name (AR)</label>
-                                            <input type="text" name="name_ar" class="form-control" value="{{ item.zone.name_ar }}">
+                                            <label class="form-label">Name
+                                                (AR)</label>
+                                            <input type="text" name="name_ar"
+                                                class="form-control"
+                                                value="{{ item.zone.name_ar }}">
                                         </div>
                                     </div>
                                     <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close / إغلاق</button>
-                                        <button type="submit" class="btn btn-info"><i class="bi bi-check"></i> Rename / إعادة تسمية</button>
+                                        <button type="button"
+                                            class="btn btn-secondary"
+                                            data-bs-dismiss="modal">Close /
+                                            إغلاق</button>
+                                        <button type="submit"
+                                            class="btn btn-info"><i
+                                                class="bi bi-check"></i> Rename
+                                            / إعادة تسمية</button>
                                     </div>
                                 </form>
                             </div>
@@ -145,52 +437,54 @@
                     </div>
 
                     <!-- Split Zone Modal -->
-                    <div class="modal fade" id="splitZoneModal{{ item.zone.id }}" tabindex="-1">
+                    <div class="modal fade"
+                        id="splitZoneModal{{ item.zone.id }}" tabindex="-1">
                         <div class="modal-dialog">
-                            <div class="modal-content">
-                                <form method="POST" action="{{ url_for('geometry.zone_split', project_id=project.id, zone_id=item.zone.id) }}">
-                                    <div class="modal-header bg-warning text-dark">
-                                        <h5 class="modal-title"><i class="bi bi-scissors"></i> Split Zone / تقسيم المنطقة</h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            <div class="modal-content modal-green">
+                                <form method="POST"
+                                    action="{{ url_for('geometry.zone_split', project_id=project.id, zone_id=item.zone.id) }}">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title"><i
+                                                class="bi bi-scissors"></i>
+                                            Split Zone / تقسيم المنطقة</h5>
+                                        <button type="button" class="btn-close"
+                                            data-bs-dismiss="modal"></button>
                                     </div>
                                     <div class="modal-body">
                                         <div class="mb-3">
-                                            <label class="form-label">Number of parts / عدد الأجزاء</label>
-                                            <select name="parts" class="form-select">
-                                                <option value="2">2 (Split/2)</option>
-                                                <option value="3">3 (Split/3)</option>
+                                            <label class="form-label">Number of
+                                                parts / عدد الأجزاء</label>
+                                            <select name="parts"
+                                                class="form-select">
+                                                <option value="2">2
+                                                    (Split/2)</option>
+                                                <option value="3">3
+                                                    (Split/3)</option>
                                             </select>
                                         </div>
                                     </div>
                                     <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close / إغلاق</button>
-                                        <button type="submit" class="btn btn-warning"><i class="bi bi-scissors"></i> Split / تقسيم</button>
+                                        <button type="button"
+                                            class="btn btn-secondary"
+                                            data-bs-dismiss="modal">Close /
+                                            إغلاق</button>
+                                        <button type="submit"
+                                            class="btn btn-warning"><i
+                                                class="bi bi-scissors"></i>
+                                            Split / تقسيم</button>
                                     </div>
                                 </form>
                             </div>
                         </div>
                     </div>
-                    {% else %}
-                    <tr class="table-secondary">
-                        <td></td>
-                        <td>-</td>
-                        <td>{{ item.sector.name_en }} ({{ item.sector.name_ar }})</td>
-                        <td colspan="3" class="text-muted text-center">No zones / لا توجد مناطق</td>
-                        <td></td>
-                    </tr>
-                    {% endif %}
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
+{% endif %}
+{% endfor %}
 
 <!-- Map -->
 <div class="card shadow-sm mt-4 geometry-map-card">
-    <div class="card-header">
-        <h5 class="mb-0"><i class="bi bi-map"></i> Map Editor - Zones / محرر الخريطة - المناطق</h5>
-    </div>
+    {% set map_title_en = "Map Editor - Zones" %}{% set map_title_ar =
+    "محرر الخريطة - المناطق" %}
+    {% include "_map_header.html" %}
     <div class="card-body">
         <div id="map"></div>
     </div>
@@ -199,40 +493,60 @@
 <!-- Add Zone Modal -->
 <div class="modal fade" id="addZoneModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <form method="POST" action="{{ url_for('geometry.zone_add', project_id=project.id) }}">
-                <div class="modal-header bg-success text-white">
-                    <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Add Zone / إضافة منطقة</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        <div class="modal-content modal-green">
+            <form method="POST"
+                action="{{ url_for('geometry.zone_add', project_id=project.id) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-plus-circle"></i>
+                        Add Zone / إضافة منطقة</h5>
+                    <button type="button" class="btn-close"
+                        data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Sector / القطاع</label>
                         <select name="sector_id" class="form-select" required>
                             {% for s in sectors %}
-                            <option value="{{ s.id }}">{{ s.name_en }} ({{ s.name_ar }})</option>
+                            <option value="{{ s.id }}">{{ s.name_en }} ({{
+                                s.name_ar }})</option>
                             {% endfor %}
                         </select>
                     </div>
                     <div class="row">
                         <div class="col-md-6">
                             <label class="form-label">Name (EN)</label>
-                            <input type="text" name="name_en" class="form-control">
+                            <input type="text" name="name_en"
+                                class="form-control">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Name (AR)</label>
-                            <input type="text" name="name_ar" class="form-control">
+                            <input type="text" name="name_ar"
+                                class="form-control">
                         </div>
                     </div>
                     <div class="mt-3">
-                        <label class="form-label">Polygon Coordinates (JSON)</label>
-                        <textarea name="polygon_coords" id="zonePolygonCoords" class="form-control" rows="4"
-                                  placeholder='[[lng,lat],...]' required></textarea>
+                        <label class="form-label">Orientation / الاتجاه</label>
+                        <select name="orientation" class="form-select">
+                            <option value="auto" selected>Auto (from slope) /
+                                تلقائي (من الميل)</option>
+                            {% for opt in orientation_options %}
+                            <option value="{{ opt.code }}">{{ opt.en }} / {{ opt.ar }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mt-3">
+                        <label class="form-label">Polygon Coordinates
+                            (JSON)</label>
+                        <textarea name="polygon_coords" id="zonePolygonCoords"
+                            class="form-control" rows="4"
+                            placeholder='[[lng,lat],...]' required></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close / إغلاق</button>
-                    <button type="submit" class="btn btn-success"><i class="bi bi-check"></i> Add / إضافة</button>
+                    <button type="button" class="btn btn-secondary"
+                        data-bs-dismiss="modal">Close / إغلاق</button>
+                    <button type="submit" class="btn btn-primary"><i
+                            class="bi bi-check"></i> Add / إضافة</button>
                 </div>
             </form>
         </div>
@@ -242,19 +556,267 @@
 <!-- Merge Zone Modal -->
 <div class="modal fade" id="mergeZoneModal" tabindex="-1">
     <div class="modal-dialog">
-        <div class="modal-content">
-            <form method="POST" action="{{ url_for('geometry.zone_merge', project_id=project.id) }}" id="zoneMergeForm">
-                <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title"><i class="bi bi-union"></i> Merge Zones / دمج المناطق</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        <div class="modal-content modal-green">
+            <form method="POST"
+                action="{{ url_for('geometry.zone_merge', project_id=project.id) }}"
+                id="zoneMergeForm">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-union"></i> Merge
+                        Zones / دمج المناطق</h5>
+                    <button type="button" class="btn-close"
+                        data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <p>Selected zones will be merged / سيتم دمق المناطق المحددة</p>
+                    <p>Selected zones will be merged / سيتم دمق المناطق
+                        المحددة</p>
                     <div id="zoneMergeList"></div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close / إغلاق</button>
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-union"></i> Merge / دمج</button>
+                    <button type="button" class="btn btn-secondary"
+                        data-bs-dismiss="modal">Close / إغلاق</button>
+                    <button type="submit" class="btn btn-primary"><i
+                            class="bi bi-union"></i> Merge / دمج</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Split Selected Zones Modal -->
+<div class="modal fade" id="splitZoneSelectedModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content modal-green">
+            <form method="POST"
+                action="{{ url_for('geometry.zone_split_selected', project_id=project.id) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-scissors"></i> Split
+                        Selected Zones / تقسيم المناطق المحددة</h5>
+                    <button type="button" class="btn-close"
+                        data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Each selected zone will be split into equal parts / سيتم
+                        تقسيم كل منطقة محددة إلى أجزاء متساوية</p>
+                    <div id="splitZoneSelectedList"></div>
+                    <div class="mb-3">
+                        <label class="form-label">Number of parts / عدد
+                            الأجزاء</label>
+                        <select name="parts" class="form-select">
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary"
+                        data-bs-dismiss="modal">Close / إغلاق</button>
+                    <button type="submit" class="btn btn-warning"><i
+                            class="bi bi-scissors"></i> Split / تقسيم</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Split Selected Sectors into Zones (map magic widget) -->
+<div class="modal fade" id="splitSectorZonesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content modal-green">
+            <form method="POST"
+                action="{{ url_for('geometry.zone_generate_for_sector', project_id=project.id) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-magic"></i> Split Sectors into
+                        Zones / تقسيم القطاعات إلى مناطق</h5>
+                    <button type="button" class="btn-close"
+                        data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="splitSectorLabel" class="text-muted small mb-3"></p>
+                    <div class="mb-3">
+                        <label class="form-label">Number of parts per sector / عدد
+                            الأجزاء لكل قطاع</label>
+                        <select name="parts" class="form-select">
+                            <option value="2">2</option>
+                            <option value="3" selected>3</option>
+                            <option value="4">4</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Orientation by Sector /
+                            الاتجاه لكل قطاع</label>
+                        <div id="splitSectorList"
+                            class="border rounded p-2"
+                            style="max-height: 280px; overflow-y: auto;"></div>
+                        <div class="form-text">
+                            Enter orientation in degrees (0-359.9) for each sector. Leave empty for auto from slope.
+                            / أدخل الاتجاه بالدرجات (0-359.9) لكل قطاع. اتركه فارغاً للتلقائي من الميل.
+                        </div>
+                    </div>
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox"
+                            name="use_elevation" id="splitSectorUseElevation"
+                            value="1" checked>
+                        <label class="form-check-label"
+                            for="splitSectorUseElevation">Use elevation data /
+                            استخدام بيانات الارتفاع</label>
+                    </div>
+                    <div class="form-text">Each selected sector is split into equal-area
+                        zones that follow the terrain slope / fall line. Existing
+                        zones of those sectors are rebuilt. /
+                        يُقسّم كل قطاع محدد إلى مناطق متساوية المساحة تتبع ميل
+                        التضاريس، وتُعاد مناطق تلك القطاعات من الصفر.</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary"
+                        data-bs-dismiss="modal">Cancel / إلغاء</button>
+                    <button type="submit" class="btn btn-warning"><i
+                            class="bi bi-magic"></i> Split / تقسيم</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Swap Zones Modal -->
+<div class="modal fade" id="swapZoneModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content modal-green">
+            <form method="POST"
+                action="{{ url_for('geometry.zone_swap', project_id=project.id) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i
+                            class="bi bi-arrow-left-right"></i> Swap Zones /
+                        تبديل المناطق</h5>
+                    <button type="button" class="btn-close"
+                        data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Zone 1 / المنطقة
+                            الأولى</label>
+                        <select name="id1" class="form-select" required>
+                            {% for z in zones %}
+                            <option value="{{ z.id }}">{{ z.name_en }} ({{
+                                z.name_ar }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Zone 2 / المنطقة
+                            الثانية</label>
+                        <select name="id2" class="form-select" required>
+                            {% for z in zones %}
+                            <option value="{{ z.id }}">{{ z.name_en }} ({{
+                                z.name_ar }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary"
+                        data-bs-dismiss="modal">Close / إغلاق</button>
+                    <button type="submit" class="btn btn-primary"><i
+                            class="bi bi-arrow-left-right"></i> Swap /
+                        تبديل</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Auto Generate Zones Modal -->
+<div class="modal fade" id="aiGenerateZoneModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-lg">
+        <div class="modal-content modal-green">
+            <form method="POST"
+                action="{{ url_for('geometry.zone_ai_regenerate', project_id=project.id) }}"
+                data-confirm="AI will rebuild the zones of the selected sectors only; unchecked sectors keep their zones. Continue? / سيعيد الذكاء الاصطناعي بناء مناطق القطاعات المحددة فقط، والقطاعات غير المحددة تحتفظ بمناطقها. متابعة؟">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-magic"></i> Auto
+                        Generate Zones / إنشاء المناطق بالذكاء الاصطناعي</h5>
+                    <button type="button" class="btn-close"
+                        data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Zones per Sector / عدد المناطق
+                            لكل قطاع</label>
+                        <input type="number" name="zones_per_sector"
+                            class="form-control" min="1" max="8"
+                            value="{{ default_zones_per_sector }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Orientation by Sector /
+                            الاتجاه لكل قطاع</label>
+                        {% if sectors %}
+                        <div class="border rounded p-2" style="max-height: 280px; overflow-y: auto;">
+                            <div class="d-flex align-items-center gap-2 pb-2 mb-2 border-bottom">
+                                <input class="form-check-input mt-0" type="checkbox"
+                                    id="zoneSectorSelectAll" checked
+                                    title="Select / deselect every sector / تحديد / إلغاء تحديد كل القطاعات">
+                                <label class="form-check-label small fw-semibold flex-grow-1"
+                                    for="zoneSectorSelectAll">
+                                    All sectors / كل القطاعات
+                                </label>
+                                <div class="small text-muted" style="width: 45%;">
+                                    Orientation (°) / الاتجاه
+                                </div>
+                            </div>
+                            {% for s in sectors %}
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <input class="form-check-input mt-0 zone-sector-checkbox" type="checkbox"
+                                    name="sector_ids" value="{{ s.id }}" id="zoneSector{{ s.id }}" checked
+                                    title="Generate zones in this sector / إنشاء المناطق في هذا القطاع">
+                                <label class="small flex-grow-1 text-muted" style="min-width: 0;"
+                                    for="zoneSector{{ s.id }}">
+                                    {{ s.name_en }}
+                                </label>
+                                <div style="width: 45%;">
+                                    <input type="number" name="orientation_deg_{{ s.id }}"
+                                        class="form-control form-control-sm orientation-deg-input"
+                                        min="0" max="359.9" step="0.1"
+                                        placeholder="Auto (from slope)"
+                                        title="0° = North, clockwise">
+                                </div>
+                                <div class="orientation-deg-hint small text-muted" style="width: 150px;"></div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="alert alert-warning py-2 small mb-0">
+                            No sectors to generate zones in / لا توجد قطاعات
+                        </div>
+                        {% endif %}
+                        <div class="form-text">
+                            Enter orientation in degrees (0-359.9) for each sector. Leave empty for auto from slope.
+                            / أدخل الاتجاه بالدرجات (0-359.9) لكل قطاع. اتركه فارغاً للتلقائي من الميل.
+                        </div>
+                    </div>
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox"
+                            name="use_elevation" id="aiZoneUseElevation"
+                            value="1" checked>
+                        <label class="form-check-label"
+                            for="aiZoneUseElevation">
+                            Use elevation data (Open-Meteo) / استخدام بيانات
+                            الارتفاع
+                        </label>
+                    </div>
+                    <div class="alert alert-info py-2 small mb-0">
+                        Zones are rebuilt from scratch inside every selected sector
+                        with elevation-aware partitioning; unchecked sectors keep
+                        the zones they already have.
+                        <br>
+                        يتم إعادة إنشاء المناطق من الصفر داخل كل قطاع محدد مع
+                        تقسيم يراعي التضاريس، والقطاعات غير المحددة تحتفظ بمناطقها.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary"
+                        data-bs-dismiss="modal">Cancel / إلغاء</button>
+                    <button type="submit" class="btn btn-warning"><i
+                            class="bi bi-magic"></i> Generate / إنشاء</button>
                 </div>
             </form>
         </div>
@@ -265,15 +827,113 @@
 
 {% block extra_js %}
 <script>
+const ZONE_ORIENTATION_DEGREES = {{ orientation_degrees | tojson }};
+
+// Sector labels used by the map widget's split modal (one row per selected sector).
+const ZONE_PAGE_SECTORS = {
+{% for s in sectors %}
+    "{{ s.id }}": {
+        short: {{ (s.short_name or s.id) | tojson }},
+        en: {{ (s.name_en or '') | tojson }},
+        ar: {{ (s.name_ar or '') | tojson }}
+    },
+{% endfor %}
+};
+
+document.addEventListener('change', function(event) {
+    const sel = event.target;
+    if (!sel || !sel.matches || !sel.matches('.zone-orientation-select')) return;
+    const deg = sel.closest('.row').querySelector('.zone-orientation-deg');
+    if (!deg) return;
+    const value = ZONE_ORIENTATION_DEGREES[sel.value];
+    deg.value = (value === undefined || value === null) ? '' : value + '°';
+});
+
+// Orientation (°) modal: preview which compass point the angle maps to
+const ZONE_ORIENTATION_OPTIONS = {{ orientation_options | tojson }};
+document.querySelectorAll('.zone-orientation-input').forEach(function (input) {
+    const hint = document.getElementById(input.dataset.hint);
+    if (!hint) return;
+    const updateHint = function () {
+        const raw = parseFloat(input.value);
+        if (!isFinite(raw)) { hint.textContent = ''; return; }
+        const step = 360 / ZONE_ORIENTATION_OPTIONS.length;
+        const index = Math.round((((raw % 360) + 360) % 360) / step) % ZONE_ORIENTATION_OPTIONS.length;
+        const opt = ZONE_ORIENTATION_OPTIONS[index];
+        hint.textContent = '→ ' + opt.en + ' / ' + opt.ar + ' (' + opt.deg + '°) ' + opt.code;
+    };
+    input.addEventListener('input', updateHint);
+    updateHint();
+});
+
+// Degree input -> compass point preview, shared by every orientation field.
+function compassHintFor(raw) {
+    const value = parseFloat(raw);
+    if (!isFinite(value)) return '';
+    const step = 360 / ZONE_ORIENTATION_OPTIONS.length;
+    const index = Math.round((((value % 360) + 360) % 360) / step) % ZONE_ORIENTATION_OPTIONS.length;
+    const opt = ZONE_ORIENTATION_OPTIONS[index];
+    return '→ ' + opt.en + ' / ' + opt.ar + ' (' + opt.deg + '°) ' + opt.code;
+}
+
+// Auto Generate Zones modal: the header checkbox ticks or clears every sector
+// row, and reflects the rows the user toggles one by one.
+(function () {
+    const selectAll = document.getElementById('zoneSectorSelectAll');
+    if (!selectAll) return;
+    const boxes = Array.prototype.slice.call(document.querySelectorAll('.zone-sector-checkbox'));
+    if (!boxes.length) return;
+    const sync = function () {
+        const checked = boxes.filter(function (box) { return box.checked; }).length;
+        selectAll.checked = checked === boxes.length;
+        selectAll.indeterminate = checked > 0 && checked < boxes.length;
+    };
+    selectAll.addEventListener('change', function () {
+        boxes.forEach(function (box) { box.checked = selectAll.checked; });
+        sync();
+    });
+    boxes.forEach(function (box) { box.addEventListener('change', sync); });
+    sync();
+})();
+
+// Auto Generate Zones modal: preview compass point for degree inputs
+function bindOrientationHint(input) {
+    const parent = input.parentElement;
+    const hint = (parent && parent.querySelector('.orientation-deg-hint'))
+        || (parent && parent.parentElement
+            ? parent.parentElement.querySelector('.orientation-deg-hint')
+            : null);
+    if (!hint) return;
+    const updateHint = function () { hint.textContent = compassHintFor(input.value); };
+    input.addEventListener('input', updateHint);
+    updateHint();
+}
+
+document.querySelectorAll('.orientation-deg-input').forEach(bindOrientationHint);
+
 document.addEventListener('DOMContentLoaded', function() {
     const geojsonUrl = '{{ url_for("api.get_geometry", project_id=project.id) }}';
-    initMap('map', geojsonUrl, {
+    initMap('map', geojsonUrl + '?types=sector,zone,boundary', {
         center: [34.0, -6.0],
         zoom: 14,
         editor: true,
+        drawTypes: ['polygon'],
         ruler: true,
         showArea: true,
         selectable: { type: 'zone', checkboxSelector: '.zone-checkbox' },
+        sectorSelect: {
+            pickTitle: 'Select sector / اختر قطاعا',
+            actions: [
+                {
+                    icon: 'bi-magic',
+                    title: 'Split selected sectors into zones by slope / تقسيم القطاعات المحددة إلى مناطق حسب الميل',
+                    enabledWhen: function(count) { return count >= 1; },
+                    onClick: function(ids) {
+                        openSplitSectorsZones(ids);
+                    }
+                }
+            ]
+        },
         mapActions: {
             idField: 'zone_ids',
             item: { en: 'zone', ar: 'منطقة' },
@@ -283,6 +943,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 merge: '{{ url_for("geometry.zone_merge", project_id=project.id) }}',
                 swap: '{{ url_for("geometry.zone_swap", project_id=project.id) }}'
             }
+        },
+        mapDelete: { onClick: zoneRemoveSelected },
+        // The heatmap toggle sits inside the map filter group (see map.js).
+        elevationHeatmap: {
+            url: '{{ url_for("engineering.elevation_heatmap", project_id=project.id) }}',
+            ramp: 'blue-red'
         },
         onDrawCreated: function(layer, layerType) {
             if (layerType !== 'polygon') return;
@@ -305,10 +971,173 @@ document.addEventListener('DOMContentLoaded', function() {
             list.innerHTML += `<div>Zone ID: ${cb.value}</div>`;
         });
     });
+
+    document.addEventListener('change', function(event) {
+        if (event.target && event.target.matches && event.target.matches('.zone-checkbox')) {
+            updateZoneToolbar();
+        }
+    });
+    updateZoneToolbar();
 });
 
+function updateZoneToolbar() {
+    const count = document.querySelectorAll('.zone-checkbox:checked').length;
+    const addBtn = document.getElementById('zoneAddBtn');
+    const renameBtn = document.getElementById('zoneRenameBtn');
+    const editBtn = document.getElementById('zoneEditBtn');
+    const removeBtn = document.getElementById('zoneRemoveBtn');
+    if (addBtn) addBtn.disabled = count !== 0;
+    if (renameBtn) renameBtn.disabled = count !== 1;
+    if (editBtn) editBtn.disabled = count !== 1;
+    if (removeBtn) removeBtn.disabled = count === 0;
+}
+
+// Map widget: split one or several selected sectors into zones, with an
+// orientation field per sector so each one can be cut at its own bearing.
+function openSplitSectorsZones(sectorIds) {
+    const ids = (sectorIds || []).map(String).filter(function (id) { return id; });
+    if (!ids.length) return;
+
+    const list = document.getElementById('splitSectorList');
+    const label = document.getElementById('splitSectorLabel');
+    list.innerHTML = '';
+
+    ids.forEach(function (id) {
+        const info = ZONE_PAGE_SECTORS[id] || {};
+
+        // The route reads one ``sector_ids`` value per selected sector.
+        const idField = document.createElement('input');
+        idField.type = 'hidden';
+        idField.name = 'sector_ids';
+        idField.value = id;
+        list.appendChild(idField);
+
+        const row = document.createElement('div');
+        row.className = 'd-flex align-items-center gap-2 mb-2';
+
+        const name = document.createElement('div');
+        name.className = 'small flex-grow-1';
+        name.style.minWidth = '0';
+        const code = document.createElement('code');
+        code.textContent = info.short || id;
+        name.appendChild(code);
+        name.appendChild(document.createTextNode(' '));
+        const nameText = document.createElement('span');
+        nameText.className = 'text-muted';
+        nameText.textContent = info.en || ('Sector ' + id);
+        name.appendChild(nameText);
+
+        const field = document.createElement('div');
+        field.style.width = '45%';
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.name = 'orientation_deg_' + id;
+        input.className = 'form-control form-control-sm orientation-deg-input';
+        input.min = '0';
+        input.max = '359.9';
+        input.step = '0.1';
+        input.placeholder = 'Auto (from slope)';
+        input.title = '0° = North, clockwise';
+        field.appendChild(input);
+
+        const hint = document.createElement('div');
+        hint.className = 'orientation-deg-hint small text-muted';
+        hint.style.width = '150px';
+
+        row.appendChild(name);
+        row.appendChild(field);
+        row.appendChild(hint);
+        list.appendChild(row);
+
+        bindOrientationHint(input);
+    });
+
+    label.textContent = ids.length === 1
+        ? '1 sector selected / قطاع واحد محدد'
+        : ids.length + ' sectors selected / ' + ids.length + ' قطاعات محددة';
+
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('splitSectorZonesModal')).show();
+}
+
+function openSplitZoneSelected() {
+    const selected = document.querySelectorAll('.zone-checkbox:checked');
+    if (!selected.length) {
+        alert('Select at least one zone first / اختر منطقة واحدة على الأقل أولا');
+        return;
+    }
+    const list = document.getElementById('splitZoneSelectedList');
+    list.innerHTML = '';
+    selected.forEach(cb => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'zone_ids';
+        input.value = cb.value;
+        list.appendChild(input);
+        const label = document.createElement('div');
+        label.textContent = 'Zone ID: ' + cb.value;
+        list.appendChild(label);
+    });
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('splitZoneSelectedModal')).show();
+}
+
+function zoneRenameSelected() {
+    const selected = document.querySelectorAll('.zone-checkbox:checked');
+    if (selected.length !== 1) return;
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('renameZoneModal' + selected[0].value)).show();
+}
+
+function zoneEditSelected() {
+    const selected = document.querySelectorAll('.zone-checkbox:checked');
+    if (selected.length !== 1) return;
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('editZoneModal' + selected[0].value)).show();
+}
+
+function zoneRemoveSelected() {
+    const selected = document.querySelectorAll('.zone-checkbox:checked');
+    if (!selected.length) {
+        alert('Select at least one zone first / اختر منطقة واحدة على الأقل أولا');
+        return;
+    }
+    const namesEn = Array.from(selected).map(cb => cb.dataset.nameEn).filter(Boolean);
+    const namesAr = Array.from(selected).map(cb => cb.dataset.nameAr).filter(Boolean);
+    const nameEn = namesEn.join(', ') || 'zone(s)';
+    const nameAr = namesAr.join('، ') || 'منطقة';
+    const doSubmit = function () {
+        const form = document.getElementById('removeZonesForm');
+        form.querySelectorAll('input[name="zone_ids"]').forEach(el => el.remove());
+        selected.forEach(cb => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'zone_ids';
+            input.value = cb.value;
+            form.appendChild(input);
+        });
+        form.requestSubmit();
+    };
+    if (window.confirmDelete) {
+        window.confirmDelete(nameEn, nameAr, doSubmit);
+    } else if (window.confirm('Delete ' + nameEn + ' ?')) {
+        doSubmit();
+    }
+}
+
 function toggleAllZones(source) {
-    document.querySelectorAll('.zone-checkbox').forEach(cb => cb.checked = source.checked);
+    document.querySelectorAll('.zone-checkbox').forEach(cb => {
+        cb.checked = source.checked;
+        cb.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+}
+
+function filterZonesByName(query) {
+    const q = (query || '').trim().toLowerCase();
+    document.querySelectorAll('.geometry-zones-table tbody tr').forEach(tr => {
+        const isZoneRow = !!tr.querySelector('.zone-checkbox');
+        if (!isZoneRow) {
+            tr.style.display = q ? 'none' : '';
+            return;
+        }
+        tr.style.display = (!q || (tr.dataset.name || '').includes(q)) ? '' : 'none';
+    });
 }
 </script>
 {% endblock %}

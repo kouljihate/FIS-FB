@@ -11,7 +11,7 @@
     <!-- Bootstrap Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
 
-    <!-- Leaflet CSS -->
+<!-- Leaflet CSS -->
     <link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet">
     <link href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" rel="stylesheet">
 
@@ -19,6 +19,10 @@
     <link href="{{ url_for('static', filename='css/app.css') }}" rel="stylesheet">
     <link rel="preload" href="{{ url_for('static', filename='fonts/Comfortaa-Regular.ttf') }}" as="font" type="font/ttf" crossorigin>
     <link rel="preload" href="{{ url_for('static', filename='fonts/VIP-Rawy-Regular.ttf') }}" as="font" type="font/ttf" crossorigin>
+
+    {# Bootstrap's JS bundle is loaded once, at the end of <body>.  Loading a
+       second copy here made every dropdown listen twice and toggle twice per
+       click (open then close), so the Components menu never appeared. #}
 
     {% block extra_head %}{% endblock %}
 </head>
@@ -38,11 +42,28 @@
                     {% if current_user.is_authenticated %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                            <i class="bi bi-person-circle"></i> {{ current_user.username }}
+                            {% if current_user.photo %}
+                            <img src="{{ url_for('auth.uploaded_file', filename=current_user.photo) }}"
+                                 alt="" class="rounded-circle me-1" width="22" height="22"
+                                 style="object-fit: cover;">
+                            {% else %}
+                            <i class="bi bi-person-circle"></i>
+                            {% endif %}
+                            {{ current_user.full_name or current_user.username }}
                         </a>
                         <ul class="dropdown-menu">
+                            <li><span class="dropdown-item-text small text-muted">{{ current_user.profile }}</span></li>
+                            <li><a class="dropdown-item" href="{{ url_for('auth.profile') }}">
+                                <i class="bi bi-person-gear"></i> Profile - الملف الشخصي
+                            </a></li>
+                            {% if current_user.is_admin %}
+                            <li><a class="dropdown-item" href="{{ url_for('auth.users') }}">
+                                <i class="bi bi-people"></i> Users  -  المستخدمون
+                            </a></li>
+                            {% endif %}
+                            <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">
-                                <i class="bi bi-box-arrow-right"></i> Logout / تسجيل الخروج
+                                <i class="bi bi-box-arrow-right"></i> Logout  -  تسجيل الخروج
                             </a></li>
                         </ul>
                     </li>
@@ -57,99 +78,156 @@
     {% set workflow_project_id = request.view_args.get('project_id') if request.view_args else none %}
     {% set workflow_endpoint = request.endpoint or '' %}
     {% if current_user.is_authenticated %}
+    {# Workflow tabs stack their icon above the bilingual label: icon, then
+       English, then Arabic. Every tab keeps the same three-line rhythm so a
+       long label can never push its icon out of view. #}
+    {% macro workflow_tab(label, icon, href, active=false, locked_title='Open a project first') %}
+        {% set label_parts = label.split(' / ', 1) %}
+        {% if href %}
+        <a class="nav-link{% if active %} active{% endif %}" href="{{ href }}" title="{{ label }}">
+        {% else %}
+        <span class="nav-link disabled" aria-disabled="true" title="{{ locked_title }}">
+        {% endif %}
+            <i class="bi {{ icon }} workflow-tab-icon" aria-hidden="true"></i>
+            <span class="workflow-tab-ar" lang="ar" dir="rtl">{{ label_parts[1] }}</span>
+            {% if label_parts|length > 1 %}
+            
+            <span class="workflow-tab-en">{{ label_parts[0] }}</span>
+            {% endif %}
+        {% if href %}</a>{% else %}</span>{% endif %}
+    {% endmacro %}
     <nav class="project-workflow-nav" aria-label="Project workflow">
         <div class="container">
-            <ul class="nav nav-tabs">
+            <ul class="nav nav-tabs{% if current_user.is_admin %} nav-tabs-admin{% endif %}">
+                {% if current_user.is_admin %}
                 <li class="nav-item">
-                    {% if workflow_project_id %}
-                    <a class="nav-link{% if workflow_endpoint == 'project.detail' %} active{% endif %}" href="{{ url_for('project.detail', project_id=workflow_project_id) }}">
-                    {% else %}
-                    <a class="nav-link{% if workflow_endpoint in ['project.index', 'project.create'] %} active{% endif %}" href="{{ url_for('project.index') }}">
-                    {% endif %}
-                        <i class="bi bi-folder"></i> Project / المشروع
-                    </a>
+                    {{ workflow_tab('Users / المستخدمون ', 'bi-people',
+                                    url_for('auth.users'), workflow_endpoint == 'auth.users') }}
+                </li>
+                {% endif %}
+                {# A Project Owner never builds the project: their tabs are Map
+                   Overview, Estimation and Report only. #}
+                {% if current_user.can_edit_projects %}
+                <li class="nav-item">
+                    {{ workflow_tab('Project / المشروع', 'bi-folder',
+                                    url_for('project.detail', project_id=workflow_project_id) if workflow_project_id else url_for('project.index'),
+                                    workflow_endpoint in ['project.detail', 'project.index', 'project.create']) }}
+                </li>
+                {% endif %}
+                {% if current_user.can_edit_projects %}
+                <li class="nav-item">
+                    {{ workflow_tab('Water Resource / الموارد المائية', 'bi-droplet-half',
+                                    url_for('water.well', project_id=workflow_project_id) if workflow_project_id else none,
+                                    workflow_endpoint in ['water.well', 'water.basin', 'water.other']) }}
                 </li>
                 <li class="nav-item">
-                    {% if workflow_project_id %}
-                    <a class="nav-link{% if workflow_endpoint in ['geometry.sectors_view', 'geometry.zones_view'] %} active{% endif %}" href="{{ url_for('geometry.sectors_view', project_id=workflow_project_id) }}">
-                    {% else %}
-                    <span class="nav-link disabled" aria-disabled="true" title="Open a project first">
-                    {% endif %}
-                        <i class="bi bi-bounding-box"></i> Geometry / الهندسة
-                    {% if workflow_project_id %}</a>{% else %}</span>{% endif %}
+                    {{ workflow_tab('Geometry / الهندسة', 'bi-bounding-box',
+                                    url_for('geometry.sectors_view', project_id=workflow_project_id) if workflow_project_id else none,
+                                    workflow_endpoint in ['geometry.sectors_view', 'geometry.zones_view']) }}
                 </li>
                 <li class="nav-item">
-                    {% if workflow_project_id %}
-                    <a class="nav-link{% if workflow_endpoint in ['hydrology.main_pipe', 'hydrology.sub_pipe'] %} active{% endif %}" href="{{ url_for('hydrology.main_pipe', project_id=workflow_project_id) }}">
-                    {% else %}
-                    <span class="nav-link disabled" aria-disabled="true" title="Open a project first">
-                    {% endif %}
-                        <i class="bi bi-water"></i> Hydrology 1 / الري 1
-                    {% if workflow_project_id %}</a>{% else %}</span>{% endif %}
+                    {{ workflow_tab('Pipes / الأنابيب', 'bi-droplet-fill',
+                                    url_for('hydrology.main_pipe', project_id=workflow_project_id) if workflow_project_id else none,
+                                    workflow_endpoint in ['hydrology.main_pipe', 'hydrology.second_pipe', 'hydrology.sub_pipe', 'hydrology.dripline']) }}
                 </li>
                 <li class="nav-item">
-                    {% if workflow_project_id %}
-                    <a class="nav-link{% if workflow_endpoint in ['trees.rows_view', 'trees.trees_view'] %} active{% endif %}" href="{{ url_for('trees.rows_view', project_id=workflow_project_id) }}">
-                    {% else %}
-                    <span class="nav-link disabled" aria-disabled="true" title="Open a project first">
-                    {% endif %}
-                        <i class="bi bi-tree"></i> Trees / الأشجار
-                    {% if workflow_project_id %}</a>{% else %}</span>{% endif %}
+                    {{ workflow_tab('Trees / الأشجار', 'bi-tree',
+                                    url_for('trees.rows_view', project_id=workflow_project_id) if workflow_project_id else none,
+                                    workflow_endpoint in ['trees.rows_view', 'trees.trees_view']) }}
                 </li>
                 <li class="nav-item">
-                    {% if workflow_project_id %}
-                    <a class="nav-link{% if workflow_endpoint in ['hydrology.valves', 'hydrology.dripline', 'hydrology.network_elements'] %} active{% endif %}" href="{{ url_for('hydrology.valves', project_id=workflow_project_id) }}">
-                    {% else %}
-                    <span class="nav-link disabled" aria-disabled="true" title="Open a project first">
-                    {% endif %}
-                        <i class="bi bi-diagram-2"></i> Hydrology 2 / الري 2
-                    {% if workflow_project_id %}</a>{% else %}</span>{% endif %}
+                    {{ workflow_tab('Components / المكونات', 'bi-gear',
+                                    url_for('components.valves', project_id=workflow_project_id) if workflow_project_id else none,
+                                    workflow_endpoint in ['components.valves', 'components.connectors', 'components.reductors', 'components.air_removal', 'components.pressure_reduction', 'components.terminators']) }}
+                </li>
+                {% endif %}
+                <li class="nav-item">
+                    {{ workflow_tab('Map Overview / نظرة عامة', 'bi-map',
+                                    url_for('overview.index', project_id=workflow_project_id) if workflow_project_id else none,
+                                    workflow_endpoint == 'overview.index') }}
+                </li>
+                {% if current_user.can_edit_projects %}
+                <li class="nav-item">
+                    {{ workflow_tab('Validation / التحقق', 'bi-clipboard-check',
+                                    url_for('engineering.validation_view', project_id=workflow_project_id) if workflow_project_id else none,
+                                    workflow_endpoint == 'engineering.validation_view') }}
+                </li>
+                {% endif %}
+                <li class="nav-item">
+                    {{ workflow_tab('Estimation / التقدير', 'bi-calculator',
+                                    url_for('estimation.quote_view', project_id=workflow_project_id) if workflow_project_id else none,
+                                    workflow_endpoint in ['estimation.quote_view', 'estimation.quote_save', 'estimation.roi_view', 'estimation.roi_save']) }}
                 </li>
                 <li class="nav-item">
-                    {% if workflow_project_id %}
-                    <a class="nav-link{% if workflow_endpoint == 'engineering.validation_view' %} active{% endif %}" href="{{ url_for('engineering.validation_view', project_id=workflow_project_id) }}">
-                    {% else %}
-                    <span class="nav-link disabled" aria-disabled="true" title="Open a project first">
-                    {% endif %}
-                        <i class="bi bi-clipboard-check"></i> Report / التقرير
-                    {% if workflow_project_id %}</a>{% else %}</span>{% endif %}
+                    {{ workflow_tab('Report / التقرير', 'bi-file-earmark-bar-graph',
+                                    url_for('report.dpa_view', project_id=workflow_project_id) if workflow_project_id else none,
+                                    workflow_endpoint in ['report.dpa_view', 'report.dpa_print', 'report.dpa_settings', 'engineering.report_view', 'engineering.technical_report_view']) }}
                 </li>
             </ul>
         </div>
     </nav>
         {% if workflow_project_id %}
         {% set workflow_subnav = [] %}
-        {% if workflow_endpoint in ['geometry.sectors_view', 'geometry.zones_view'] %}
+        {% if workflow_endpoint in ['water.well', 'water.basin', 'water.other'] %}
             {% set workflow_subnav = [
-                ('geometry.sectors_view', url_for('geometry.sectors_view', project_id=workflow_project_id), 'Sectors / القطاعات', 'bi-bounding-box'),
-                ('geometry.zones_view', url_for('geometry.zones_view', project_id=workflow_project_id), 'Zones / المناطق', 'bi-grid')
+                ('water.well', url_for('water.well', project_id=workflow_project_id), 'Well / بئر', 'bi-droplet', False),
+                ('water.basin', url_for('water.basin', project_id=workflow_project_id), 'Basin / حوض', 'bi-water', False),
+                ('water.other', url_for('water.other', project_id=workflow_project_id), 'Other / أخرى', 'bi-boxes', False)
             ] %}
-        {% elif workflow_endpoint in ['hydrology.main_pipe', 'hydrology.sub_pipe'] %}
+        {% elif workflow_endpoint in ['geometry.sectors_view', 'geometry.zones_view'] %}
             {% set workflow_subnav = [
-                ('hydrology.main_pipe', url_for('hydrology.main_pipe', project_id=workflow_project_id), 'Main Pipe / الأنبوب الرئيسي', 'bi-water'),
-                ('hydrology.sub_pipe', url_for('hydrology.sub_pipe', project_id=workflow_project_id), 'Sub Pipe / الأنبوب الفرعي', 'bi-droplet')
+                ('geometry.sectors_view', url_for('geometry.sectors_view', project_id=workflow_project_id), 'Sectors / القطاعات', 'bi-bounding-box', False),
+                ('geometry.zones_view', url_for('geometry.zones_view', project_id=workflow_project_id), 'Zones / المناطق', 'bi-grid', False)
+            ] %}
+        {% elif workflow_endpoint in ['hydrology.main_pipe', 'hydrology.second_pipe', 'hydrology.sub_pipe', 'hydrology.dripline'] %}
+            {# Rule DL-1: one drip line per tree row. The stage is disabled until
+               the Rows tab has been validated for the whole project. #}
+            {% set dripline_url = url_for('hydrology.dripline', project_id=workflow_project_id) if workflow_rows_validated else none %}
+            {% set workflow_subnav = [
+                ('hydrology.main_pipe', url_for('hydrology.main_pipe', project_id=workflow_project_id), 'Main Pipe (MP) / الأنبوب الرئيسي', 'bi-water', False),
+                ('hydrology.second_pipe', url_for('hydrology.second_pipe', project_id=workflow_project_id), 'Second Pipe (SP) / الأنبوب الثانوي', 'bi-signpost-split', False),
+                ('hydrology.sub_pipe', url_for('hydrology.sub_pipe', project_id=workflow_project_id), 'Zone Pipe (ZP) / أنابيب المناطق', 'bi-droplet', False),
+                ('hydrology.dripline', dripline_url, 'DripLine (DL) / خطوط التنقيط', 'bi-droplet-half', False)
             ] %}
         {% elif workflow_endpoint in ['trees.rows_view', 'trees.trees_view'] %}
             {% set workflow_subnav = [
-                ('trees.rows_view', url_for('trees.rows_view', project_id=workflow_project_id), 'Rows / الصفوف', 'bi-list-ol'),
-                ('trees.trees_view', url_for('trees.trees_view', project_id=workflow_project_id), 'Trees / الأشجار', 'bi-tree')
+                ('trees.rows_view', url_for('trees.rows_view', project_id=workflow_project_id), 'Rows / الصفوف', 'bi-list-ol', False),
+                ('trees.trees_view', url_for('trees.trees_view', project_id=workflow_project_id), 'Trees / الأشجار', 'bi-tree', False)
             ] %}
-        {% elif workflow_endpoint in ['hydrology.valves', 'hydrology.dripline', 'hydrology.network_elements'] %}
+        {% elif workflow_endpoint in ['estimation.quote_view', 'estimation.quote_save', 'estimation.roi_view', 'estimation.roi_save'] %}
             {% set workflow_subnav = [
-                ('hydrology.valves', url_for('hydrology.valves', project_id=workflow_project_id), 'Valves / الصمامات', 'bi-valve'),
-                ('hydrology.dripline', url_for('hydrology.dripline', project_id=workflow_project_id), 'Dripline / خط التنقيط', 'bi-droplet-half'),
-                ('hydrology.network_elements', url_for('hydrology.network_elements', project_id=workflow_project_id), 'Network / الشبكة', 'bi-diagram-2')
+                ('estimation.quote_view', url_for('estimation.quote_view', project_id=workflow_project_id), 'Pricing / التسعير', 'bi-calculator', False),
+                ('estimation.roi_view', url_for('estimation.roi_view', project_id=workflow_project_id), 'ROI / العائد', 'bi-graph-up-arrow', False),
+                (None, None, 'Result / النتيجة', 'bi-file-earmark-bar-graph', True)
+            ] %}
+        {% elif workflow_endpoint in ['components.valves', 'components.connectors', 'components.reductors', 'components.air_removal', 'components.pressure_reduction', 'components.terminators'] %}
+            {% set workflow_subnav = [
+                ('components.valves', url_for('components.valves', project_id=workflow_project_id), 'Valves / الصمامات', 'bi-valve', False),
+                ('components.connectors', url_for('components.connectors', project_id=workflow_project_id), 'Connectors / الوصلات', 'bi-link-45deg', False),
+                ('components.reductors', url_for('components.reductors', project_id=workflow_project_id), 'Reductors / المخفضات', 'bi-arrow-left-right', False),
+                ('components.air_removal', url_for('components.air_removal', project_id=workflow_project_id), 'Air Removal / إزالة الهواء', 'bi-wind', False),
+                ('components.pressure_reduction', url_for('components.pressure_reduction', project_id=workflow_project_id), 'Reduce Pressure / خفض الضغط', 'bi-arrow-down-circle', False),
+                ('components.terminators', url_for('components.terminators', project_id=workflow_project_id), 'Terminators / النهايات', 'bi-stop-circle', False)
+            ] %}
+        {% elif workflow_endpoint == 'engineering.validation_view' %}
+            {% set workflow_subnav = [
+                (None, None, 'Charts / الرسوم البيانية', 'bi-bar-chart', True),
+                ('engineering.validation_view', url_for('engineering.validation_view', project_id=workflow_project_id), 'Standard / قياسي', 'bi-clipboard-check', False)
+            ] %}
+        {% elif workflow_endpoint in ['report.dpa_view', 'report.dpa_settings'] %}
+            {# The DPA sub-tab holds the printable report and the button that generates it. #}
+            {% set workflow_subnav = [
+                ('report.dpa_view', url_for('report.dpa_view', project_id=workflow_project_id), 'DPA / التقرير الفني', 'bi-file-earmark-bar-graph', False)
             ] %}
         {% endif %}
         {% if workflow_subnav %}
-    <nav class="project-workflow-subnav{% if workflow_endpoint in ['geometry.sectors_view', 'geometry.zones_view'] %} project-workflow-subnav-geometry{% endif %}" aria-label="Project section">
+    <nav class="project-workflow-subnav project-workflow-subnav-centered" aria-label="Project section">
         <div class="container">
             <ul class="nav nav-pills">
-                {% for sub_endpoint, sub_url, sub_label, sub_icon in workflow_subnav %}
+                {% for sub_endpoint, sub_url, sub_label, sub_icon, sub_soon in workflow_subnav %}
                 <li class="nav-item">
-                    <a class="nav-link{% if workflow_endpoint == sub_endpoint %} active{% endif %}" href="{{ sub_url }}">
-                        <i class="bi {{ sub_icon }}"></i> {{ sub_label }}
-                    </a>
+                    {{ workflow_tab(sub_label, sub_icon, sub_url, workflow_endpoint == sub_endpoint,
+                                    'Validate the tree rows first / تحقق من صفوف الأشجار أولا' if sub_endpoint == 'hydrology.dripline' else ('Coming Soon' if sub_soon else 'Open a project first')) }}
                 </li>
                 {% endfor %}
             </ul>
@@ -161,7 +239,7 @@
 
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-        <div class="toast-container position-fixed top-0 end-0 p-3 flash-toast-container" aria-live="assertive" aria-atomic="true">
+        <div class="toast-container position-fixed bottom-0 end-0 p-3 flash-toast-container" aria-live="assertive" aria-atomic="true">
             {% for category, message in messages %}
                 {% set toast_variant = 'danger' if category in ['error', 'danger'] else category %}
                 {% if toast_variant not in ['success', 'info', 'warning', 'danger'] %}
@@ -186,11 +264,47 @@
     <!-- Fixed Footer -->
     <footer>
         <div class="container">
-            <span class="en-text">Irrigation Planning System</span>
-            <span class="ar-text"> | نظام تخطيط الري</span>
-            &copy; 2026
+            <div class="row align-items-center g-0">
+                <div class="col-4 text-start">
+                    <span class="en-text">Irrigation Planning System</span>
+                    <span class="ar-text"> | نظام تخطيط الري</span>
+                </div>
+                <div class="col-4 text-center">
+                    koul &copy;2026
+                </div>
+                <div class="col-4 text-end">
+                    <span class="footer-badges">
+                        <span class="badge version-badge repo-badge"><i class="bi bi-git"></i> {{ app_repo }}</span>
+                        <span class="badge version-badge">v{{ app_version }}</span>
+                        <span class="badge version-badge db-badge {{ 'db-ready' if db_ready else 'db-down' }}"
+                              title="Database / قاعدة البيانات: {{ 'Ready' if db_ready else 'Not ready' }}">
+                            <i class="bi bi-circle-fill db-status-icon"></i> {{ 'Ready' if db_ready else 'Not' }}
+                        </span>
+                        {% if ui_page %}
+                        <span class="badge version-badge page-id-badge" id="pageIdBadge"
+                              role="button" tabindex="0"
+                              title="{{ ui_page.id }} · {{ ui_page.name }}"
+                              data-page-key="{{ ui_page.key }}"
+                              data-page-name="{{ ui_page.name }}"
+                              data-page-description="{{ ui_page.description }}"
+                              data-page-templates="{{ ui_page.templates | join(', ') }}"
+                              aria-label="Page {{ ui_page.id }} information / معلومات الصفحة">
+                            <i class="bi bi-hash"></i> {{ ui_page.id }}
+                        </span>
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
         </div>
     </footer>
+
+    <div id="globalLoadingOverlay" class="global-loading-overlay" aria-hidden="true" aria-live="polite">
+        <div class="global-loading-box">
+            <img src="{{ url_for('static', filename='img/loading.gif') }}" alt="Working.... / جارٍ العمل" class="global-loading-gif">
+            <span class="global-loading-text"> جارٍ العمل</span>
+            <span class="global-loading-text">Working.... </span>
+        </div>
+    </div>
 
     <div class="modal fade" id="confirmActionModal" tabindex="-1" aria-labelledby="confirmActionTitle" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
@@ -208,8 +322,89 @@
         </div>
     </div>
 
+    <!-- Delete confirmation modal (styled) -->
+    <div class="modal fade" id="confirmDeleteModal" tabindex="-1" aria-labelledby="confirmDeleteTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header confirm-delete-header">
+                    <div class="row w-100 m-0 g-0 align-items-center">
+                        <div class="col-6 confirm-delete-icon-col">
+                            <i class="bi bi-exclamation-triangle-fill"></i>
+                        </div>
+                        <div class="col-6 confirm-delete-title-ar">
+                            <h5 class="modal-title" id="confirmDeleteTitle">تأكيد الحذف</h5>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-body confirm-delete-body">
+                    <p class="mb-2 confirm-delete-en" id="confirmDeleteMessageEn"></p>
+                    <p class="mb-0 confirm-delete-ar" id="confirmDeleteMessageAr"></p>
+                </div>
+                <div class="modal-footer confirm-delete-footer">
+                    <button type="button" class="btn confirm-delete-btn" id="confirmDeleteAccept">Confirm / تأكيد</button>
+                    <button type="button" class="btn confirm-delete-btn" data-bs-dismiss="modal">Cancel / إلغاء</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        (() => {
+            const overlay = document.getElementById('globalLoadingOverlay');
+            if (!overlay) return;
+
+            let isShowing = false;
+
+            function showLoader() {
+                if (isShowing) return;
+                isShowing = true;
+                overlay.classList.add('is-visible');
+                overlay.setAttribute('aria-hidden', 'false');
+            }
+
+            function hideLoader() {
+                if (!isShowing) return;
+                isShowing = false;
+                overlay.classList.remove('is-visible');
+                overlay.setAttribute('aria-hidden', 'true');
+            }
+
+            // Show the spinner for real navigation (anchor clicks).
+            document.addEventListener('click', (event) => {
+                const link = event.target.closest('a[href]');
+                if (!link) return;
+                if (link.dataset.noLoader !== undefined) return;
+                if (link.hasAttribute('data-confirm')) return;
+                if (link.hasAttribute('data-bs-toggle') || link.hasAttribute('data-bs-dismiss')) return;
+
+                const href = link.getAttribute('href') || '';
+                if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+                if (link.target && link.target !== '_self') return;
+                if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+
+                showLoader();
+            }, true);
+
+            // Show the spinner for real form submissions. Buttons guarded by a
+            // confirmation modal preventDefault on click, so this only runs after
+            // the user confirms. Forms with data-confirm are checked below.
+            document.addEventListener('submit', (event) => {
+                const form = event.target;
+                if (!(form instanceof HTMLFormElement)) return;
+                if (form.dataset.confirm && form.dataset.confirmed !== 'true') return;
+                if (form.dataset.confirmDelete && form.dataset.confirmed !== 'true') return;
+                if (form.dataset.noLoader !== undefined) return;
+                showLoader();
+            }, true);
+
+            // Keep the spinner visible during navigation. Only clear it when a
+            // page is restored from the back-forward cache (pageshow), otherwise
+            // it is torn down with the page and the new page starts clean.
+            window.addEventListener('pageshow', hideLoader);
+        })();
+    </script>
     <script>
         document.querySelectorAll('.flash-toast').forEach((toastElement) => {
             bootstrap.Toast.getOrCreateInstance(toastElement, { autohide: true, delay: 5000 }).show();
@@ -228,6 +423,9 @@
                 pendingAction = action;
                 modal.show();
             }
+
+            // Public API: confirmAction(message, onConfirm)
+            window.confirmAction = askForConfirmation;
 
             document.addEventListener('submit', (event) => {
                 const form = event.target;
@@ -278,6 +476,107 @@
             });
         })();
     </script>
+    <script>
+        (() => {
+            const modalElement = document.getElementById('confirmDeleteModal');
+            if (!modalElement) return;
+            const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
+            const messageEn = document.getElementById('confirmDeleteMessageEn');
+            const messageAr = document.getElementById('confirmDeleteMessageAr');
+            const acceptButton = document.getElementById('confirmDeleteAccept');
+            let pendingAction = null;
+
+            function setMessage(element, prefix, name, suffix) {
+                element.textContent = '';
+                element.append(document.createTextNode(prefix));
+                const strong = document.createElement('strong');
+                strong.textContent = name;
+                element.append(strong, document.createTextNode(suffix));
+            }
+
+            function askForDelete(nameEn, nameAr, action) {
+                const en = (nameEn == null ? '' : String(nameEn)).trim() || 'this element';
+                const ar = (nameAr == null ? '' : String(nameAr)).trim() || en;
+                setMessage(messageEn, 'Are you sure, you want to Delete ', en, ' ?');
+                setMessage(messageAr, 'هل أنت متأكد أنك تريد حذف ', ar, ' ؟');
+                pendingAction = action;
+                modal.show();
+            }
+
+            // Public API: confirmDelete(nameEn, nameAr, onConfirm)
+            window.confirmDelete = askForDelete;
+
+            document.addEventListener('submit', (event) => {
+                const form = event.target;
+                if (!(form instanceof HTMLFormElement) || !form.dataset.confirmDelete) return;
+                if (form.dataset.confirmed === 'true') {
+                    delete form.dataset.confirmed;
+                    return;
+                }
+                event.preventDefault();
+                askForDelete(form.dataset.confirmDelete, form.dataset.confirmDeleteAr, () => {
+                    form.dataset.confirmed = 'true';
+                    form.requestSubmit();
+                });
+            }, true);
+
+            document.addEventListener('click', (event) => {
+                const trigger = event.target.closest('[data-confirm-delete]');
+                if (!trigger || trigger instanceof HTMLFormElement) return;
+                if (trigger.matches('button[type="submit"], input[type="submit"]') && trigger.form) {
+                    event.preventDefault();
+                    askForDelete(trigger.dataset.confirmDelete, trigger.dataset.confirmDeleteAr,
+                                 () => trigger.form.requestSubmit(trigger));
+                }
+            }, true);
+
+            acceptButton.addEventListener('click', () => {
+                const action = pendingAction;
+                pendingAction = null;
+                modal.hide();
+                if (action) action();
+            });
+
+            modalElement.addEventListener('hidden.bs.modal', () => {
+                pendingAction = null;
+            });
+        })();
+    </script>
+
+    <!-- Page id badge in the footer: toggles the ui_registry popover -->
+    <script>
+        (() => {
+            const badge = document.getElementById('pageIdBadge');
+            if (!badge || !window.bootstrap) return;
+
+            const escape = (value) => String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+
+            const data = badge.dataset;
+            const rows = [
+                ['Key / المفتاح', data.pageKey],
+                ['Name / الاسم', data.pageName],
+                ['Description / الوصف', data.pageDescription],
+                ['Templates / القوالب', data.pageTemplates],
+            ];
+            const content = rows.map(([label, value]) =>
+                '<div class="page-id-popover-row">' +
+                '<span class="page-id-popover-label">' + escape(label) + '</span>' +
+                '<span class="page-id-popover-value">' + escape(value) + '</span>' +
+                '</div>').join('');
+
+            new bootstrap.Popover(badge, {
+                html: true,
+                trigger: 'click',
+                placement: 'top',
+                content: content,
+            });
+        })();
+    </script>
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -285,6 +584,10 @@
 
     <!-- App JS -->
     <script src="{{ url_for('static', filename='js/map.js') }}"></script>
+
+    {# Voice assistant: floats over every project page and answers from the
+       project it belongs to. Pages without a project render nothing. #}
+    {% include "shared/_voice_assistant.html" %}
 
     {% block extra_js %}{% endblock %}
     <script>

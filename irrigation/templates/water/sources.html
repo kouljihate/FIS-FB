@@ -1,0 +1,500 @@
+{% extends "base.html" %}
+{% block title %}{{ tab.en }} / {{ tab.ar }}{% endblock %}
+
+{% block content %}
+{#- Type-specific attributes: every kind's group is rendered and the one that
+    matches the selected type is shown.  Inputs post as "<kind>_<key>" and the
+    hidden groups are disabled, so only the live type's values are submitted. -#}
+{% macro attribute_groups(selected, source) %}
+{% for kind, label, group_fields in kind_fields %}
+{% if group_fields %}
+<div class="col-12 source-attributes" data-attr-kind="{{ kind }}"{% if kind != selected %} hidden{% endif %}>
+    <div class="row g-2">
+        {% for field in group_fields %}
+        {% if field.kind == 'polygon' %}
+        {% set ring = (source.get('polygon') if source else none) or [] %}
+        <div class="col-12">
+            <label class="form-label">{{ field.en }} / {{ field.ar }}</label>
+            <textarea name="{{ kind }}_{{ field.key }}" rows="3"
+                      class="form-control latin-number source-polygon"
+                      placeholder="{{ field.hint }}">{% if ring %}{{ ring|tojson }}{% endif %}</textarea>
+        </div>
+        {% else %}
+        {% set value = source.get(field.key) if source else none %}
+        <div class="col-md-4">
+            <label class="form-label">{{ field.en }} / {{ field.ar }}</label>
+            <input type="number" step="{{ field.step }}" min="0"
+                   name="{{ kind }}_{{ field.key }}" class="form-control latin-number"
+                   value="{{ value if value is not none else '' }}">
+        </div>
+        {% endif %}
+        {% endfor %}
+        <div class="col-12">
+            <p class="text-muted small mb-0 source-estimate"></p>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endfor %}
+{% endmacro %}
+
+{# Same page layout as Sectors: header, project context, table card with a
+   circle-button toolbar, per-row modals, then the map editor. #}
+<div class="wf-page-header mb-3">
+    <h2 class="wf-title-en">{{ tab.en }}</h2>
+    <i class="bi {{ tab.icon }} wf-icon" aria-hidden="true"></i>
+    <h2 class="wf-title-ar" lang="ar">{{ tab.ar }}</h2>
+</div>
+
+<!-- Project context -->
+<div class="mb-3">
+    <span class="badge bg-primary"><i class="bi bi-folder"></i> {{ project.name }}</span>
+    <span class="badge bg-info">Status: {{ project.status }}</span>
+</div>
+
+<!-- Water sources table -->
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        {% set n_cols = 9 + columns|length %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th colspan="{{ n_cols }}" class="text-center" style="width: 100%; min-width: 1200px;">
+                            <button class="btn btn-circle btn-sm btn-success" data-bs-toggle="modal"
+                                    data-bs-target="#addSourceModal" title="Add / إضافة">
+                                <i class="bi bi-plus-circle"></i>
+                            </button>
+                            <form method="POST" id="removeSourcesForm"
+                                  action="{{ url_for('water.source_remove', project_id=project.id, tab=tab.key) }}"
+                                  class="d-inline">
+                                <button class="btn btn-circle btn-sm btn-outline-danger" type="button"
+                                        onclick="removeSelectedSources()" title="Remove / إزالة">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                            <form method="POST"
+                                  action="{{ url_for('water.source_validate', project_id=project.id, tab=tab.key) }}"
+                                  class="d-inline">
+                                <button type="submit" class="btn btn-circle btn-sm btn-primary"
+                                        title="Validate: position inside the land boundary / تحقق: الموقع داخل حدود الأرض">
+                                    <i class="bi bi-check-circle"></i>
+                                </button>
+                            </form>
+                        </th>
+                    </tr>
+                    <tr>
+                        <th width="40" style="vertical-align: middle;"><input type="checkbox" id="selectAll" onclick="toggleAll(this)"></th>
+                        <th style="text-align: center; vertical-align: middle;">ID</th>
+                        <th style="text-align: center; vertical-align: middle;" aria-label="Name ar top / Name en bottom"><span class="ar-text">الاسم</span><br>Name</th>
+                        <th style="text-align: center; vertical-align: middle;" aria-label="Valid ar top / Valid en top"><span class="ar-text">مثبت</span><br>Valid</th>
+                        <th style="text-align: center; vertical-align: middle;" aria-label="Type ar top / Type en top"><span class="ar-text">النوع</span><br>Type</th>
+                        {% for col in columns %}
+                        <th style="text-align: center; vertical-align: middle;" aria-label="{{ col.en }}"><span class="ar-text">{{ col.ar }}</span><br>{{ col.en }}</th>
+                        {% endfor %}
+                        <th style="text-align: center; vertical-align: middle;" aria-label="Flow ar top / Flow en top"><span class="ar-text">التدفق</span><br>Flow (L/min)</th>
+                        <th style="text-align: center; vertical-align: middle;" aria-label="Latitude ar top / Latitude en top"><span class="ar-text">خط العرض</span><br>Latitude</th>
+                        <th style="text-align: center; vertical-align: middle;" aria-label="Longitude ar top / Longitude en top"><span class="ar-text">خط الطول</span><br>Longitude</th>
+                        <th style="text-align: center; vertical-align: middle;" aria-label="Actions ar top / Actions en top"><span class="ar-text">إجراءات</span><br>Actions</th>
+                    </tr>
+                </thead>
+                <tfoot class="table-light">
+                    <tr>
+                        <th colspan="{{ n_cols }}" class="text-center">
+                            Total {{ tab.en }} sources: {{ sources|length }} / إجمالي {{ tab.ar }}: {{ sources|length }}
+                        </th>
+                    </tr>
+                </tfoot>
+                <tbody>
+                    {% for s in sources %}
+                    {% set meta = kinds.get(s.type, ('Other', 'أخرى', 'dark', 'bi-question-circle')) %}
+                    <tr class="align-middle">
+                        <td><input type="checkbox" class="source-checkbox" value="{{ s.id }}"
+                                   data-name-en="{{ s.name or '' }}" data-name-ar="{{ s.name_ar or '' }}"></td>
+                        <td>{{ s.id }}</td>
+                        <td>
+                            {{ s.name or '—' }}
+                            {% if s.name_ar %}<span class="ar-text text-muted"> / {{ s.name_ar }}</span>{% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if s.validated %}
+                            <span class="badge bg-success"><i class="bi bi-check"></i></span>
+                            {% else %}
+                            <span class="badge bg-warning"><i class="bi bi-clock"></i></span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-{{ meta[2] }}{% if meta[2] == 'warning' %} text-dark{% endif %}">
+                                <i class="bi {{ meta[3] }}"></i> {{ meta[0] }} / {{ meta[1] }}
+                            </span>
+                        </td>
+                        {% for cell in s.cells %}
+                        <td class="text-center latin-number">{{ cell }}</td>
+                        {% endfor %}
+                        {#- A source may come from a KML import or from the project
+                            settings, where flow and position can be absent: the
+                            three cells must render "—" instead of raising. -#}
+                        <td class="text-center">
+                            {% if s.get('flow_lpm') is not none %}{{ '{:,.1f}'.format(s['flow_lpm']|float) }}{% else %}<span class="text-muted">&mdash;</span>{% endif %}
+                        </td>
+                        <td class="text-center latin-number">
+                            {% if s.get('lat') is not none %}{{ '{:.6f}'.format(s['lat']|float) }}{% else %}<span class="text-muted">&mdash;</span>{% endif %}
+                        </td>
+                        <td class="text-center latin-number">
+                            {% if s.get('lng') is not none %}{{ '{:.6f}'.format(s['lng']|float) }}{% else %}<span class="text-muted">&mdash;</span>{% endif %}
+                        </td>
+                        <td class="text-center">
+                            <button class="btn btn-circle btn-sm btn-primary" data-bs-toggle="modal"
+                                    data-bs-target="#editSourceModal{{ s.id }}" title="Edit / تعديل">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-circle btn-sm btn-info" data-bs-toggle="modal"
+                                    data-bs-target="#renameSourceModal{{ s.id }}" title="Rename / إعادة تسمية">
+                                <i class="bi bi-input-cursor-text"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="{{ n_cols }}" class="text-center text-muted py-4">
+                            No {{ tab.en }} source yet / لا يوجد {{ tab.ar }} بعد
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Per-row modals: kept outside the table so the browser never re-parents
+     them away from their forms. -->
+{% for s in sources %}
+<div class="modal fade" id="editSourceModal{{ s.id }}" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content modal-green">
+            <form method="POST"
+                  action="{{ url_for('water.source_edit', project_id=project.id, tab=tab.key, source_id=s.id) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-pencil"></i> Edit {{ tab.en }} / تعديل</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-2">
+                        <div class="col-md-4">
+                            <label class="form-label">Type / النوع</label>
+                            <select name="type" class="form-select" onchange="syncSourceAttributes(this)">
+                                {% for value, label in kind_options %}
+                                <option value="{{ value }}"{% if s.type == value %} selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Name (EN) / الاسم</label>
+                            <input type="text" name="name" class="form-control" value="{{ s.name or '' }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Name (AR) / الاسم</label>
+                            <input type="text" name="name_ar" class="form-control" lang="ar" value="{{ s.name_ar or '' }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Latitude / خط العرض</label>
+                            <input type="number" step="any" name="lat" class="form-control latin-number"
+                                   value="{{ s.lat if s.lat is not none else '' }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Longitude / خط الطول</label>
+                            <input type="number" step="any" name="lng" class="form-control latin-number"
+                                   value="{{ s.lng if s.lng is not none else '' }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Flow (L/min) / التدفق</label>
+                            <input type="number" step="0.1" min="0" name="flow_lpm" class="form-control"
+                                   value="{{ s.flow_lpm if s.flow_lpm is not none else '' }}">
+                        </div>
+                        {{ attribute_groups(s.type, s) }}
+                        <div class="col-12">
+                            <label class="form-label">Notes / ملاحظات</label>
+                            <input type="text" name="notes" class="form-control" value="{{ s.notes or '' }}">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close / إغلاق</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check"></i> Save / حفظ</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="renameSourceModal{{ s.id }}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content modal-green">
+            <form method="POST"
+                  action="{{ url_for('water.source_rename', project_id=project.id, tab=tab.key, source_id=s.id) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-input-cursor-text"></i> Rename / إعادة تسمية</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Name (EN) / الاسم</label>
+                        <input type="text" name="name" class="form-control" value="{{ s.name or '' }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Name (AR) / الاسم</label>
+                        <input type="text" name="name_ar" class="form-control" lang="ar" value="{{ s.name_ar or '' }}">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close / إغلاق</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check"></i> Save / حفظ</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<!-- Map -->
+<div class="card shadow-sm mt-4 geometry-map-card">
+    {% set map_title_en = "Map Editor - " ~ tab.en %}{% set map_title_ar = "محرر الخريطة - " ~ tab.ar %}
+    {% include "_map_header.html" %}
+    <div class="card-body">
+        <div id="map"></div>
+    </div>
+</div>
+
+<!-- Add source modal -->
+<div class="modal fade" id="addSourceModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content modal-green">
+            <form method="POST" action="{{ url_for('water.source_add', project_id=project.id, tab=tab.key) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Add {{ tab.en }} / إضافة {{ tab.ar }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-2">
+                        <div class="col-md-4">
+                            <label class="form-label">Type / النوع</label>
+                            <select name="type" id="addSourceType" class="form-select"
+                                    onchange="syncSourceAttributes(this)">
+                                {% for value, label in tab.types %}
+                                <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Name (EN) / الاسم</label>
+                            <input type="text" name="name" class="form-control" placeholder="{{ tab.en }} 1">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Name (AR) / الاسم</label>
+                            <input type="text" name="name_ar" class="form-control" lang="ar" placeholder="{{ tab.ar }} 1">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Latitude / خط العرض</label>
+                            <input type="number" step="any" name="lat" id="addSourceLat"
+                                   class="form-control latin-number" placeholder="34.020000">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Longitude / خط الطول</label>
+                            <input type="number" step="any" name="lng" id="addSourceLng"
+                                   class="form-control latin-number" placeholder="-6.000000">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Flow (L/min) / التدفق</label>
+                            <input type="number" step="0.1" min="0" name="flow_lpm" class="form-control">
+                        </div>
+                        {{ attribute_groups(tab.types[0][0], none) }}
+                        <div class="col-12">
+                            <label class="form-label">Notes / ملاحظات</label>
+                            <input type="text" name="notes" class="form-control">
+                        </div>
+                    </div>
+                    <p class="text-muted small mb-0 mt-3">
+                        Place the marker tool on the map to fill the coordinates, or type them here. /
+                        ضع علامة على الخريطة لتعبئة الإحداثيات أو أدخلها هنا.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel / إلغاء</button>
+                    <button type="submit" class="btn btn-success"><i class="bi bi-plus-circle"></i> Add / إضافة</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const geojsonUrl = '{{ url_for("api.get_geometry", project_id=project.id) }}';
+    initMap('map', geojsonUrl + '?types=boundary,water_source', {
+        center: {{ map_center|tojson }},
+        zoom: {{ map_zoom }},
+        editor: true,
+        drawTypes: {{ tab.draw|tojson }},
+        ruler: true,
+        showArea: true,
+        mapFilters: ['boundary', 'water_source'],
+        // Drawing on the map fills the Add form instead of saving an unnamed
+        // feature: the table is the only place a source is stored.
+        onDrawCreated: function(layer, layerType) {
+            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addSourceModal'));
+            if (layerType === 'polygon') {
+                fillSourcePolygon(layer);
+                modal.show();
+                return;
+            }
+            if (layerType !== 'marker') return;
+            const position = layer.getLatLng();
+            document.getElementById('addSourceLat').value = position.lat.toFixed(6);
+            document.getElementById('addSourceLng').value = position.lng.toFixed(6);
+            modal.show();
+        },
+        elevationHeatmap: {
+            url: '{{ url_for("engineering.elevation_heatmap", project_id=project.id) }}',
+            ramp: 'blue-red'
+        }
+    });
+});
+
+// ---------- Type-specific attributes ----------
+// Show only the group of the selected type and disable the others, so their
+// "<kind>_<key>" inputs are not posted.
+function syncSourceAttributes(select) {
+    const form = select.closest('form');
+    if (!form) return;
+    form.querySelectorAll('[data-attr-kind]').forEach(function(group) {
+        const on = group.dataset.attrKind === select.value;
+        group.hidden = !on;
+        group.querySelectorAll('input, textarea').forEach(function(el) {
+            el.disabled = !on;
+        });
+    });
+    updateSourceEstimate(form);
+}
+
+function sourceAttrNumber(group, key) {
+    const el = group.querySelector('[name$="' + key + '"]');
+    if (!el || !el.value.trim()) return null;
+    const value = parseFloat(el.value.replace(',', '.'));
+    return isNaN(value) ? null : value;
+}
+
+// Ring area in m² (same spherical approximation as the map's area readout).
+function polygonRingAreaM2(text) {
+    let ring;
+    try { ring = JSON.parse(text); } catch (err) { return null; }
+    if (!Array.isArray(ring) || ring.length < 3) return null;
+    const d2r = Math.PI / 180;
+    let area = 0;
+    for (let i = 0; i < ring.length; i++) {
+        const p1 = ring[i];
+        const p2 = ring[(i + 1) % ring.length];
+        if (!Array.isArray(p1) || !Array.isArray(p2)) return null;
+        area += ((p2[0] - p1[0]) * d2r) * (2 + Math.sin(p1[1] * d2r) + Math.sin(p2[1] * d2r));
+    }
+    return Math.abs(area * 6378137 * 6378137 / 2);
+}
+
+// Live "Area ≈ / Volume ≈" hint under the visible attribute group.
+function updateSourceEstimate(form) {
+    const out = form.querySelector('[data-attr-kind]:not([hidden]) .source-estimate');
+    if (!out) return;
+    const group = out.closest('[data-attr-kind]');
+    const length = sourceAttrNumber(group, 'length_m');
+    const width = sourceAttrNumber(group, 'width_m');
+    const depth = sourceAttrNumber(group, 'depth_m');
+    const footprint = group.querySelector('textarea[name$="polygon"]');
+    let area = footprint && footprint.value.trim() ? polygonRingAreaM2(footprint.value) : null;
+    if (area === null && length !== null && width !== null) area = length * width;
+    const parts = [];
+    const fmt = function(value) {
+        return Math.round(value).toLocaleString('en-US');
+    };
+    if (area !== null) parts.push('Area ≈ ' + fmt(area) + ' m²');
+    if (area !== null && depth !== null) parts.push('Volume ≈ ' + fmt(area * depth) + ' m³');
+    out.textContent = parts.length ? parts.join(' · ') + ' / مساحة وحجم تقديري' : '';
+}
+
+// Drawing a footprint on the map fills the basin polygon and its centre.
+function fillSourcePolygon(layer) {
+    const form = document.getElementById('addSourceModal');
+    if (!form) return;
+    const select = document.getElementById('addSourceType');
+    const ring = (layer.getLatLngs()[0] || []).map(function(point) {
+        return [Number(point.lng.toFixed(6)), Number(point.lat.toFixed(6))];
+    });
+    if (select) {
+        const option = Array.from(select.options).find(function(el) {
+            return el.value === 'basin' || el.value === 'reservoir';
+        });
+        if (option) select.value = option.value;
+        syncSourceAttributes(select);
+    }
+    const textarea = form.querySelector('textarea[name$="polygon"]');
+    if (textarea) textarea.value = JSON.stringify(ring);
+    const centre = layer.getBounds().getCenter();
+    const lat = document.getElementById('addSourceLat');
+    const lng = document.getElementById('addSourceLng');
+    if (lat) lat.value = centre.lat.toFixed(6);
+    if (lng) lng.value = centre.lng.toFixed(6);
+    updateSourceEstimate(form);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Keep the estimate in step with whatever is typed, and start every form
+    // on the group that matches its selected type.
+    document.querySelectorAll('[data-attr-kind]').forEach(function(group) {
+        const form = group.closest('form');
+        if (!form) return;
+        group.querySelectorAll('input, textarea').forEach(function(el) {
+            el.addEventListener('input', function() { updateSourceEstimate(form); });
+        });
+    });
+    document.querySelectorAll('select[onchange="syncSourceAttributes(this)"]').forEach(function(select) {
+        syncSourceAttributes(select);
+    });
+});
+
+function toggleAll(source) {
+    document.querySelectorAll('.source-checkbox').forEach(cb => {
+        cb.checked = source.checked;
+    });
+}
+
+function removeSelectedSources() {
+    const selected = document.querySelectorAll('.source-checkbox:checked');
+    if (!selected.length) {
+        alert('Select at least one source first / اختر مصدرا واحدا على الأقل أولا');
+        return;
+    }
+    const namesEn = Array.from(selected).map(cb => cb.dataset.nameEn).filter(Boolean);
+    const namesAr = Array.from(selected).map(cb => cb.dataset.nameAr).filter(Boolean);
+    const nameEn = namesEn.join(', ') || 'water source(s)';
+    const nameAr = namesAr.join('، ') || 'مصدر مياه';
+    const doSubmit = function () {
+        const form = document.getElementById('removeSourcesForm');
+        form.querySelectorAll('input[name="source_ids"]').forEach(el => el.remove());
+        selected.forEach(cb => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'source_ids';
+            input.value = cb.value;
+            form.appendChild(input);
+        });
+        form.requestSubmit();
+    };
+    if (window.confirmDelete) {
+        window.confirmDelete(nameEn, nameAr, doSubmit);
+    } else if (window.confirm('Delete ' + nameEn + ' ?')) {
+        doSubmit();
+    }
+}
+</script>
+{% endblock %}
