@@ -549,8 +549,9 @@ document.addEventListener('DOMContentLoaded', function() {
         drawTypes: ['polygon'],
         ruler: true,
         showArea: true,
-        // The funnel widget: land border (always first) + water sources.
-        mapFilters: ['water_source'],
+        // The funnel widget: land border (always first), then sectors and water
+        // sources, so either can be shown / hidden without reloading the map.
+        mapFilters: ['sector', 'water_source'],
         selectable: { type: 'sector', checkboxSelector: '.sector-checkbox' },
         mapActions: {
             idField: 'sector_ids',

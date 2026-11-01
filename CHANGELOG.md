@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.71 - 2026-11-01
+
+### Added
+- the funnel filter widget on Geometry > Sectors (page 4.0) now offers the S (Sectors / القطاعات) toggle alongside Water Source, hiding or showing every sector polygon and its labels without reloading the map
+
 ## 0.4.70 - 2026-11-01
 
 ### Changed
