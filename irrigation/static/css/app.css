@@ -1847,8 +1847,9 @@ body.map-fullscreen-lock {
 }
 
 .global-loading-gif {
-  width: 96px;
-  height: 96px;
+  /* Ring + "Working" label baked into the GIF: keep the portrait ratio. */
+  width: 110px;
+  height: auto;
   display: block;
 }
 

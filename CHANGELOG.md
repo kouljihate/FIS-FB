@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.73 - 2026-11-01
+
+### Changed
+- replaced the global loading spinner (static/img/loading.gif) with a free modern gradient-ring animation (source: Giphy, giphy.com/gifs/lF4qNLBtpkNxU5sXS6), with 'Working' text baked in using the pastel theme olive color; updated .global-loading-gif CSS to preserve the new ring+label aspect ratio
+
 ## 0.4.72 - 2026-11-01
 
 ### Fixed
