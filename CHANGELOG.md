@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.74 - 2026-11-01
+
+### Added
+- pagination to Geometry - Sectors (#4.0) and Geometry - Zones (#4.1) tables, following the Trees page convention - 50 rows per page by default with 25/50/100/All sizes, Showing X-Y of N info and Previous/Next controls; the bar stays hidden when the table fits on one page; on Zones the search box resets to page 1 and cooperates with paging, per-sector 'No zones' placeholders stand aside while paging or filtering, and select-all still works across all pages with the header checkbox tracking the selection
+
 ## 0.4.73 - 2026-11-01
 
 ### Changed

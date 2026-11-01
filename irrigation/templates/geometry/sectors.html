@@ -18,7 +18,7 @@
 <div class="card shadow-sm">
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover mb-0">
+            <table class="table table-hover mb-0" id="sectorsTable">
 <thead>
                     <tr>
                         <th colspan="9" class="text-center" style="width: 100%; min-width: 1200px;">
@@ -145,6 +145,26 @@
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+        <div class="px-3 pb-3">
+            <!-- Pagination Controls -->
+            <div class="d-flex justify-content-between align-items-center mt-3" id="sectorsPagination" style="display: none;">
+                <div>
+                    <span class="me-2 small" id="sectorPageInfo">Showing 0 of 0 sectors</span>
+                    <select class="form-select form-select-sm d-inline-block w-auto ms-2" id="sectorPageSize">
+                        <option value="25">25 per page</option>
+                        <option value="50" selected>50 per page</option>
+                        <option value="100">100 per page</option>
+                        <option value="0">All</option>
+                    </select>
+                </div>
+                <nav aria-label="Sector pagination">
+                    <ul class="pagination pagination-sm mb-0" id="sectorsPaginationControls">
+                        <li class="page-item disabled"><a class="page-link" href="#" id="sectorPagePrev">« Previous</a></li>
+                        <li class="page-item"><a class="page-link" href="#" id="sectorPageNext">Next »</a></li>
+                    </ul>
+                </nav>
+            </div>
         </div>
     </div>
 </div>
@@ -577,6 +597,15 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // Paginate the sector rows (same convention as the Trees page).
+    initSectorPagination();
+
+    document.addEventListener('change', function(event) {
+        if (event.target && event.target.matches && event.target.matches('.sector-checkbox')) {
+            syncSectorSelectAll();
+        }
+    });
+
     // Merge modal: collect selected sector IDs
     document.getElementById('mergeModal').addEventListener('show.bs.modal', function() {
         const selected = document.querySelectorAll('.sector-checkbox:checked');
@@ -624,11 +653,89 @@ function openSplitSelected() {
     bootstrap.Modal.getOrCreateInstance(document.getElementById('splitSelectedModal')).show();
 }
 
+// Sector table pagination state (same convention as the Trees page).
+const sectorPagination = {
+    page: 1,
+    pageSize: 50,
+    allRows: []
+};
+
+function initSectorPagination() {
+    const tbody = document.querySelector('#sectorsTable tbody');
+    if (!tbody) return;
+    sectorPagination.allRows = Array.from(tbody.querySelectorAll('tr'));
+    const sizeSelect = document.getElementById('sectorPageSize');
+    if (sizeSelect) {
+        sectorPagination.pageSize = parseInt(sizeSelect.value) || 50;
+        sizeSelect.addEventListener('change', function () {
+            sectorPagination.pageSize = parseInt(this.value) || 50;
+            sectorPagination.page = 1;
+            renderSectorPage();
+        });
+    }
+    renderSectorPage();
+}
+
+function renderSectorPage() {
+    const bar = document.getElementById('sectorsPagination');
+    const info = document.getElementById('sectorPageInfo');
+    const prev = document.getElementById('sectorPagePrev');
+    const next = document.getElementById('sectorPageNext');
+    const rows = sectorPagination.allRows;
+    if (!bar) return;
+
+    // Few rows or "All" selected: keep the table exactly as it is today.
+    if (!rows.length || !sectorPagination.pageSize || rows.length <= sectorPagination.pageSize) {
+        bar.style.display = 'none';
+        rows.forEach(row => { row.style.display = ''; });
+        return;
+    }
+
+    bar.style.display = 'flex';
+    const totalPages = Math.ceil(rows.length / sectorPagination.pageSize);
+    sectorPagination.page = Math.min(Math.max(1, sectorPagination.page), totalPages);
+    const startIdx = (sectorPagination.page - 1) * sectorPagination.pageSize;
+    const endIdx = startIdx + sectorPagination.pageSize;
+
+    rows.forEach((row, idx) => {
+        row.style.display = (idx >= startIdx && idx < endIdx) ? '' : 'none';
+    });
+
+    if (info) {
+        info.textContent = `Showing ${startIdx + 1}-${endIdx} of ${rows.length} sectors`;
+    }
+    if (prev) {
+        prev.parentElement.classList.toggle('disabled', sectorPagination.page === 1);
+        prev.onclick = (e) => {
+            e.preventDefault();
+            if (sectorPagination.page > 1) { sectorPagination.page--; renderSectorPage(); }
+        };
+    }
+    if (next) {
+        next.parentElement.classList.toggle('disabled', sectorPagination.page >= totalPages);
+        next.onclick = (e) => {
+            e.preventDefault();
+            if (sectorPagination.page < totalPages) { sectorPagination.page++; renderSectorPage(); }
+        };
+    }
+}
+
 function toggleAll(source) {
+    // Selects every sector on every page, matching the old behaviour;
+    // the header checkbox follows the rows as they are toggled.
     document.querySelectorAll('.sector-checkbox').forEach(cb => {
         cb.checked = source.checked;
         cb.dispatchEvent(new Event('change', { bubbles: true }));
     });
+}
+
+function syncSectorSelectAll() {
+    const boxes = document.querySelectorAll('.sector-checkbox');
+    const checked = document.querySelectorAll('.sector-checkbox:checked').length;
+    const selectAll = document.getElementById('selectAll');
+    if (!selectAll) return;
+    selectAll.checked = boxes.length > 0 && checked === boxes.length;
+    selectAll.indeterminate = checked > 0 && checked < boxes.length;
 }
 
 function removeSelectedSectors() {

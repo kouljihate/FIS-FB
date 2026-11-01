@@ -258,6 +258,26 @@
                 </tbody>
             </table>
         </div>
+        <div class="px-3 pb-3">
+            <!-- Pagination Controls -->
+            <div class="d-flex justify-content-between align-items-center mt-3" id="zonesPagination" style="display: none;">
+                <div>
+                    <span class="me-2 small" id="zonePageInfo">Showing 0 of 0 zones</span>
+                    <select class="form-select form-select-sm d-inline-block w-auto ms-2" id="zonePageSize">
+                        <option value="25">25 per page</option>
+                        <option value="50" selected>50 per page</option>
+                        <option value="100">100 per page</option>
+                        <option value="0">All</option>
+                    </select>
+                </div>
+                <nav aria-label="Zone pagination">
+                    <ul class="pagination pagination-sm mb-0" id="zonesPaginationControls">
+                        <li class="page-item disabled"><a class="page-link" href="#" id="zonePagePrev">« Previous</a></li>
+                        <li class="page-item"><a class="page-link" href="#" id="zonePageNext">Next »</a></li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -975,9 +995,13 @@ document.addEventListener('DOMContentLoaded', function() {
     document.addEventListener('change', function(event) {
         if (event.target && event.target.matches && event.target.matches('.zone-checkbox')) {
             updateZoneToolbar();
+            syncZoneSelectAll();
         }
     });
     updateZoneToolbar();
+
+    // Paginate the zone rows (same convention as the Trees page).
+    initZonePagination();
 });
 
 function updateZoneToolbar() {
@@ -1128,16 +1152,106 @@ function toggleAllZones(source) {
     });
 }
 
+// Zone table pagination state (same convention as the Trees page).
+const zonePagination = {
+    page: 1,
+    pageSize: 50,
+    query: '',
+    allRows: [],
+    filteredRows: []
+};
+
+function initZonePagination() {
+    const tbody = document.querySelector('.geometry-zones-table tbody');
+    if (!tbody) return;
+    // Real zone rows carry data-name; the other tbody rows are per-sector
+    // "no zones" placeholders that follow the same show/hide rules.
+    zonePagination.allRows = Array.from(tbody.querySelectorAll('tr[data-name]'));
+    zonePagination.filteredRows = zonePagination.allRows;
+    const sizeSelect = document.getElementById('zonePageSize');
+    if (sizeSelect) {
+        zonePagination.pageSize = parseInt(sizeSelect.value) || 50;
+        sizeSelect.addEventListener('change', function () {
+            zonePagination.pageSize = parseInt(this.value) || 50;
+            zonePagination.page = 1;
+            renderZonePage();
+        });
+    }
+    renderZonePage();
+}
+
+function renderZonePage() {
+    const bar = document.getElementById('zonesPagination');
+    const info = document.getElementById('zonePageInfo');
+    const prev = document.getElementById('zonePagePrev');
+    const next = document.getElementById('zonePageNext');
+    const tbody = document.querySelector('.geometry-zones-table tbody');
+    const placeholders = tbody
+        ? Array.from(tbody.querySelectorAll('tr')).filter(tr => !tr.hasAttribute('data-name'))
+        : [];
+    const filtered = zonePagination.filteredRows;
+    const total = zonePagination.allRows.length;
+    const pageSize = zonePagination.pageSize;
+
+    // Few rows or "All" selected: no bar, the search box alone decides
+    // visibility, and the per-sector placeholders behave as before.
+    const usePages = total > 0 && pageSize > 0 && total > pageSize;
+    if (bar) bar.style.display = usePages ? 'flex' : 'none';
+
+    let visible;
+    if (usePages) {
+        const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+        zonePagination.page = Math.min(Math.max(1, zonePagination.page), totalPages);
+        const startIdx = (zonePagination.page - 1) * pageSize;
+        visible = new Set(filtered.slice(startIdx, startIdx + pageSize));
+        if (info) {
+            const start = visible.size ? startIdx + 1 : 0;
+            const end = Math.min(startIdx + pageSize, filtered.length);
+            info.textContent = `Showing ${start}-${end} of ${filtered.length} zones (${total} total)`;
+        }
+        if (prev) {
+            prev.parentElement.classList.toggle('disabled', zonePagination.page === 1);
+            prev.onclick = (e) => {
+                e.preventDefault();
+                if (zonePagination.page > 1) { zonePagination.page--; renderZonePage(); }
+            };
+        }
+        if (next) {
+            next.parentElement.classList.toggle('disabled', zonePagination.page >= totalPages);
+            next.onclick = (e) => {
+                e.preventDefault();
+                if (zonePagination.page < totalPages) { zonePagination.page++; renderZonePage(); }
+            };
+        }
+    } else {
+        visible = new Set(filtered);
+    }
+
+    zonePagination.allRows.forEach(tr => {
+        tr.style.display = visible.has(tr) ? '' : 'none';
+    });
+    // Placeholder rows follow the search box, and stand aside while paging.
+    placeholders.forEach(tr => {
+        tr.style.display = (!zonePagination.query && !usePages) ? '' : 'none';
+    });
+}
+
 function filterZonesByName(query) {
     const q = (query || '').trim().toLowerCase();
-    document.querySelectorAll('.geometry-zones-table tbody tr').forEach(tr => {
-        const isZoneRow = !!tr.querySelector('.zone-checkbox');
-        if (!isZoneRow) {
-            tr.style.display = q ? 'none' : '';
-            return;
-        }
-        tr.style.display = (!q || (tr.dataset.name || '').includes(q)) ? '' : 'none';
-    });
+    zonePagination.query = q;
+    zonePagination.filteredRows = zonePagination.allRows.filter(tr =>
+        !q || (tr.dataset.name || '').includes(q));
+    zonePagination.page = 1;
+    renderZonePage();
+}
+
+function syncZoneSelectAll() {
+    const boxes = document.querySelectorAll('.zone-checkbox');
+    const checked = document.querySelectorAll('.zone-checkbox:checked').length;
+    const selectAll = document.getElementById('selectAllZones');
+    if (!selectAll) return;
+    selectAll.checked = boxes.length > 0 && checked === boxes.length;
+    selectAll.indeterminate = checked > 0 && checked < boxes.length;
 }
 </script>
 {% endblock %}
