@@ -11,7 +11,9 @@ name: fis
 
 x-app-environment: &app-environment
   # --- data ---
-  MONGO_URI: mongodb://mongo:27017/FIS
+  # Cloud database when MONGO_URI is set in .env (MongoDB Atlas), otherwise the
+  # bundled `mongo` service below.
+  MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017/FIS}
   RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-fis}:${RABBITMQ_DEFAULT_PASS:-fis}@rabbitmq:5672/%2F
   # --- session / security ---
   # A fixed key is mandatory with more than one worker: sessions signed by one

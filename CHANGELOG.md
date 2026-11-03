@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.78 - 2026-11-03
+
+### Changed
+- docker-compose passes MONGO_URI from .env to the web app and the event worker, so the stack uses the existing MongoDB Atlas cluster instead of the bundled mongo service
+- .env.example documents MONGO_URI (empty = bundled mongo service) and README explains the override and the port variables
+
 ## 0.4.77 - 2026-11-03
 
 ### Added
