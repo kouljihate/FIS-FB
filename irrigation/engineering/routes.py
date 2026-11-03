@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 from flask_login import login_required, current_user
 from irrigation.extensions import mongo
 from irrigation.engineering.hydraulics import ENGINEERING_DEFAULTS
+from irrigation.events import catalog, emit
 from irrigation.engineering.validation import (
     run_full_validation, get_last_validation, get_validation_history,
     apply_recommended_diameters
@@ -107,6 +108,12 @@ def run_validation(project_id):
     passes = result.get('summary', {}).get('passes', 0)
     warnings = result.get('summary', {}).get('warnings', 0)
     failures = result.get('summary', {}).get('failures', 0)
+    emit(catalog.VALIDATION_COMPLETED, {
+        'status': status,
+        'passes': passes,
+        'warnings': warnings,
+        'failures': failures,
+    }, project_id=project_id)
 
     if status == 'pass':
         flash(f'Validation passed: {passes} checks OK / اجتاز التحقق: {passes} فحوصات', 'success')

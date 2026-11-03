@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 from flask_login import login_required, current_user
 from irrigation.extensions import mongo
 from irrigation.models import get_next_id
+from irrigation.events import catalog, emit
 from irrigation.engineering.boundaries import adjust_pipes_to_boundaries
 from irrigation.engineering.piping import (
     generate_driplines, generate_piping_structure)
@@ -337,6 +338,12 @@ def piping_generate(project_id):
         return redirect(url_for(dest, project_id=project_id))
 
     c = report.get('counts', {})
+    emit(catalog.PIPING_GENERATED, {
+        'scope': scope,
+        'counts': c,
+        'replace': options['replace'],
+        'use_elevation': options['use_elevation'],
+    }, project_id=project_id)
     if scope == 'main':
         flash('Main pipe generated: %d main pipe(s) / تم إنشاء الأنبوب الرئيسي'
               % c.get('main_pipe', 0), 'success')

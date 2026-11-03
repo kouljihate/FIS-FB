@@ -1,0 +1,126 @@
+# FIS in Docker: web app + audit/event worker + MongoDB + RabbitMQ.
+#
+#   cp .env.example .env      # then edit SECRET_KEY (and SMTP/WhatsApp keys if used)
+#   docker compose up -d --build
+#   open http://localhost:8000           (app)
+#   open http://localhost:15672          (RabbitMQ management, user fis / fis)
+#
+# Only the web port and the RabbitMQ ports are published; MongoDB stays on the
+# private compose network.
+name: fis
+
+x-app-environment: &app-environment
+  # --- data ---
+  MONGO_URI: mongodb://mongo:27017/FIS
+  RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-fis}:${RABBITMQ_DEFAULT_PASS:-fis}@rabbitmq:5672/%2F
+  # --- session / security ---
+  # A fixed key is mandatory with more than one worker: sessions signed by one
+  # process would be rejected by the next.  Change the default in production.
+  SECRET_KEY: ${SECRET_KEY:-dev-insecure-change-me}
+  SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-0}
+  # --- domain events ---
+  EVENTS_ENABLED: ${EVENTS_ENABLED:-1}
+  EVENTS_EXCHANGE: ${EVENTS_EXCHANGE:-fis.events}
+  EVENTS_DEAD_EXCHANGE: ${EVENTS_DEAD_EXCHANGE:-fis.dead}
+  EVENTS_AUDIT_QUEUE: ${EVENTS_AUDIT_QUEUE:-fis.audit}
+  EVENTS_QUEUE_MAX: ${EVENTS_QUEUE_MAX:-2000}
+  # --- performance ---
+  MONGO_MAX_POOL_SIZE: ${MONGO_MAX_POOL_SIZE:-50}
+  MONGO_TIMEOUT_MS: ${MONGO_TIMEOUT_MS:-5000}
+  STATIC_CACHE_SECONDS: ${STATIC_CACHE_SECONDS:-3600}
+  WEB_CONCURRENCY: ${WEB_CONCURRENCY:-4}
+  GUNICORN_THREADS: ${GUNICORN_THREADS:-4}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  # --- optional integrations (empty: messages are logged instead of sent) ---
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_FROM: ${SMTP_FROM:-}
+  BLUETICKS_API_KEY: ${BLUETICKS_API_KEY:-}
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-fis}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-fis}
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+
+  web:
+    build: .
+    image: fis-web:local
+    restart: unless-stopped
+    environment:
+      <<: *app-environment
+      SERVICE_NAME: fis-web
+    depends_on:
+      mongo:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "${WEB_PORT:-8000}:8000"
+    volumes:
+      - uploads:/app/uploads
+      - app-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/readyz"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+
+  # First extracted service: it owns the audit log and is the template for the
+  # next consumers (notifications, reports).  Same image, different command.
+  worker:
+    build: .
+    image: fis-web:local
+    restart: unless-stopped
+    command: ["python", "-m", "irrigation.events.worker"]
+    environment:
+      <<: *app-environment
+      SERVICE_NAME: fis-audit-worker
+      EVENTS_ENABLED: "0"   # consumers do not publish domain events
+    depends_on:
+      mongo:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - app-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "python", "-m", "irrigation.events.worker", "--check"]
+      interval: 60s
+      timeout: 20s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  mongo-data:
+  rabbitmq-data:
+  uploads:
+  app-logs:

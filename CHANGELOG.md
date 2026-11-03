@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.77 - 2026-11-03
+
+### Added
+- Dockerfile, docker-compose.yml (web + audit worker + MongoDB + RabbitMQ), gunicorn config, .env.example, .dockerignore
+- RabbitMQ domain events (topic exchange fis.events, publisher confirms, bounded queue, dead-letter), audit consumer service and wsgi entry point
+- /healthz, /readyz probes and admin-only /ops/events feed; MICROSERVICES.md with the service map, event catalogue, extraction phases and performance review
+
+### Changed
+- project, sector, zone, piping and validation write paths publish domain events after the request commits
+- gunicorn 4x4 instead of the Flask dev server, Mongo pool size and 5s selection timeout, static asset caching and hardened session cookies
+
 ## 0.4.76 - 2026-11-03
 
 ### Changed

@@ -1,0 +1,30 @@
+# Build context for the FIS image: only what the app needs at runtime.
+.git
+.gitignore
+.freebuff
+.cloud-attachments
+/venv
+/.venv
+/env
+__pycache__
+**/__pycache__
+*.pyc
+*.pyo
+*.log
+/logs
+/uploads
+/maps
+/PDFs
+/screenshots
+/report
+/tests
+/patchs
+/zip
+/FIS - 0.*
+.env
+.env.*
+!.env.example
+.pytest_cache
+*.md
+!README.md
+release.py

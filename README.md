@@ -1,6 +1,6 @@
 # FIS (Farming Irrigation System)
 
-Version: **0.4.76**
+Version: **0.4.77**
 
 FIS is a Flask irrigation-planning application for organizing farm projects, field geometry, irrigation networks, trees, and engineering validation.
 
@@ -81,6 +81,19 @@ WHATSAPP_DEFAULT_COUNTRY_CODE=216
 ```
 
 Phone numbers can be written with a country prefix (`+216 ...`, `00216 ...`) or locally (`12345678`); the local form gets `WHATSAPP_DEFAULT_COUNTRY_CODE`. The Project Admin's number comes from that user's profile, the Owner's from the project settings. Without `BLUETICKS_API_KEY` the message is written to `logs/irrigation.log` instead of being sent, so the flow still works locally.
+
+## Docker deployment
+
+The application also ships as a container image that runs as two processes - the web app under gunicorn and an event consumer - next to MongoDB and RabbitMQ:
+
+```powershell
+copy .env.example .env      # set SECRET_KEY (required with more than one worker)
+docker compose up -d --build
+```
+
+The app is then on <http://localhost:8000>, the RabbitMQ management UI on <http://localhost:15672>. Operational probes: `/healthz` (liveness) and `/readyz` (MongoDB, plus the broker state). Every write path publishes a domain event to the `fis.events` topic exchange; the `worker` service consumes them into the append-only `event_log` collection, readable by an admin at `/ops/events`.
+
+See [MICROSERVICES.md](MICROSERVICES.md) for the service map, the event catalogue, the extraction phases and the performance review behind this setup. Running without Docker is unchanged (`python app.py`); without a broker the app simply publishes nothing.
 
 ## Database
 

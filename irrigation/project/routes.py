@@ -9,6 +9,7 @@ from irrigation.access import (ROLE_PROJECT_ADMIN, ROLE_PROJECT_OWNER,
                                require_project)
 from irrigation.extensions import mongo
 from irrigation.models import get_next_id, serialize_doc
+from irrigation.events import catalog, emit
 from irrigation.utils.kml import parse_kml_content, parse_kmz_file, export_project_to_kml
 from irrigation.utils.kml_elevation import KML_SUFFIXES, KmlElevation
 from irrigation.utils.whatsapp import send_whatsapp, whatsapp_configured
@@ -593,6 +594,15 @@ def create():
         result = mongo.db.projects.insert_one(project_doc)
         project_id = project_doc['id']
 
+        emit(catalog.PROJECT_CREATED, {
+            'name': name,
+            'location': location,
+            'status': project_doc['status'],
+            'admin_user_id': project_doc['admin_user_id'],
+            'owner_user_id': project_doc['owner_user_id'],
+            'sector_count': 0,
+        }, project_id=project_id)
+
         flash('Project created successfully / تم إنشاء المشروع بنجاح', 'success')
         return redirect(url_for('project.detail', project_id=project_id))
 
@@ -712,6 +722,12 @@ def settings(project_id):
         {'id': project_id},
         {'$set': update_fields}
     )
+    emit(catalog.PROJECT_UPDATED, {
+        'fields': sorted(k for k in update_fields
+                         if k not in ('spec', 'land', 'water')),
+        'water_sources': len(update_fields.get('water') or []),
+        'spec_keys': sorted((update_fields.get('spec') or {}).keys()),
+    }, project_id=project_id)
     flash('Project settings saved / تم حفظ إعدادات المشروع', 'success')
     return redirect(url_for('project.detail', project_id=project_id))
 
@@ -1155,6 +1171,10 @@ def delete(project_id):
     if not project:
         flash('Project not found / المشروع غير موجود', 'danger')
         return redirect(url_for('project.index'))
+    emit(catalog.PROJECT_DELETED, {
+        'name': project.get('name'),
+        'sector_count': len(project.get('sectors') or []),
+    }, project_id=project_id)
     mongo.db.projects.delete_one({'id': project_id})
     try:
         mongo.db.discard(project_id)

@@ -5,7 +5,7 @@ from pymongo import MongoClient
 from irrigation.extensions import mongo, login_manager
 from irrigation.utils.logger import setup_logging
 
-__version__ = '0.4.76'
+__version__ = '0.4.77'
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -99,9 +99,23 @@ def create_app():
 
     os.makedirs(app.config.get('UPLOAD_FOLDER', 'uploads'), exist_ok=True)
 
-    # Extensions
-    mongo.init_app(app)
+    # Extensions: one pool per worker process, with a short selection timeout
+    # so an unreachable database fails fast instead of hanging the request.
+    mongo.init_app(app,
+                   maxPoolSize=app.config.get('MONGO_MAX_POOL_SIZE', 50),
+                   serverSelectionTimeoutMS=app.config.get('MONGO_TIMEOUT_MS', 5000))
     login_manager.init_app(app)
+
+    # Domain events are published *after* the request's write is committed:
+    # this teardown handler is registered before install_storage() below,
+    # and Flask unwinds teardown handlers in reverse registration order, so
+    # the embedded-project flush runs first.
+    from irrigation.events import flush as flush_domain_events
+    from irrigation.events import shutdown as shutdown_domain_events
+
+    @app.teardown_appcontext
+    def _publish_domain_events(_exc):
+        flush_domain_events()
 
     # The new model stores everything in two collections (user / project).
     # Wrap mongo.db so existing collection-style queries keep working.
@@ -117,6 +131,14 @@ def create_app():
     # Logging
     setup_logging(app)
     app.logger.info("Irrigation Planner starting up...")
+
+    # Event bus (RabbitMQ).  The publisher connects lazily from its own
+    # thread, so an absent broker never delays startup.
+    import atexit
+
+    from irrigation.events import init_events
+    init_events(app)
+    atexit.register(shutdown_domain_events)
 
     # User loader for Flask-Login
     from irrigation.models import serialize_doc
@@ -142,6 +164,7 @@ def create_app():
     from irrigation.estimation.routes import estimation_bp
     from irrigation.water.routes import water_bp
     from irrigation.report.routes import report_bp
+    from irrigation.ops.routes import ops_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(project_bp)
@@ -155,6 +178,19 @@ def create_app():
     app.register_blueprint(estimation_bp, url_prefix='/estimation')
     app.register_blueprint(water_bp, url_prefix='/water')
     app.register_blueprint(report_bp, url_prefix='/report')
+    # /healthz, /readyz and /ops/events: no prefix, no login, no project data.
+    app.register_blueprint(ops_bp)
+
+    @app.after_request
+    def _cache_static_assets(response):
+        # Static files are versioned by the URL the templates build, so a
+        # container deployment can cache them aggressively instead of
+        # revalidating every CSS/JS/image on each page.
+        if response.status_code == 200 and request.path.startswith('/static/'):
+            response.headers.setdefault(
+                'Cache-Control', 'public, max-age=%d' %
+                int(app.config.get('STATIC_CACHE_SECONDS') or 3600))
+        return response
 
     # A Project Owner reads their project through Map Overview, Estimation and
     # Report only: the tabs that build it refuse a typed URL too.  Registered

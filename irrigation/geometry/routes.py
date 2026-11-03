@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 from flask_login import login_required, current_user
 from irrigation.extensions import mongo
 from irrigation.models import get_next_id, serialize_doc, assign_short_names
+from irrigation.events import catalog, emit
 from irrigation.engineering.regeneration import regenerate_sectors, regenerate_zones
 from irrigation.engineering.projection import projected_shape, get_project_centroid
 from irrigation.engineering.elevation import (
@@ -440,6 +441,11 @@ def sector_add(project_id):
         'validated': False
     }
     mongo.db.sectors.insert_one(sector)
+    emit(catalog.SECTOR_CREATED, {
+        'sector_id': sector['id'],
+        'name_en': sector['name_en'],
+        'orientation': sector['orientation'],
+    }, project_id=project_id)
     flash('Sector added / تم إضافة القطاع', 'success')
     return redirect(url_for('geometry.sectors_view', project_id=project_id))
 
@@ -614,6 +620,11 @@ def sector_remove(project_id):
         mongo.db.network_elements.delete_many({'project_id': project_id, 'zone_id': {'$in': zone_ids}})
 
     removed = mongo.db.sectors.delete_many({'id': {'$in': ids}, 'project_id': project_id}).deleted_count
+    emit(catalog.SECTORS_REMOVED, {
+        'sector_ids': ids,
+        'zone_ids': zone_ids,
+        'removed': removed,
+    }, project_id=project_id)
     flash(f'Removed {removed} sector(s) / تمت إزالة {removed} قطاع', 'success')
     return redirect(url_for('geometry.sectors_view', project_id=project_id))
 
@@ -978,6 +989,11 @@ def zone_add(project_id):
         'validated': False
     }
     mongo.db.zones.insert_one(zone)
+    emit(catalog.ZONE_CREATED, {
+        'zone_id': zone['id'],
+        'sector_id': sector_id,
+        'name_en': zone['name_en'],
+    }, project_id=project_id)
     flash('Zone added / تمت إضافة المنطقة', 'success')
     return redirect(url_for('geometry.zones_view', project_id=project_id))
 

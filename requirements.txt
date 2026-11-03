@@ -9,3 +9,5 @@ shapely
 python-dotenv
 pyproj
 numpy
+gunicorn>=21.2
+pika>=1.3
