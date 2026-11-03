@@ -684,23 +684,26 @@ function renderSectorPage() {
     const rows = sectorPagination.allRows;
     if (!bar) return;
 
-    // Few rows or "All" selected: keep the table exactly as it is today.
-    if (!rows.length || !sectorPagination.pageSize || rows.length <= sectorPagination.pageSize) {
-        bar.style.display = 'none';
-        rows.forEach(row => { row.style.display = ''; });
+    // Empty table: nothing to page.
+    if (!rows.length) {
+        bar.style.setProperty('display', 'none', 'important');
         return;
     }
 
-    bar.style.display = 'flex';
-    const totalPages = Math.ceil(rows.length / sectorPagination.pageSize);
+    // The bar always reflects the table: it pages when there are more rows
+    // than the page size, and simply reports "Showing X-Y of N" (one page,
+    // Prev/Next disabled) when everything fits or "All" is chosen.
+    const pageSize = sectorPagination.pageSize || rows.length;
+    const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
     sectorPagination.page = Math.min(Math.max(1, sectorPagination.page), totalPages);
-    const startIdx = (sectorPagination.page - 1) * sectorPagination.pageSize;
-    const endIdx = startIdx + sectorPagination.pageSize;
+    const startIdx = (sectorPagination.page - 1) * pageSize;
+    const endIdx = Math.min(startIdx + pageSize, rows.length);
 
     rows.forEach((row, idx) => {
         row.style.display = (idx >= startIdx && idx < endIdx) ? '' : 'none';
     });
 
+    bar.style.setProperty('display', 'flex', 'important');
     if (info) {
         info.textContent = `Showing ${startIdx + 1}-${endIdx} of ${rows.length} sectors`;
     }

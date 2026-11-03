@@ -1193,38 +1193,40 @@ function renderZonePage() {
     const total = zonePagination.allRows.length;
     const pageSize = zonePagination.pageSize;
 
-    // Few rows or "All" selected: no bar, the search box alone decides
-    // visibility, and the per-sector placeholders behave as before.
+    // The bar always reflects the table: it pages when there are more rows
+    // than the page size, and reports "Showing X-Y of N" (one page,
+    // Prev/Next disabled) when everything fits or "All" is chosen. The
+    // per-sector placeholders keep standing aside while paging or filtering.
     const usePages = total > 0 && pageSize > 0 && total > pageSize;
-    if (bar) bar.style.display = usePages ? 'flex' : 'none';
+    if (bar) {
+        bar.style.setProperty('display', total > 0 ? 'flex' : 'none', 'important');
+    }
 
-    let visible;
-    if (usePages) {
-        const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-        zonePagination.page = Math.min(Math.max(1, zonePagination.page), totalPages);
-        const startIdx = (zonePagination.page - 1) * pageSize;
-        visible = new Set(filtered.slice(startIdx, startIdx + pageSize));
-        if (info) {
-            const start = visible.size ? startIdx + 1 : 0;
-            const end = Math.min(startIdx + pageSize, filtered.length);
-            info.textContent = `Showing ${start}-${end} of ${filtered.length} zones (${total} total)`;
-        }
-        if (prev) {
-            prev.parentElement.classList.toggle('disabled', zonePagination.page === 1);
-            prev.onclick = (e) => {
-                e.preventDefault();
-                if (zonePagination.page > 1) { zonePagination.page--; renderZonePage(); }
-            };
-        }
-        if (next) {
-            next.parentElement.classList.toggle('disabled', zonePagination.page >= totalPages);
-            next.onclick = (e) => {
-                e.preventDefault();
-                if (zonePagination.page < totalPages) { zonePagination.page++; renderZonePage(); }
-            };
-        }
-    } else {
-        visible = new Set(filtered);
+    const activeSize = pageSize || total || 1;
+    const totalPages = Math.max(1, Math.ceil(filtered.length / activeSize));
+    zonePagination.page = Math.min(Math.max(1, zonePagination.page), totalPages);
+    const startIdx = (zonePagination.page - 1) * activeSize;
+    const visible = new Set(usePages ? filtered.slice(startIdx, startIdx + activeSize)
+                                     : filtered);
+    if (info && total > 0) {
+        const start = visible.size ? startIdx + 1 : 0;
+        const end = usePages ? Math.min(startIdx + activeSize, filtered.length)
+                             : filtered.length;
+        info.textContent = `Showing ${start}-${end} of ${filtered.length} zones (${total} total)`;
+    }
+    if (prev) {
+        prev.parentElement.classList.toggle('disabled', zonePagination.page === 1);
+        prev.onclick = (e) => {
+            e.preventDefault();
+            if (zonePagination.page > 1) { zonePagination.page--; renderZonePage(); }
+        };
+    }
+    if (next) {
+        next.parentElement.classList.toggle('disabled', zonePagination.page >= totalPages);
+        next.onclick = (e) => {
+            e.preventDefault();
+            if (zonePagination.page < totalPages) { zonePagination.page++; renderZonePage(); }
+        };
     }
 
     zonePagination.allRows.forEach(tr => {

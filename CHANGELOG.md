@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.76 - 2026-11-03
+
+### Changed
+- the pagination bar always reports Showing X-Y of N and disables Prev/Next when everything fits on one page; it hides only when the table is empty
+
+### Fixed
+- Sectors (#4.0) and Zones (#4.1) pagination bars now render and work on small tables (8 sectors / 24 zones); they used to hide below the 50-row page size, which looked like pagination was never applied
+
 ## 0.4.75 - 2026-11-01
 
 ### Fixed
