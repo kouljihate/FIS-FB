@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.79 - 2026-11-12
+
+### Changed
+- docker-compose.yml no longer defines mongo, web/worker depend only on RabbitMQ, so Docker Desktop's Start no longer fails with 'could not find mongo'
+- MONGO_URI is now required from .env (compose reports a clear message when it is missing); .env.example and README updated
+
 ## 0.4.78 - 2026-11-03
 
 ### Changed

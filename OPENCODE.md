@@ -4,8 +4,8 @@
 Irrigation Planning System - A Flask-based web application for irrigation planning and management.
 
 ## Current Version
-- **Version**: 0.4.78
-- **Last Updated**: 2026-11-03
+- **Version**: 0.4.79
+- **Last Updated**: 2026-11-12
 
 ## Architecture Overview
 
@@ -180,7 +180,7 @@ Key API endpoints for rebuild:
 
 ### Version Control
 - Git branches: `project-settings-v1`
-- Version: 0.4.78
+- Version: 0.4.79
 - Changelog: CHANGELOG.md
 - **ALWAYS bump the version on every change (never forget).** Increment `__version__` in
   `irrigation/__init__.py` (patch `+1`, e.g. `0.3.44` -> `0.3.45`), add a dated `## <version> - YYYY-MM-DD`

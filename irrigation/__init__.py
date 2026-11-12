@@ -5,7 +5,7 @@ from pymongo import MongoClient
 from irrigation.extensions import mongo, login_manager
 from irrigation.utils.logger import setup_logging
 
-__version__ = '0.4.78'
+__version__ = '0.4.79'
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
