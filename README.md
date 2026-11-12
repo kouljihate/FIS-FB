@@ -1,6 +1,6 @@
 # FIS (Farming Irrigation System)
 
-Version: **0.4.79**
+Version: **0.4.80**
 
 FIS is a Flask irrigation-planning application for organizing farm projects, field geometry, irrigation networks, trees, and engineering validation.
 
@@ -84,7 +84,7 @@ Phone numbers can be written with a country prefix (`+216 ...`, `00216 ...`) or 
 
 ## Docker deployment
 
-The application also ships as a container image that runs as two processes - the web app under gunicorn and an event consumer - next to RabbitMQ, against the MongoDB Atlas cluster named by `MONGO_URI`:
+The application also ships as a container image that runs as two processes - the web app under gunicorn and an event consumer - next to MongoDB and RabbitMQ:
 
 ```powershell
 copy .env.example .env      # set SECRET_KEY (required with more than one worker)
@@ -93,7 +93,7 @@ docker compose up -d --build
 
 The app is then on <http://localhost:8000>, the RabbitMQ management UI on <http://localhost:15672>. Operational probes: `/healthz` (liveness) and `/readyz` (MongoDB, plus the broker state). Every write path publishes a domain event to the `fis.events` topic exchange; the `worker` service consumes them into the append-only `event_log` collection, readable by an admin at `/ops/events`.
 
-`MONGO_URI` is required: it is read from `.env` by both `web` and `worker`, and `docker compose` refuses to start with a message pointing at `.env.example` when it is missing. `WEB_PORT`, `RABBITMQ_PORT` and `RABBITMQ_MANAGEMENT_PORT` move the published ports when the defaults are taken.
+MongoDB runs in its own `mongo` container and keeps its data in the `mongo-data` volume; `web` and `worker` wait for it to be healthy before starting. Set `MONGO_URI` in `.env` to use an external cluster (e.g. `mongodb+srv://...`) instead - both processes then use that and the container stays idle. `WEB_PORT`, `RABBITMQ_PORT` and `RABBITMQ_MANAGEMENT_PORT` move the published ports when the defaults are taken.
 
 See [MICROSERVICES.md](MICROSERVICES.md) for the service map, the event catalogue, the extraction phases and the performance review behind this setup. Running without Docker is unchanged (`python app.py`); without a broker the app simply publishes nothing.
 

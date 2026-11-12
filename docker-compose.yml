@@ -1,18 +1,20 @@
-# FIS in Docker: web app + audit/event worker + RabbitMQ, on the cloud MongoDB.
+# FIS in Docker: web app + audit/event worker + MongoDB + RabbitMQ.
 #
-#   cp .env.example .env      # set MONGO_URI, SECRET_KEY (and SMTP/WhatsApp keys if used)
+#   cp .env.example .env      # then edit SECRET_KEY (and SMTP/WhatsApp keys if used)
 #   docker compose up -d --build
 #   open http://localhost:8000           (app)
 #   open http://localhost:15673          (RabbitMQ management, user fis / fis)
 #
-# The database is the MongoDB Atlas cluster named by MONGO_URI; only the web port
-# and the RabbitMQ ports are published.
+# MongoDB runs in its own container with its data in the mongo-data volume; set
+# MONGO_URI in .env to point at an external/cloud cluster instead.  Only the web
+# port and the RabbitMQ ports are published.
 name: fis
 
 x-app-environment: &app-environment
   # --- data ---
-  # Cloud database (MongoDB Atlas).  Required: there is no bundled Mongo service.
-  MONGO_URI: ${MONGO_URI:?set MONGO_URI in .env - see .env.example}
+  # The `mongo` container below, unless MONGO_URI is set in .env (e.g. a cloud
+  # MongoDB Atlas cluster).
+  MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017/FIS}
   RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-fis}:${RABBITMQ_DEFAULT_PASS:-fis}@rabbitmq:5672/%2F
   # --- session / security ---
   # A fixed key is mandatory with more than one worker: sessions signed by one
@@ -41,6 +43,18 @@ x-app-environment: &app-environment
   BLUETICKS_API_KEY: ${BLUETICKS_API_KEY:-}
 
 services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
   rabbitmq:
     image: rabbitmq:3.13-management
     restart: unless-stopped
@@ -67,6 +81,8 @@ services:
       <<: *app-environment
       SERVICE_NAME: fis-web
     depends_on:
+      mongo:
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
     ports:
@@ -93,6 +109,8 @@ services:
       SERVICE_NAME: fis-audit-worker
       EVENTS_ENABLED: "0"   # consumers do not publish domain events
     depends_on:
+      mongo:
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
     volumes:
@@ -105,6 +123,7 @@ services:
       start_period: 30s
 
 volumes:
+  mongo-data:
   rabbitmq-data:
   uploads:
   app-logs:

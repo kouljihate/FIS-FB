@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.80 - 2026-11-12
+
+### Changed
+- docker-compose.yml restores the mongo service (mongo:7 with healthcheck and the mongo-data volume) and web/worker wait for it; MONGO_URI still overrides it when set in .env
+- README and .env.example describe the container default; the current cloud data (project, users, ui_registry) was migrated into the container volume
+
 ## 0.4.79 - 2026-11-12
 
 ### Changed
